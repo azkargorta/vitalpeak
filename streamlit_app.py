@@ -364,25 +364,26 @@ elif page == "🩺 Salud (Peso)":
 
         if df_plot.empty:
             st.info("No hay datos en el rango seleccionado.")
-        else:
-            fig = plt.figure()
-            plt.plot(df_plot["date"], df_plot["weight"], marker="o")
-            plt.xlabel("Fecha")
-            plt.ylabel("Peso (kg)")
-            plt.title("Evolución de peso")
-            ax = plt.gca()
-plt.xticks(rotation=90)  # Rotar fechas verticalmente
+        # --- Gráfica de peso (bloque limpio, sin TABs) ---
+        if not df_plot.empty:
+            fig, ax = plt.subplots()
+            ax.plot(df_plot["date"], df_plot["weight"], marker="o")
+            ax.set_xlabel("Fecha")
+            ax.set_ylabel("Peso (kg)")
+            ax.set_title("Evolución de peso")
+
+            # Fechas en vertical para que no se solapen
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%m"))
             for label in ax.get_xticklabels():
                 label.set_rotation(90)
                 label.set_fontsize(8)
-              # rota y evita solapamientos
-            plt.tight_layout()
-            st.pyplot(fig, clear_figure=True)
-    else:
-        st.info("Añade registros para ver el gráfico.")
 
+            fig.tight_layout()
+            st.pyplot(fig, clear_figure=True)
+        else:
+            st.info("No hay datos de peso para mostrar.")
+        
 elif page == "📘 Rutinas":
     require_auth()
     st.title("Planificador de rutinas")
