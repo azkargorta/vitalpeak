@@ -845,11 +845,10 @@ elif page == "📘 Rutinas":
             for r in program:
                 st.markdown(f"**{r['name']}**"); st.table(pd.DataFrame(r["items"]))
 
-            st.markdown("**Dime cosas como:**  
+            st.markdown("""**Dime cosas como:**  
 • *no quiero sentadilla* → alternativa  
 • *sustituye jalón por dominadas*  
-• *más piernas* / *menos pecho*")
-
+• *más piernas* / *menos pecho*""")
             def _apply_feedback(text: str, program: list[dict]):
                 t = text.strip().lower()
                 changed = False
