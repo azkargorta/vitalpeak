@@ -970,8 +970,12 @@ elif page == "📘 Rutinas":
                     msg_scope = f" en **{scope}**" if scope else ""
                     return True, f"Ajustadas **{count_mod}** entradas ({field_key}={val}) para **{ex_kw}**{msg_scope}."
 
-                return False, "No entendí el ajuste. Prueba con *'no quiero sentadilla'*, *'sustituye jalón por dominadas'*, *'más piernas'*, o *'sube a 4 series en pecho'* (puedes añadir *'solo en Lower A'*).
-
+                return False, (
+                    "No entendí el ajuste. Prueba con *'no quiero sentadilla'*, "
+                    "*'sustituye jalón por dominadas'*, *'más piernas'*, "
+                    "o *'sube a 4 series en pecho'* (puedes añadir *'solo en Lower A'*)."
+                )
+                
             fb = st.chat_input("Dime qué quieres cambiar…")
             if fb:
                 changed,msg = _apply_feedback(fb, program)
