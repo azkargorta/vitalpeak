@@ -4,6 +4,19 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+# Query params (Streamlit >= 1.30)
+params = st.query_params
+_u = params.get("user")
+_t = params.get("reset_token")
+if _u and _t:
+    if isinstance(_u, list): _u = _u[0]
+    if isinstance(_t, list): _t = _t[0]
+    st.session_state["_pending_user"] = _u
+    st.session_state["_pending_token"] = _t
+import os, time, time
+
+from app.email_utils import send_email
+from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset
 
 from app.datastore import (
     ensure_base_dirs, register_user, authenticate, load_user, save_user,
@@ -50,33 +63,111 @@ with st.sidebar:
             "📈 Tabla de entrenamientos",
             "🩺 Salud (Peso)",
             "📘 Rutinas",
+            "👤 Perfil",
         ],
         index=0 if "user" not in st.session_state else 1,
     )
 
 if page == "🔐 Login / Registro":
     st.title("Acceso")
+
     col1, col2 = st.columns(2)
+
     with col1:
         st.subheader("Iniciar sesión")
-        u = st.text_input("Usuario", key="login_user")
-        p = st.text_input("Contraseña", type="password", key="login_pass")
-        if st.button("Entrar"):
-            if authenticate(u, p):
-                st.session_state["user"] = u
-                st.success("¡Bienvenido!")
-                st.rerun()
+        u = st.text_input("Usuario")
+        p = st.text_input("Contraseña", type="password")
+
+        # Reseteo por token desde URL (?user=&reset_token=)
+        if st.session_state.get("_pending_user") and st.session_state.get("_pending_token"):
+            u_tok = st.session_state.pop("_pending_user")
+            tk = st.session_state.pop("_pending_token")
+            data_tok = get_password_reset(u_tok)
+            if data_tok and data_tok.get("token") == tk and data_tok.get("expires_at", 0) >= int(time.time()):
+                st.success(f"Token válido para **{u_tok}**. Establece nueva contraseña:")
+                with st.form("reset_from_link"):
+                    p1 = st.text_input("Nueva contraseña", type="password")
+                    p2 = st.text_input("Repite la nueva contraseña", type="password")
+                    done = st.form_submit_button("Guardar")
+                if done:
+                    if p1 and p1 == p2:
+                        set_password(u_tok, p1)
+                        clear_password_reset(u_tok)
+                        st.success("Contraseña actualizada. Ya puedes iniciar sesión.")
+                    else:
+                        st.error("Las contraseñas no coinciden.")
             else:
-                st.error("Usuario/contraseña incorrectos.")
-    with col2:
-        st.subheader("Crear cuenta")
-        u2 = st.text_input("Nuevo usuario", key="reg_user")
-        p2 = st.text_input("Nueva contraseña", type="password", key="reg_pass")
-        if st.button("Registrarme"):
-            if not u2 or not p2:
+                st.error("El enlace/código de recuperación no es válido o ha caducado.")
+
+        with st.expander("Olvidé mi contraseña"):
+            rec_id = st.text_input("Tu usuario o email de recuperación", key="forgot_id")
+            if st.button("Enviar enlace de recuperación", key="forgot_btn"):
+                target_user = None
+                if rec_id:
+                    try:
+                        _ = load_user(rec_id)  # como usuario
+                        target_user = rec_id
+                    except Exception:
+                        pass
+                if not target_user:
+                    import glob, json
+                    from pathlib import Path as _P
+                    for pth in glob.glob(str((_P(".")/"usuarios_data"/"*.json").resolve())):
+                        try:
+                            d = json.load(open(pth, "r", encoding="utf-8"))
+                            if d.get("recovery_email") == rec_id or d.get("email") == rec_id:
+                                target_user = _P(pth).stem
+                                break
+                        except Exception:
+                            pass
+                if not target_user:
+                    st.info("Si existe, te llegará un correo con instrucciones.")
+                else:
+                    token = __import__("secrets").token_urlsafe(24)
+                    create_password_reset(target_user, token, ttl_seconds=3600)
+                    base_url = os.getenv("APP_BASE_URL", "")
+                    link = f"{base_url}?user={target_user}&reset_token={token}" if base_url else f"(Configura APP_BASE_URL) token: {token}"
+                    acc, rec = get_emails_for_user(target_user)
+                    to_email = rec or acc
+                    ok, msg = send_email(to_email, "Recuperación de contraseña",
+                        f"<p>Hola {target_user},</p><p>Enlace para restablecer (1h): <a href='{link}'>{link}</a></p><p>Código: <b>{token}</b></p>",
+                        text=f"Enlace: {link}\nCódigo: {token}")
+                    if ok:
+                        st.info("Si existe, te llegará un correo con instrucciones.")
+                    else:
+                        st.warning("No se pudo enviar email. Usa este código en la app: " + token)
+
+        if st.button("Iniciar sesión"):
+            if not u or not p:
                 st.warning("Completa usuario y contraseña.")
             else:
-                created = register_user(u2, p2)
+                if authenticate(u, p):
+                    st.session_state["user"] = u
+                    st.success("Sesión iniciada.")
+                    st.rerun()
+                else:
+                    st.error("Usuario o contraseña incorrectos.")
+
+    with col2:
+        st.subheader("Crear cuenta")
+        with st.form("register_form"):
+            u2 = st.text_input("Nuevo usuario", key="reg_user")
+            e2 = st.text_input("Email", key="reg_email")
+            p2 = st.text_input("Nueva contraseña", type="password", key="reg_pass")
+            submit_reg = st.form_submit_button("Registrarme")
+        if submit_reg:
+            if not u2 or not e2 or not p2:
+                st.warning("Completa usuario, email y contraseña.")
+            else:
+                created = False
+                try:
+                    created = register_user(u2, p2, e2)
+                except TypeError:
+                    created = register_user(u2, p2)
+                    data = load_user(u2)
+                    data["email"] = e2
+                    data["recovery_email"] = e2
+                    save_user(u2, data)
                 if created:
                     st.success("Usuario creado. Ahora inicia sesión.")
                 else:
@@ -1088,3 +1179,51 @@ elif page == "📘 Rutinas":
                     r = next(rr for rr in routines if rr["name"] == sel)
                     pdf_bytes = _build_pdf(f"Rutina — {sel}", r.get("items", []))
                     st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{sel}.pdf", mime="application/pdf", use_container_width=True)
+
+
+
+elif page == "👤 Perfil":
+    require_auth()
+    st.title("👤 Mi perfil")
+    user = st.session_state["user"]
+    data = load_user(user)
+    profile = data.get("profile", {})
+    with st.form("perfil_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            first_name = st.text_input("Nombre", value=profile.get("first_name",""))
+            birthdate = st.text_input("Fecha de nacimiento (YYYY-MM-DD)", value=profile.get("birthdate",""))
+        with c2:
+            last_name = st.text_input("Apellidos", value=profile.get("last_name",""))
+            gender = st.selectbox("Género", ["", "Masculino", "Femenino", "No binario", "Prefiero no decir"], index=0 if profile.get("gender","") not in ["","Masculino","Femenino","No binario","Prefiero no decir"] else ["","Masculino","Femenino","No binario","Prefiero no decir"].index(profile.get("gender","")))
+        notes = st.text_area("Notas", value=profile.get("notes",""))
+        save_btn = st.form_submit_button("Guardar perfil")
+    if save_btn:
+        set_profile(user, {"first_name": first_name, "last_name": last_name, "birthdate": birthdate, "gender": gender, "notes": notes})
+        st.success("Perfil actualizado.")
+
+    st.subheader("Cambiar contraseña")
+    with st.form("pass_form"):
+        cur = st.text_input("Contraseña actual", type="password")
+        p1  = st.text_input("Nueva contraseña", type="password")
+        p2  = st.text_input("Repite nueva contraseña", type="password")
+        sbt = st.form_submit_button("Actualizar contraseña")
+    if sbt:
+        if not authenticate(user, cur):
+            st.error("La contraseña actual no es correcta.")
+        elif not p1 or p1 != p2:
+            st.error("Las nuevas contraseñas no coinciden.")
+        else:
+            set_password(user, p1)
+            st.success("Contraseña actualizada.")
+
+    st.subheader("Emails")
+    acc, rec = get_emails_for_user(user)
+    with st.form("email_form"):
+        new_acc = st.text_input("Email de cuenta", value=acc or "")
+        new_rec = st.text_input("Email de recuperación", value=rec or acc or "")
+        sbt2 = st.form_submit_button("Guardar emails")
+    if sbt2:
+        if new_acc: set_account_email(user, new_acc)
+        if new_rec: set_recovery_email(user, new_rec)
+        st.success("Emails actualizados.")
