@@ -13,21 +13,18 @@ class Meta(BaseModel):
 class Ejercicio(BaseModel):
     nombre: str = Field(min_length=2)
     series: conint(ge=2, le=6)
-    reps: str  # "5" o "6-8" o "10-12"
-    intensidad: Optional[str] = None  # "RPE 7-8", "75-80%"
-    descanso: str  # "60-90s", "2-3m"
+    reps: str
+    intensidad: Optional[str] = None
+    descanso: str
 
     @validator("reps")
     def validar_reps(cls, v):
         import re
         v = v.strip()
-        if re.fullmatch(r"\d{1,2}", v):
-            return v
-        if re.fullmatch(r"\d{1,2}\s*[–-]\s*\d{1,2}", v):
-            return v
-        if re.search(r"s$", v):
-            return v
-        raise ValueError("Formato de reps no válido. Usa p.ej. '5' o '6-8' o '10-12'")
+        if re.fullmatch(r"\d{1,2}", v): return v
+        if re.fullmatch(r"\d{1,2}\s*[–-]\s*\d{1,2}", v): return v
+        if re.search(r"s$", v): return v
+        raise ValueError("Formato de reps no válido. Usa '5' o '6-8' o '10-12'")
 
 class Dia(BaseModel):
     nombre: str
@@ -73,10 +70,11 @@ def validar_negocio(data: Dict[str, Any]) -> list[str]:
 
     rep_set = set(ej.reps for d in rutina.dias for ej in d.ejercicios if not ej.reps.endswith("s"))
     if len(rep_set) <= 1:
-        errors.append("Todas las reps son iguales; usa rangos distintos para principales/ secundarios/ accesorios.")
+        errors.append("Todas las reps son iguales; usa rangos distintos para principales/secundarios/accesorios.")
 
     for dia in rutina.dias:
         if not (5 <= len(dia.ejercicios) <= 7):
             errors.append(f"'{dia.nombre}' tiene {len(dia.ejercicios)} ejercicios (recomendado 6–7).")
 
     return errors
+
