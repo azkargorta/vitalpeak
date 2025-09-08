@@ -745,6 +745,7 @@ elif page == "📘 Rutinas":
         user = st.session_state.get("user", "default")
         st.info("Genera tu plan con IA, se guarda en memoria y se muestra como tablas por día (tipo PDF).")
 
+        # ---------- Formulario de entrada ----------
         with st.form("ia_form"):
             col1, col2 = st.columns(2)
             with col1:
@@ -764,24 +765,25 @@ elif page == "📘 Rutinas":
                 unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
                 idioma = st.selectbox("Idioma", ["es","en"], index=0)
 
-        st.markdown("#### Experiencia y PR recientes")
-        c1,c2,c3 = st.columns(3)
-        with c1:
-            exp_banca = st.text_input("Banca (experiencia)", value="2 años")
-            pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
-        with c2:
-            exp_sentadilla = st.text_input("Sentadilla (experiencia)", value="1 año")
-            pr_senta = st.number_input("Sentadilla 1x3 (kg)", value=110, step=2)
-        with c3:
-            exp_muerto = st.text_input("Peso muerto (experiencia)", value="1 año")
-            pr_muerto = st.number_input("Muerto 1x3 (kg)", value=130, step=2)
+            st.markdown("#### Experiencia y PR recientes")
+            c1,c2,c3 = st.columns(3)
+            with c1:
+                exp_banca = st.text_input("Banca (experiencia)", value="2 años")
+                pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
+            with c2:
+                exp_sentadilla = st.text_input("Sentadilla (experiencia)", value="1 año")
+                pr_senta = st.number_input("Sentadilla 1x3 (kg)", value=110, step=2)
+            with c3:
+                exp_muerto = st.text_input("Peso muerto (experiencia)", value="1 año")
+                pr_muerto = st.number_input("Muerto 1x3 (kg)", value=130, step=2)
 
-        enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
-        evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
-        calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
+            enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
+            evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
+            calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
 
-        submitted = st.form_submit_button("Generar rutina")
+            submitted = st.form_submit_button("Generar rutina")
 
+        # ---------- Función de render tipo PDF ----------
         def render_rutina_tabular(rutina: dict):
             st.subheader("Plan (vista tipo PDF)")
             dias = rutina.get("dias", [])
@@ -810,6 +812,7 @@ elif page == "📘 Rutinas":
                 f"- **Deload (semana):** {prog.get('deload_semana','')}"
             )
 
+        # ---------- Llamada a IA / Fallback ----------
         if submitted:
             datos_usuario = {
                 "nivel": nivel,
@@ -847,6 +850,7 @@ elif page == "📘 Rutinas":
                 st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
             st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
 
+        # ---------- Mostrar desde sesión ----------
         rutina_view = st.session_state.get("rutina_ia")
         if rutina_view:
             render_rutina_tabular(rutina_view)
