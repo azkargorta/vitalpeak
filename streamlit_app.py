@@ -761,14 +761,14 @@ elif page == "📘 Rutinas":
             error = None
 
             if submitted:
-                datos_usuario = {{
+                datos_usuario = {
                     "nivel": nivel,
                     "dias": int(dias),
                     "duracion": int(duracion),
                     "objetivo": objetivo,
                     "material": material,
                     "limitaciones": limitaciones.strip()
-                }}
+                }
 
                 api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
                 if api_key_ok:
@@ -805,20 +805,20 @@ elif page == "📘 Rutinas":
                 schedule = []
                 for i, dia in enumerate(rutina.get("dias", [])):
                     with st.container():
-                        st.write(f"**{{i+1}}. {{dia.get('nombre','Día')}}**")
+                        st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
                         cols = st.columns(3)
                         with cols[0]:
-                            weekday = st.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{{i}}")
+                            weekday = st.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
                         with cols[1]:
                             default_name = dia.get("nombre","Día")
-                            custom_name = st.text_input("Nombre de la rutina (registro)", value=default_name, key=f"dname_ai_{{i}}")
+                            custom_name = st.text_input("Nombre de la rutina (registro)", value=default_name, key=f"dname_ai_{i}")
                         with cols[2]:
                             st.caption("Ejercicios: " + ", ".join(e.get("nombre","") for e in dia.get("ejercicios", [])[:3]) + ("..." if len(dia.get("ejercicios", []))>3 else ""))
-                        schedule.append({{
+                        schedule.append({
                             "day_index": i,
                             "weekday": dias_semana.index(weekday),
                             "name": custom_name
-                        }})
+                        })
 
                 # Programación por semanas
                 colA, colB, colC = st.columns(3)
@@ -835,7 +835,7 @@ elif page == "📘 Rutinas":
                     candidate = base
                     while candidate in existing:
                         n += 1
-                        candidate = f"{{base}} ({{n}})"
+                        candidate = f"{base} ({n})"
                     existing.append(candidate)
                     return candidate
 
@@ -847,12 +847,12 @@ elif page == "📘 Rutinas":
                             reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
                         except:
                             reps_val = 10
-                        items.append({{
+                        items.append({
                             "exercise": ej.get("nombre",""),
                             "sets": int(ej.get("series", 3)),
                             "reps": reps_val,
                             "weight": 0.0
-                        }})
+                        })
                     return items
 
                 if st.button("💾 Guardar rutinas por día y programar semanas", use_container_width=True):
@@ -865,16 +865,16 @@ elif page == "📘 Rutinas":
                             add_routine(user, rname, _to_items(d))
                             created_names.append((s["weekday"], rname))
                         except Exception as e:
-                            st.error(f"No se pudo crear la rutina '{{rname}}': {{e}}")
+                            st.error(f"No se pudo crear la rutina '{rname}': {e}")
                     try:
                         base_monday = start_date - _dt.timedelta(days=start_date.weekday())
                         for w in range(int(weeks)):
                             for weekday, rname in created_names:
                                 assign_date = base_monday + _dt.timedelta(weeks=w, days=int(weekday))
                                 _set_plan(user, assign_date.isoformat(), rname)
-                        st.success(f"Rutinas guardadas y programadas por {{int(weeks)}} semanas desde {{start_date.isoformat()}}.")
+                        st.success(f"Rutinas guardadas y programadas por {int(weeks)} semanas desde {start_date.isoformat()}.")
                     except Exception as e:
-                        st.error(f"Error al programar: {{e}}")
+                        st.error(f"Error al programar: {e}")
 
     with st.expander("Exportar rutina (PDF)", expanded=False):
         from io import BytesIO
