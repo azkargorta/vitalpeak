@@ -3,7 +3,6 @@ import os, json
 import streamlit as st
 from app.ai_generator import call_gpt
 from app.rules_fallback import generate_fallback
-from app.pdf_export import rutina_a_pdf_bytes
 
 st.set_page_config(page_title="Creador de Rutinas (IA)", page_icon="💪", layout="centered")
 st.title("💪 Creador de Rutinas (IA)")
