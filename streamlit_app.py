@@ -474,7 +474,7 @@ elif page == "🩺 Salud (Peso)":
             st.pyplot(fig, clear_figure=True)
         else:
             st.info("No hay datos de peso para mostrar.")
-        
+
 elif page == "📘 Rutinas":
     require_auth()
     st.title("Planificador de rutinas")
@@ -731,150 +731,150 @@ elif page == "📘 Rutinas":
             st.info("No hay rutinas todavía. Crea una en el formulario de arriba.")
 
     # ---------- Auto-configurador de rutinas (chat) ----------
-    
-with st.expander("Auto-configurador de rutinas (chat)", expanded=False):
-        # Sustituido por generador IA + programación y guardado
-        import os, json
-        import datetime as _dt
-        import streamlit as st
-        from app.ai_generator import call_gpt
-        from app.rules_fallback import generate_fallback
-        from app.pdf_export import rutina_a_pdf_bytes
-        from app.routines import add_routine, list_routines
 
-        st.info("Crea tu plan con IA, nómbralo por días, expórtalo a PDF y prográmalo por semanas.")
+    with st.expander("Auto-configurador de rutinas (chat)", expanded=False):
+            # Sustituido por generador IA + programación y guardado
+            import os, json
+            import datetime as _dt
+            import streamlit as st
+            from app.ai_generator import call_gpt
+            from app.rules_fallback import generate_fallback
+            from app.pdf_export import rutina_a_pdf_bytes
+            from app.routines import add_routine, list_routines
 
-        with st.form("ia_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nivel = st.selectbox("Nivel", ["principiante","intermedio","avanzado"], index=1)
-                dias = st.number_input("Días/semana", min_value=1, max_value=6, value=4, step=1)
-                duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=60, step=5)
-            with col2:
-                objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
-                material = st.multiselect("Material disponible", ["barra","mancuernas","poleas","máquinas","banco","rack","ninguno"])
-                limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
-            submitted = st.form_submit_button("Generar rutina")
+            st.info("Crea tu plan con IA, nómbralo por días, expórtalo a PDF y prográmalo por semanas.")
 
-        rutina = None
-        used_fallback = False
-        error = None
+            with st.form("ia_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nivel = st.selectbox("Nivel", ["principiante","intermedio","avanzado"], index=1)
+                    dias = st.number_input("Días/semana", min_value=1, max_value=6, value=4, step=1)
+                    duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=60, step=5)
+                with col2:
+                    objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
+                    material = st.multiselect("Material disponible", ["barra","mancuernas","poleas","máquinas","banco","rack","ninguno"])
+                    limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+                submitted = st.form_submit_button("Generar rutina")
 
-        if submitted:
-            datos_usuario = {{
-                "nivel": nivel,
-                "dias": int(dias),
-                "duracion": int(duracion),
-                "objetivo": objetivo,
-                "material": material,
-                "limitaciones": limitaciones.strip()
-            }}
+            rutina = None
+            used_fallback = False
+            error = None
 
-            api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
-            if api_key_ok:
-                with st.spinner("Generando con ChatGPT..."):
-                    result = call_gpt(datos_usuario)
-                    if result.get("ok"):
-                        rutina = result["data"]
-                    else:
-                        used_fallback = True
-                        error = result.get("error","Error desconocido")
-                        rutina = generate_fallback(datos_usuario)
-            else:
-                used_fallback = True
-                rutina = generate_fallback(datos_usuario)
+            if submitted:
+                datos_usuario = {{
+                    "nivel": nivel,
+                    "dias": int(dias),
+                    "duracion": int(duracion),
+                    "objetivo": objetivo,
+                    "material": material,
+                    "limitaciones": limitaciones.strip()
+                }}
 
-            st.subheader("Rutina generada")
-            if used_fallback:
-                st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
-                if error:
-                    with st.expander("Detalle del error de IA"):
-                        st.code(error)
-            st.json(rutina)
+                api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+                if api_key_ok:
+                    with st.spinner("Generando con ChatGPT..."):
+                        result = call_gpt(datos_usuario)
+                        if result.get("ok"):
+                            rutina = result["data"]
+                        else:
+                            used_fallback = True
+                            error = result.get("error","Error desconocido")
+                            rutina = generate_fallback(datos_usuario)
+                else:
+                    used_fallback = True
+                    rutina = generate_fallback(datos_usuario)
 
-            pdf_bytes = rutina_a_pdf_bytes(rutina)
-            st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
+                st.subheader("Rutina generada")
+                if used_fallback:
+                    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+                    if error:
+                        with st.expander("Detalle del error de IA"):
+                            st.code(error)
+                st.json(rutina)
 
-            st.markdown("---")
-            st.subheader("📅 Nombra, asigna días y programa semanas")
+                pdf_bytes = rutina_a_pdf_bytes(rutina)
+                st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
 
-            # Preparar nombres y mapeo a día de semana
-            dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-            routine_names_before = [r["name"] for r in list_routines(user)] if "user" in st.session_state else []
+                st.markdown("---")
+                st.subheader("📅 Nombra, asigna días y programa semanas")
 
-            schedule = []
-            for i, dia in enumerate(rutina.get("dias", [])):
-                with st.container():
-                    st.write(f"**{{i+1}}. {{dia.get('nombre','Día')}}**")
-                    cols = st.columns(3)
-                    with cols[0]:
-                        weekday = st.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{{i}}")
-                    with cols[1]:
-                        default_name = dia.get("nombre","Día")
-                        custom_name = st.text_input("Nombre de la rutina (registro)", value=default_name, key=f"dname_ai_{{i}}")
-                    with cols[2]:
-                        st.caption("Ejercicios: " + ", ".join(e.get("nombre","") for e in dia.get("ejercicios", [])[:3]) + ("..." if len(dia.get("ejercicios", []))>3 else ""))
-                    schedule.append({{
-                        "day_index": i,
-                        "weekday": dias_semana.index(weekday),
-                        "name": custom_name
-                    }})
+                # Preparar nombres y mapeo a día de semana
+                dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+                routine_names_before = [r["name"] for r in list_routines(user)] if "user" in st.session_state else []
 
-            # Programación por semanas
-            colA, colB, colC = st.columns(3)
-            with colA:
-                start_date = st.date_input("Fecha de inicio (lunes recomendado)", value=_dt.date.today())
-            with colB:
-                weeks = st.number_input("Número de semanas", min_value=1, max_value=52, value=4, step=1)
-            with colC:
-                st.caption("Se planifica cada semana en el mismo día elegido.")
+                schedule = []
+                for i, dia in enumerate(rutina.get("dias", [])):
+                    with st.container():
+                        st.write(f"**{{i+1}}. {{dia.get('nombre','Día')}}**")
+                        cols = st.columns(3)
+                        with cols[0]:
+                            weekday = st.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{{i}}")
+                        with cols[1]:
+                            default_name = dia.get("nombre","Día")
+                            custom_name = st.text_input("Nombre de la rutina (registro)", value=default_name, key=f"dname_ai_{{i}}")
+                        with cols[2]:
+                            st.caption("Ejercicios: " + ", ".join(e.get("nombre","") for e in dia.get("ejercicios", [])[:3]) + ("..." if len(dia.get("ejercicios", []))>3 else ""))
+                        schedule.append({{
+                            "day_index": i,
+                            "weekday": dias_semana.index(weekday),
+                            "name": custom_name
+                        }})
 
-            # Utilidades
-            def _ensure_unique(name: str, existing: list[str]) -> str:
-                base, n = name, 1
-                candidate = base
-                while candidate in existing:
-                    n += 1
-                    candidate = f"{{base}} ({{n}})"
-                existing.append(candidate)
-                return candidate
+                # Programación por semanas
+                colA, colB, colC = st.columns(3)
+                with colA:
+                    start_date = st.date_input("Fecha de inicio (lunes recomendado)", value=_dt.date.today())
+                with colB:
+                    weeks = st.number_input("Número de semanas", min_value=1, max_value=52, value=4, step=1)
+                with colC:
+                    st.caption("Se planifica cada semana en el mismo día elegido.")
 
-            def _to_items(dia: dict):
-                items = []
-                for ej in dia.get("ejercicios", []):
-                    reps = ej.get("reps","10")
+                # Utilidades
+                def _ensure_unique(name: str, existing: list[str]) -> str:
+                    base, n = name, 1
+                    candidate = base
+                    while candidate in existing:
+                        n += 1
+                        candidate = f"{{base}} ({{n}})"
+                    existing.append(candidate)
+                    return candidate
+
+                def _to_items(dia: dict):
+                    items = []
+                    for ej in dia.get("ejercicios", []):
+                        reps = ej.get("reps","10")
+                        try:
+                            reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
+                        except:
+                            reps_val = 10
+                        items.append({{
+                            "exercise": ej.get("nombre",""),
+                            "sets": int(ej.get("series", 3)),
+                            "reps": reps_val,
+                            "weight": 0.0
+                        }})
+                    return items
+
+                if st.button("💾 Guardar rutinas por día y programar semanas", use_container_width=True):
+                    existing = routine_names_before.copy()
+                    created_names = []
+                    for s in schedule:
+                        d = rutina["dias"][s["day_index"]]
+                        rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
+                        try:
+                            add_routine(user, rname, _to_items(d))
+                            created_names.append((s["weekday"], rname))
+                        except Exception as e:
+                            st.error(f"No se pudo crear la rutina '{{rname}}': {{e}}")
                     try:
-                        reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
-                    except:
-                        reps_val = 10
-                    items.append({{
-                        "exercise": ej.get("nombre",""),
-                        "sets": int(ej.get("series", 3)),
-                        "reps": reps_val,
-                        "weight": 0.0
-                    }})
-                return items
-
-            if st.button("💾 Guardar rutinas por día y programar semanas", use_container_width=True):
-                existing = routine_names_before.copy()
-                created_names = []
-                for s in schedule:
-                    d = rutina["dias"][s["day_index"]]
-                    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
-                    try:
-                        add_routine(user, rname, _to_items(d))
-                        created_names.append((s["weekday"], rname))
+                        base_monday = start_date - _dt.timedelta(days=start_date.weekday())
+                        for w in range(int(weeks)):
+                            for weekday, rname in created_names:
+                                assign_date = base_monday + _dt.timedelta(weeks=w, days=int(weekday))
+                                _set_plan(user, assign_date.isoformat(), rname)
+                        st.success(f"Rutinas guardadas y programadas por {{int(weeks)}} semanas desde {{start_date.isoformat()}}.")
                     except Exception as e:
-                        st.error(f"No se pudo crear la rutina '{{rname}}': {{e}}")
-                try:
-                    base_monday = start_date - _dt.timedelta(days=start_date.weekday())
-                    for w in range(int(weeks)):
-                        for weekday, rname in created_names:
-                            assign_date = base_monday + _dt.timedelta(weeks=w, days=int(weekday))
-                            _set_plan(user, assign_date.isoformat(), rname)
-                    st.success(f"Rutinas guardadas y programadas por {{int(weeks)}} semanas desde {{start_date.isoformat()}}.")
-                except Exception as e:
-                    st.error(f"Error al programar: {{e}}")
+                        st.error(f"Error al programar: {{e}}")
 
     with st.expander("Exportar rutina (PDF)", expanded=False):
         from io import BytesIO
