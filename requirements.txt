@@ -2,7 +2,8 @@ streamlit
 pillow
 matplotlib
 pandas
-
 reportlab>=3.6.12
-
 xlsxwriter>=3.1.0
+openai==1.52.2
+pydantic==2.9.2
+python-dotenv==1.0.1
