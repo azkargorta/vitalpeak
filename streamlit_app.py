@@ -1,3 +1,4 @@
+import datetime as _dt
 import matplotlib.pyplot as plt
 from datetime import date
 from pathlib import Path
@@ -66,11 +67,11 @@ with st.form("planificacion_form", clear_on_submit=False):
     for i, dia in enumerate((rutina_view or {}).get("dias", [])):
         st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
         c1, c2 = st.columns(2)
-        weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
+        weekday = c1.selectbox("Día de la semana", ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"], key=f"weekday_ai_{i}")
         custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
         schedule.append({
             "day_index": i,
-            "weekday": dias_semana.index(weekday),
+            "weekday": ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].index(weekday),
             "name": custom_name
         })
     cA, cB, cC = st.columns(3)
