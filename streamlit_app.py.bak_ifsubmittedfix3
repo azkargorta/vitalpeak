@@ -228,78 +228,78 @@ def render_rutina_tabular(rutina: dict):
     )
 
     # ---------- Llamada a IA / Fallback ----------
-                if submitted:
-                    datos_usuario = {
-                    "nivel": nivel,
-                    "dias": int(dias),
-                    "duracion": int(duracion),
-                    "objetivo": objetivo,
-                    "material": material,
-                    "agrupacion": agrupacion,
-                    "comentarios": comentarios.strip(),
-                    "lesiones": limitaciones.strip(),
-                    "disponibilidad": disponibilidad,
-                    "progresion_preferida": progresion_pref,
-                    "volumen_tolerancia": volumen_tol,
-                    "semanas_ciclo": int(semanas_ciclo),
-                    "superseries_ok": bool(superseries_ok),
-                    "deload_preferido_semana": int(deload_semana_pref),
-                    "unidades": unidades,
-                    "idioma": idioma,
-                    "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto},
-                    "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
-                    "enfasis_accesorios": enfasis,
-                    "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],
-                    "calentamiento": calentamiento
-                    }
-                    api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
-                    if api_key_ok:
-                    with st.spinner("Generando con ChatGPT..."):
+        if submitted:
+            datos_usuario = {
+                "nivel": nivel,
+                "dias": int(dias),
+                "duracion": int(duracion),
+                "objetivo": objetivo,
+                "material": material,
+        "agrupacion": agrupacion,
+        "comentarios": comentarios.strip(),
+                "lesiones": limitaciones.strip(),
+                "disponibilidad": disponibilidad,
+                "progresion_preferida": progresion_pref,
+                "volumen_tolerancia": volumen_tol,
+                "semanas_ciclo": int(semanas_ciclo),
+                "superseries_ok": bool(superseries_ok),
+                "deload_preferido_semana": int(deload_semana_pref),
+                "unidades": unidades,
+                "idioma": idioma,
+                "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto},
+                "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
+                "enfasis_accesorios": enfasis,
+                "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],
+                "calentamiento": calentamiento
+            }
+            api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+            if api_key_ok:
+                with st.spinner("Generando con ChatGPT..."):
                     result = call_gpt(datos_usuario)
                     if result.get("ok"):
-                    st.session_state["rutina_ia"] = result["data"]
+                        st.session_state["rutina_ia"] = result["data"]
                     else:
-                    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                    st.session_state["ia_error"] = result.get("error","Error desconocido")
-                    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
-                    else:
-                    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
-                    st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
+                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                        st.session_state["ia_error"] = result.get("error","Error desconocido")
+                        st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+            else:
+                st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+            st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
 
-                    # ---------- Mostrar desde sesión ----------
-                    rutina_view = st.session_state.get("rutina_ia")
-                    if rutina_view:
-                    render_rutina_tabular(rutina_view)
+        # ---------- Mostrar desde sesión ----------
+        rutina_view = st.session_state.get("rutina_ia")
+        if rutina_view:
+            render_rutina_tabular(rutina_view)
 
-                    pdf_bytes = rutina_a_pdf_bytes(rutina_view)
-                    st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
-                    st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
-                    file_name="rutina.json", mime="application/json")
+            pdf_bytes = rutina_a_pdf_bytes(rutina_view)
+            st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
+            st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
+                               file_name="rutina.json", mime="application/json")
 
-                    st.markdown("---")
-                    st.subheader("📅 Nombra, asigna días y programa semanas")
+            st.markdown("---")
+            st.subheader("📅 Nombra, asigna días y programa semanas")
 
-                    dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-                    with st.form("planificacion_form", clear_on_submit=False):
-                    schedule = []
-                    for i, dia in enumerate(rutina_view.get("dias", [])):
+            dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+            with st.form("planificacion_form", clear_on_submit=False):
+                schedule = []
+                for i, dia in enumerate(rutina_view.get("dias", [])):
                     st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
                     c1, c2 = st.columns(2)
                     weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
                     custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
                     schedule.append({
-                    "day_index": i,
-                    "weekday": dias_semana.index(weekday),
-                    "name": custom_name
+                        "day_index": i,
+                        "weekday": dias_semana.index(weekday),
+                        "name": custom_name
                     })
-                    cA, cB, cC = st.columns(3)
-                    start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
-                    weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
-                    guardar = cC.form_submit_button("💾 Guardar y programar")
+                cA, cB, cC = st.columns(3)
+                start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
+                weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
+                guardar = cC.form_submit_button("💾 Guardar y programar")
 
-                    if guardar:
-                    existing = [r["name"] for r in list_routines(user)]
+            if guardar:
+                existing = [r["name"] for r in list_routines(user)]
 def _ensure_unique(name, existing_names):
                     base, n, cand = name, 1, name
                     while cand in existing_names:
