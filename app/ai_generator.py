@@ -20,55 +20,62 @@ def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
 def build_prompt(datos: Dict[str, Any]) -> str:
-    return f"""
-Genera una rutina semanal siguiendo estas reglas:
-{RULES_TEXT.format(dur=datos.get('duracion', 60))} + f"""
+    """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
+    agrup = datos.get("agrupacion", "Varios grupos principales por día")
+    material = datos.get("material", [])
+    notas = datos.get("comentarios", "")
+    objetivo = datos.get("objetivo", "mixto")
+    nivel = datos.get("nivel", "intermedio")
 
+    reglas_estrictas = f"""
 REGLAS ESTRICTAS (debes cumplirlas sí o sí):
-- Agrupación pedida: {datos.get("agrupacion","Varios grupos principales por día")}
+- Agrupación pedida: {agrup}
 - Si es "Un solo grupo principal por día":
   * EXACTAMENTE 1 grupo principal por día.
-  * No mezclar dos grupos principales (por ejemplo, "pecho" y "espalda" juntos) en el mismo día.
-  * Puedes añadir accesorios SUPEDITADOS a ese principal (ej.: bíceps en día de espalda), pero no contarlos como principales.
+  * No mezclar dos grupos principales (p. ej., pecho y espalda) el mismo día.
+  * Accesorios subordinados al principal (bíceps con espalda, tríceps con pecho) permitidos.
 - Si es "Varios grupos principales por día":
-  * Máximo 2 (como push/pull o torso/pierna) salvo que el usuario pida explícitamente 3.
-  * Evitar solapar el mismo grupo dos días consecutivos si el volumen es alto.
+  * Máximo 2 principales salvo que el usuario pida 3 explícitamente.
+  * Evitar solapar el mismo grupo en días consecutivos si el volumen es alto.
 - Material:
-  * Si material incluye "todo": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).
+  * Si la lista incluye "todo": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).
   * Si es personalizado, usa SOLO el material listado.
-- Respeta siempre los límites de lesiones/limitaciones.
-- Ajusta volumen y selección de ejercicios al objetivo indicado.
-{("\nNotas del usuario: " + datos.get("comentarios","")) if datos.get("comentarios") else ""}
+- Respeta lesiones/limitaciones y el objetivo indicado.
+- Ajusta volumen y selección de ejercicios al objetivo ({objetivo}) y nivel ({nivel}).
+{("Notas del usuario: " + notas) if notas else ""}
+""".strip("\n")
+
+    prompt = f"""
+Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
+
+Genera una rutina semanal siguiendo estas reglas base:
+{RULES_TEXT.format(dur=datos.get('duracion', 60))}
+
+{reglas_estrictas}
+
+ENTRADA DEL USUARIO (estructura):
+- Nivel: {nivel}
+- Días/semana: {datos.get('dias')}
+- Duración (min): {datos.get('duracion')}
+- Objetivo: {objetivo}
+- Material: {material}
+- Lesiones/limitaciones: {datos.get('limitaciones','')}
+- Disponibilidad: {datos.get('disponibilidad',[])}
+- Progresión preferida: {datos.get('progresion_preferida','')}
+- Tolerancia a volumen: {datos.get('volumen_tolerancia','')}
+- Semanas del ciclo: {datos.get('semanas_ciclo','')}
+- Superseries: {datos.get('superseries_ok')}
+- Unidades: {datos.get('unidades','kg')}
+- Idioma: {datos.get('idioma','es')}
+- PR recientes: {datos.get('pr_recientes',{})}
+- Énfasis accesorios: {datos.get('enfasis_accesorios',[])}
+- Evitar: {datos.get('evitar',[])}
+- Calentamiento: {datos.get('calentamiento','')}
+- Agrupación: {agrup}
+
+SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
 """
-
-
-ENTRADA (datos del usuario, JSON):
-{json.dumps(datos, ensure_ascii=False)}
-
-SALIDA (solo JSON con este esquema mínimo):
-{{
-  "meta": {{
-    "nivel": "principiante|intermedio|avanzado",
-    "dias": int,
-    "duracion_min": int,
-    "objetivo": "fuerza|hipertrofia|resistencia|mixto"
-  }},
-  "dias": [
-    {{
-      "nombre": "Upper A | Lower A | FullBody | ...",
-      "ejercicios": [
-        {{"nombre":"", "series": 3, "reps": "6-8", "intensidad":"RPE 7-8 o 75-80%", "descanso":"90s|2-3m"}}
-      ],
-      "notas": ""
-    }}
-  ],
-  "progresion": {{
-    "principales": "regla",
-    "accesorios": "regla",
-    "deload_semana": 0
-  }}
-}}
-"""
+    return prompt
 
 def _client() -> OpenAI:
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
