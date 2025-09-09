@@ -758,18 +758,8 @@ elif page == "📘 Rutinas":
                 semanas_ciclo = st.number_input("Semanas del ciclo", min_value=4, max_value=12, value=6)
             with col2:
                 objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
-                
-# --- Material (con presets) ---
-material_preset = st.radio("Material (preset)", ["Todo", "Gomas", "Personalizado"], index=0, horizontal=True)
-material_personalizado = []
-if material_preset == "Personalizado":
-    material_personalizado = st.multiselect(
-        "Material disponible (personalizado)",
-        ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","ninguno"]
-    )
-# Normalizamos a lista enviable
-material = (["todo"] if material_preset=="Todo" else (["gomas"] if material_preset=="Gomas" else material_personalizado))
-limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+                material = st.multiselect("Material disponible", ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","ninguno"])
+                limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
                 superseries_ok = st.checkbox("Permitir superseries", value=True)
                 deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
                 unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
@@ -790,19 +780,6 @@ limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Ho
             enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
             evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
             calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
-
-            # --- Preferencias extra ---
-            agrupacion = st.selectbox(
-                "Estructura de grupos por día",
-                ["Varios grupos principales por día", "Un solo grupo principal por día"],
-                index=0,
-                help="Combinar varios grupos principales en un día o centrarse en uno."
-            )
-            comentarios = st.text_area(
-                "Comentarios y observaciones (opcional)",
-                placeholder="Ej.: solo un día pierna/glúteo • añadir 1 día de cardio + core • evitar press militar...",
-                height=120
-            )
 
             submitted = st.form_submit_button("Generar rutina")
 
@@ -843,8 +820,6 @@ limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Ho
                 "duracion": int(duracion),
                 "objetivo": objetivo,
                 "material": material,
-        "agrupacion": agrupacion,
-        "comentarios": comentarios.strip(),
                 "lesiones": limitaciones.strip(),
                 "disponibilidad": disponibilidad,
                 "progresion_preferida": progresion_pref,
