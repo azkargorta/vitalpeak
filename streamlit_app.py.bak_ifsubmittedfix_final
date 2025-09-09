@@ -228,161 +228,161 @@ def render_rutina_tabular(rutina: dict):
     )
 
     # ---------- Llamada a IA / Fallback ----------
-if submitted:
-    datos_usuario = {
-    "nivel": nivel,
-    "dias": int(dias),
-    "duracion": int(duracion),
-    "objetivo": objetivo,
-    "material": material,
-    "agrupacion": agrupacion,
-    "comentarios": comentarios.strip(),
-    "lesiones": limitaciones.strip(),
-    "disponibilidad": disponibilidad,
-    "progresion_preferida": progresion_pref,
-    "volumen_tolerancia": volumen_tol,
-    "semanas_ciclo": int(semanas_ciclo),
-    "superseries_ok": bool(superseries_ok),
-    "deload_preferido_semana": int(deload_semana_pref),
-    "unidades": unidades,
-    "idioma": idioma,
-    "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto},
-    "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
-    "enfasis_accesorios": enfasis,
-    "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],
-    "calentamiento": calentamiento
-    }
-    api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
-    if api_key_ok:
-    with st.spinner("Generando con ChatGPT..."):
-    result = call_gpt(datos_usuario)
-    if result.get("ok"):
-    st.session_state["rutina_ia"] = result["data"]
-    else:
-    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-    st.session_state["ia_error"] = result.get("error","Error desconocido")
-    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
-    else:
-    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
-    st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
+                if submitted:
+                    datos_usuario = {
+                    "nivel": nivel,
+                    "dias": int(dias),
+                    "duracion": int(duracion),
+                    "objetivo": objetivo,
+                    "material": material,
+                    "agrupacion": agrupacion,
+                    "comentarios": comentarios.strip(),
+                    "lesiones": limitaciones.strip(),
+                    "disponibilidad": disponibilidad,
+                    "progresion_preferida": progresion_pref,
+                    "volumen_tolerancia": volumen_tol,
+                    "semanas_ciclo": int(semanas_ciclo),
+                    "superseries_ok": bool(superseries_ok),
+                    "deload_preferido_semana": int(deload_semana_pref),
+                    "unidades": unidades,
+                    "idioma": idioma,
+                    "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto},
+                    "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
+                    "enfasis_accesorios": enfasis,
+                    "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],
+                    "calentamiento": calentamiento
+                    }
+                    api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+                    if api_key_ok:
+                    with st.spinner("Generando con ChatGPT..."):
+                    result = call_gpt(datos_usuario)
+                    if result.get("ok"):
+                    st.session_state["rutina_ia"] = result["data"]
+                    else:
+                    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                    st.session_state["ia_error"] = result.get("error","Error desconocido")
+                    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+                    else:
+                    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                    st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+                    st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
 
-    # ---------- Mostrar desde sesión ----------
-    rutina_view = st.session_state.get("rutina_ia")
-    if rutina_view:
-    render_rutina_tabular(rutina_view)
+                    # ---------- Mostrar desde sesión ----------
+                    rutina_view = st.session_state.get("rutina_ia")
+                    if rutina_view:
+                    render_rutina_tabular(rutina_view)
 
-    pdf_bytes = rutina_a_pdf_bytes(rutina_view)
-    st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
-    st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
-    file_name="rutina.json", mime="application/json")
+                    pdf_bytes = rutina_a_pdf_bytes(rutina_view)
+                    st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
+                    st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
+                    file_name="rutina.json", mime="application/json")
 
-    st.markdown("---")
-    st.subheader("📅 Nombra, asigna días y programa semanas")
+                    st.markdown("---")
+                    st.subheader("📅 Nombra, asigna días y programa semanas")
 
-    dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-    with st.form("planificacion_form", clear_on_submit=False):
-    schedule = []
-    for i, dia in enumerate(rutina_view.get("dias", [])):
-    st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
-    c1, c2 = st.columns(2)
-    weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
-    custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
-    schedule.append({
-    "day_index": i,
-    "weekday": dias_semana.index(weekday),
-    "name": custom_name
-    })
-    cA, cB, cC = st.columns(3)
-    start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
-    weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
-    guardar = cC.form_submit_button("💾 Guardar y programar")
+                    dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+                    with st.form("planificacion_form", clear_on_submit=False):
+                    schedule = []
+                    for i, dia in enumerate(rutina_view.get("dias", [])):
+                    st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
+                    c1, c2 = st.columns(2)
+                    weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
+                    custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
+                    schedule.append({
+                    "day_index": i,
+                    "weekday": dias_semana.index(weekday),
+                    "name": custom_name
+                    })
+                    cA, cB, cC = st.columns(3)
+                    start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
+                    weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
+                    guardar = cC.form_submit_button("💾 Guardar y programar")
 
-    if guardar:
-    existing = [r["name"] for r in list_routines(user)]
+                    if guardar:
+                    existing = [r["name"] for r in list_routines(user)]
 def _ensure_unique(name, existing_names):
-    base, n, cand = name, 1, name
-    while cand in existing_names:
-    n += 1
-    cand = f"{base} ({n})"
-    existing_names.append(cand)
-    return cand
+                    base, n, cand = name, 1, name
+                    while cand in existing_names:
+                        n += 1
+                        cand = f"{base} ({n})"
+                    existing_names.append(cand)
+                    return cand
 
-    created = []
-    for s in schedule:
-    d = rutina_view["dias"][s["day_index"]]
-    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
-    items = []
-    for ej in d.get("ejercicios", []):
-    reps = ej.get("reps","10")
-    try:
-    reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
-    except:
-    reps_val = 10
-    items.append({"exercise": ej.get("nombre",""), "sets": int(ej.get("series",3)), "reps": reps_val, "weight": 0.0})
-    add_routine(user, rname, items)
-    created.append((s["weekday"], rname))
+                created = []
+                for s in schedule:
+                    d = rutina_view["dias"][s["day_index"]]
+                    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
+                    items = []
+                    for ej in d.get("ejercicios", []):
+                        reps = ej.get("reps","10")
+                        try:
+                            reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
+                        except:
+                            reps_val = 10
+                        items.append({"exercise": ej.get("nombre",""), "sets": int(ej.get("series",3)), "reps": reps_val, "weight": 0.0})
+                    add_routine(user, rname, items)
+                    created.append((s["weekday"], rname))
 
-    try:
-    base_mon = start_date - _dt.timedelta(days=start_date.weekday())
-    for w in range(int(weeks)):
-    for wd, rname in created:
-    d = base_mon + _dt.timedelta(weeks=w, days=int(wd))
-    _set_plan(user, d.isoformat(), rname)
-    st.success("Rutinas guardadas y programadas ✅")
-    except NameError:
-    st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
-    except Exception as e:
-    st.error(f"Error al programar: {e}")
+                try:
+                    base_mon = start_date - _dt.timedelta(days=start_date.weekday())
+                    for w in range(int(weeks)):
+                        for wd, rname in created:
+                            d = base_mon + _dt.timedelta(weeks=w, days=int(wd))
+                            _set_plan(user, d.isoformat(), rname)
+                    st.success("Rutinas guardadas y programadas ✅")
+                except NameError:
+                    st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
+                except Exception as e:
+                    st.error(f"Error al programar: {e}")
 
-    with st.expander("Ver JSON (avanzado)", expanded=False):
-    st.json(rutina_view)
+            with st.expander("Ver JSON (avanzado)", expanded=False):
+                st.json(rutina_view)
 
     with st.expander("Exportar rutina (PDF)", expanded=False):
-    from io import BytesIO
-    try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    except Exception as _e:
-    st.error("Falta la dependencia 'reportlab'. Instálala con: pip install reportlab"); st.stop()
+        from io import BytesIO
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        except Exception as _e:
+            st.error("Falta la dependencia 'reportlab'. Instálala con: pip install reportlab"); st.stop()
 
 def _build_pdf(title: str, items: list, fecha: str | None = None) -> bytes:
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-    styles = getSampleStyleSheet(); story=[]
-    story.append(Paragraph(title, styles["Title"]))
-    if fecha: story.append(Paragraph(f"Fecha: {fecha}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-    data = [["Ejercicio","Series","Reps","Peso (kg)"]]
-    for it in items:
-    data.append([str(it.get("exercise","")), str(it.get("sets","")), str(it.get("reps","")), str(it.get("weight",""))])
-    table = Table(data, repeatRows=1)
-    table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("ALIGN",(1,1),(-1,-1),"CENTER"),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("FONTSIZE",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,0),6),("TOPPADDING",(0,0),(-1,0),6)]))
-    story.append(table); doc.build(story); pdf=buf.getvalue(); buf.close(); return pdf
+            buf = BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
+            styles = getSampleStyleSheet(); story=[]
+            story.append(Paragraph(title, styles["Title"]))
+            if fecha: story.append(Paragraph(f"Fecha: {fecha}", styles["Normal"]))
+            story.append(Spacer(1, 12))
+            data = [["Ejercicio","Series","Reps","Peso (kg)"]]
+            for it in items:
+                data.append([str(it.get("exercise","")), str(it.get("sets","")), str(it.get("reps","")), str(it.get("weight",""))])
+            table = Table(data, repeatRows=1)
+            table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("ALIGN",(1,1),(-1,-1),"CENTER"),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("FONTSIZE",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,0),6),("TOPPADDING",(0,0),(-1,0),6)]))
+            story.append(table); doc.build(story); pdf=buf.getvalue(); buf.close(); return pdf
 
-    mode = st.radio("¿Qué quieres exportar?", ["Rutina de hoy", "Elegir rutina"], horizontal=True)
-    if mode == "Rutina de hoy":
-    today = date.today(); today_iso = today.isoformat()
-    rt_name = _get_plan(user).get(today_iso)
-    if not rt_name: st.info("Hoy no hay rutina asignada.")
-    else:
-    r = next((rr for rr in list_routines(user) if rr["name"] == rt_name), None)
-    if not r: st.warning("La rutina asignada ya no existe.")
-    else:
-    pdf_bytes = _build_pdf(f"Rutina de hoy — {rt_name}", r.get("items", []), fecha=today_iso)
-    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{today_iso}_{rt_name}.pdf", mime="application/pdf", use_container_width=True)
-    else:
-    routines = list_routines(user)
-    if not routines: st.info("No tienes rutinas creadas aún.")
-    else:
-    names = [r["name"] for r in routines]
-    sel = st.selectbox("Rutina a exportar", names, key="export_sel_routine")
-    if sel:
-    r = next(rr for rr in routines if rr["name"] == sel)
-    pdf_bytes = _build_pdf(f"Rutina — {sel}", r.get("items", []))
-    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{sel}.pdf", mime="application/pdf", use_container_width=True)
+        mode = st.radio("¿Qué quieres exportar?", ["Rutina de hoy", "Elegir rutina"], horizontal=True)
+        if mode == "Rutina de hoy":
+            today = date.today(); today_iso = today.isoformat()
+            rt_name = _get_plan(user).get(today_iso)
+            if not rt_name: st.info("Hoy no hay rutina asignada.")
+            else:
+                r = next((rr for rr in list_routines(user) if rr["name"] == rt_name), None)
+                if not r: st.warning("La rutina asignada ya no existe.")
+                else:
+                    pdf_bytes = _build_pdf(f"Rutina de hoy — {rt_name}", r.get("items", []), fecha=today_iso)
+                    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{today_iso}_{rt_name}.pdf", mime="application/pdf", use_container_width=True)
+        else:
+            routines = list_routines(user)
+            if not routines: st.info("No tienes rutinas creadas aún.")
+            else:
+                names = [r["name"] for r in routines]
+                sel = st.selectbox("Rutina a exportar", names, key="export_sel_routine")
+                if sel:
+                    r = next(rr for rr in routines if rr["name"] == sel)
+                    pdf_bytes = _build_pdf(f"Rutina — {sel}", r.get("items", []))
+                    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{sel}.pdf", mime="application/pdf", use_container_width=True)
 
 
 
@@ -393,41 +393,41 @@ elif page == "👤 Perfil":
     data = load_user(user)
     profile = data.get("profile", {})
     with st.form("perfil_form"):
-    c1, c2 = st.columns(2)
-    with c1:
-    first_name = st.text_input("Nombre", value=profile.get("first_name",""))
-    birthdate = st.text_input("Fecha de nacimiento (YYYY-MM-DD)", value=profile.get("birthdate",""))
-    with c2:
-    last_name = st.text_input("Apellidos", value=profile.get("last_name",""))
-    gender = st.selectbox("Género", ["", "Masculino", "Femenino", "No binario", "Prefiero no decir"], index=0 if profile.get("gender","") not in ["","Masculino","Femenino","No binario","Prefiero no decir"] else ["","Masculino","Femenino","No binario","Prefiero no decir"].index(profile.get("gender","")))
-    notes = st.text_area("Notas", value=profile.get("notes",""))
+        c1, c2 = st.columns(2)
+        with c1:
+            first_name = st.text_input("Nombre", value=profile.get("first_name",""))
+            birthdate = st.text_input("Fecha de nacimiento (YYYY-MM-DD)", value=profile.get("birthdate",""))
+        with c2:
+            last_name = st.text_input("Apellidos", value=profile.get("last_name",""))
+            gender = st.selectbox("Género", ["", "Masculino", "Femenino", "No binario", "Prefiero no decir"], index=0 if profile.get("gender","") not in ["","Masculino","Femenino","No binario","Prefiero no decir"] else ["","Masculino","Femenino","No binario","Prefiero no decir"].index(profile.get("gender","")))
+        notes = st.text_area("Notas", value=profile.get("notes",""))
     save_btn = st.form_submit_button("Guardar perfil")
     if save_btn:
-    set_profile(user, {"first_name": first_name, "last_name": last_name, "birthdate": birthdate, "gender": gender, "notes": notes})
-    st.success("Perfil actualizado.")
+        set_profile(user, {"first_name": first_name, "last_name": last_name, "birthdate": birthdate, "gender": gender, "notes": notes})
+        st.success("Perfil actualizado.")
 
     st.subheader("Cambiar contraseña")
     with st.form("pass_form"):
-    cur = st.text_input("Contraseña actual", type="password")
-    p1  = st.text_input("Nueva contraseña", type="password")
-    p2  = st.text_input("Repite nueva contraseña", type="password")
+        cur = st.text_input("Contraseña actual", type="password")
+        p1  = st.text_input("Nueva contraseña", type="password")
+        p2  = st.text_input("Repite nueva contraseña", type="password")
     sbt = st.form_submit_button("Actualizar contraseña")
     if sbt:
-    if not authenticate(user, cur):
-    st.error("La contraseña actual no es correcta.")
-    elif not p1 or p1 != p2:
-    st.error("Las nuevas contraseñas no coinciden.")
-    else:
-    set_password(user, p1)
-    st.success("Contraseña actualizada.")
+        if not authenticate(user, cur):
+            st.error("La contraseña actual no es correcta.")
+        elif not p1 or p1 != p2:
+            st.error("Las nuevas contraseñas no coinciden.")
+        else:
+            set_password(user, p1)
+            st.success("Contraseña actualizada.")
 
     st.subheader("Emails")
     acc, rec = get_emails_for_user(user)
     with st.form("email_form"):
-    new_acc = st.text_input("Email de cuenta", value=acc or "")
-    new_rec = st.text_input("Email de recuperación", value=rec or acc or "")
+        new_acc = st.text_input("Email de cuenta", value=acc or "")
+        new_rec = st.text_input("Email de recuperación", value=rec or acc or "")
     sbt2 = st.form_submit_button("Guardar emails")
     if sbt2:
-    if new_acc: set_account_email(user, new_acc)
-    if new_rec: set_recovery_email(user, new_rec)
-    st.success("Emails actualizados.")
+        if new_acc: set_account_email(user, new_acc)
+        if new_rec: set_recovery_email(user, new_rec)
+        st.success("Emails actualizados.")
