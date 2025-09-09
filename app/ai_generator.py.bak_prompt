@@ -24,12 +24,6 @@ def build_prompt(datos: Dict[str, Any]) -> str:
 Genera una rutina semanal siguiendo estas reglas:
 {RULES_TEXT.format(dur=datos.get('duracion', 60))}
 
-Notas adicionales del usuario:
-- Agrupación preferida: {datos.get("agrupacion","no especificado")}
-- Comentarios: {datos.get("comentarios","")}
-
-
-
 ENTRADA (datos del usuario, JSON):
 {json.dumps(datos, ensure_ascii=False)}
 

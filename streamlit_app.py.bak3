@@ -759,16 +759,16 @@ elif page == "📘 Rutinas":
             with col2:
                 objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
                 
-    # --- Material (con presets) ---
-    material_preset = st.radio("Material (preset)", ["Todo", "Gomas", "Personalizado"], index=0, horizontal=True)
-    material_personalizado = []
-    if material_preset == "Personalizado":
-        material_personalizado = st.multiselect(
-            "Material disponible (personalizado)",
-            ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","ninguno"]
-        )
-    # Normalizamos a lista enviable
-    material = (["todo"] if material_preset=="Todo" else (["gomas"] if material_preset=="Gomas" else material_personalizado))
+# --- Material (con presets) ---
+material_preset = st.radio("Material (preset)", ["Todo", "Gomas", "Personalizado"], index=0, horizontal=True)
+material_personalizado = []
+if material_preset == "Personalizado":
+    material_personalizado = st.multiselect(
+        "Material disponible (personalizado)",
+        ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","ninguno"]
+    )
+# Normalizamos a lista enviable
+material = (["todo"] if material_preset=="Todo" else (["gomas"] if material_preset=="Gomas" else material_personalizado))
 limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
                 superseries_ok = st.checkbox("Permitir superseries", value=True)
                 deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
