@@ -147,46 +147,55 @@ if page == "🔐 Login / Registro":
                     st.rerun()
                 else:
                     st.error("Usuario o contraseña incorrectos.")
-with col2:
-    objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
 
-    # --- Material (con presets) ---
-    material_preset = st.radio("Material (preset)", ["Todo", "Gomas", "Personalizado"], index=0, horizontal=True)
-    material_personalizado = []
-    if material_preset == "Personalizado":
-        material_personalizado = st.multiselect(
-            "Material disponible (personalizado)",
-            ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","ninguno"]
-        )
-    material = (["todo"] if material_preset == "Todo" else (["gomas"] if material_preset == "Gomas" else material_personalizado))
+    with col2:
+                objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
 
-    limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
-    superseries_ok = st.checkbox("Permitir superseries", value=True)
-    deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
-    unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
-    idioma = st.selectbox("Idioma", ["es","en"], index=0)
+                # --- Material (con presets) ---
+                material_preset = st.radio(
+                    "Material (preset)",
+                    ["Todo", "Gomas", "Personalizado"],
+                    index=0,
+                    horizontal=True
+                )
+                material_personalizado = []
+                if material_preset == "Personalizado":
+                    material_personalizado = st.multiselect(
+                        "Material disponible (personalizado)",
+                        ["barra","mancuernas","poleas","máquinas","banco","rack",
+                         "prensa","dominadas","anillas","gomas","ninguno"]
+                    )
+                # Normalizamos a lista enviable
+                material = (
+                    ["todo"] if material_preset == "Todo"
+                    else (["gomas"] if material_preset == "Gomas" else material_personalizado)
+                )
 
-# ---------- Después de col1/col2 ----------
-st.markdown("#### Experiencia y PR recientes")
-c1, c2, c3 = st.columns(3)
-with c1:
-    exp_banca = st.text_input("Banca (experiencia)", value="2 años")
-    pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
-with c2:
-    exp_sentadilla = st.text_input("Sentadilla (experiencia)", value="1 año")
-    pr_senta = st.number_input("Sentadilla 1x3 (kg)", value=110, step=2)
-with c3:
-    exp_muerto = st.text_input("Peso muerto (experiencia)", value="1 año")
-    pr_muerto = st.number_input("Muerto 1x3 (kg)", value=130, step=2)
+                limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+                superseries_ok = st.checkbox("Permitir superseries", value=True)
+                deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
+                unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
+                idioma = st.selectbox("Idioma", ["es","en"], index=0)
 
-enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
-evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
-calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
+    st.markdown("#### Experiencia y PR recientes")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        exp_banca = st.text_input("Banca (experiencia)", value="2 años")
+        pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
+    with c2:
+        exp_sentadilla = st.text_input("Sentadilla (experiencia)", value="1 año")
+        pr_senta = st.number_input("Sentadilla 1x3 (kg)", value=110, step=2)
+    with c3:
+        exp_muerto = st.text_input("Peso muerto (experiencia)", value="1 año")
+        pr_muerto = st.number_input("Muerto 1x3 (kg)", value=130, step=2)
 
-# --- Preferencias extra ---
-agrupacion = st.selectbox("Estructura de grupos por día", ["Varios grupos principales por día", "Un solo grupo principal por día"], index=0)
-comentarios = st.text_area("Comentarios y observaciones (opcional)", placeholder="Ej.: solo un día pierna/glúteo • añadir 1 día de cardio + core • evitar press militar...", height=120)
+    enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
+    evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
+    calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
 
+    # --- Preferencias extra ---
+    agrupacion = st.selectbox("Estructura de grupos por día", ["Varios grupos principales por día", "Un solo grupo principal por día"], index=0)
+    comentarios = st.text_area("Comentarios y observaciones (opcional)", placeholder="Ej.: solo un día pierna/glúteo • añadir 1 día de cardio + core • evitar press militar...", height=120)
             submitted = st.form_submit_button("Generar rutina")
 
         # ---------- Función de render tipo PDF ----------
