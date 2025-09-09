@@ -747,34 +747,44 @@ elif page == "📘 Rutinas":
 
         # ---------- Formulario de entrada ----------
         with st.form("ia_form"):
+
             col1, col2 = st.columns(2)
+
             with col1:
                 nivel = st.selectbox("Nivel", ["principiante","intermedio","avanzado"], index=1)
                 dias = st.number_input("Días/semana", min_value=1, max_value=6, value=4, step=1)
                 duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=60, step=5)
-                disponibilidad = st.multiselect("Disponibilidad (elige días)", ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"], default=["Lunes","Martes","Jueves","Viernes"])
+                disponibilidad = st.multiselect(
+                    "Disponibilidad (elige días)",
+                    ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"],
+                    default=["Lunes","Martes","Jueves","Viernes"]
+                )
                 progresion_pref = st.selectbox("Progresión preferida", ["doble_progresion","lineal","RPE_autorregulada"], index=0)
                 volumen_tol = st.select_slider("Tolerancia a volumen", options=["baja","media","alta"], value="media")
                 semanas_ciclo = st.number_input("Semanas del ciclo", min_value=4, max_value=12, value=6)
+
             with col2:
                 objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
+
+                # --- Material (con preset) ---
                 material_preset = st.radio("Material (preset)", ["Todo", "Personalizado"], index=0, horizontal=True)
-material_personalizado = []
-if material_preset == "Personalizado":
-    material_personalizado = st.multiselect(
-        "Material disponible",
-        ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","kettlebells","discos"]
-    )
-# Normalizamos la lista para enviar a la IA: "Todo" => ["todo"] (gimnasio completo)
-material = (["todo"] if material_preset == "Todo" else material_personalizado)
-limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
-superseries_ok = st.checkbox("Permitir superseries", value=True)
+                material_personalizado = []
+                if material_preset == "Personalizado":
+                    material_personalizado = st.multiselect(
+                        "Material disponible",
+                        ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","kettlebells","discos"]
+                    )
+                material = (["todo"] if material_preset == "Todo" else material_personalizado)
+
+                limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+                superseries_ok = st.checkbox("Permitir superseries", value=True)
                 deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
                 unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
                 idioma = st.selectbox("Idioma", ["es","en"], index=0)
 
+            # ---------- Experiencia y PR ----------
             st.markdown("#### Experiencia y PR recientes")
-            c1,c2,c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
             with c1:
                 exp_banca = st.text_input("Banca (experiencia)", value="2 años")
                 pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
@@ -789,17 +799,18 @@ superseries_ok = st.checkbox("Permitir superseries", value=True)
             evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
             calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
 
+            agrupacion = st.selectbox(
+                "Estructura de grupos por día",
+                ["Varios grupos principales por día", "Un solo grupo principal por día"],
+                index=0
+            )
 
-agrupacion = st.selectbox(
-    "Estructura de grupos por día",
-    ["Varios grupos principales por día", "Un solo grupo principal por día"],
-    index=0,
-    help="Elige si quieres trabajar varios grupos principales en un día o solo uno."
-)
-    detalles_ia = st.text_area("Detalles adicionales para la IA (opcional)", placeholder="Ej.: evitar press militar por hombro • añadir 1 día de cardio + core • priorizar glúteo...", height=120)
-
-
-            submitted = st.form_submit_button("Generar rutina")
+            detalles_ia = st.text_area(
+                "Detalles adicionales para la IA (opcional)",
+                placeholder="Ej.: evitar press militar por hombro • añadir 1 día de cardio + core • priorizar glúteo...",
+                height=120
+            )
+        submitted = st.form_submit_button("Generar rutina")
 
         # ---------- Función de render tipo PDF ----------
         def render_rutina_tabular(rutina: dict):
