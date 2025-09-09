@@ -768,7 +768,7 @@ if material_preset == "Personalizado":
 # Normalizamos la lista para enviar a la IA: "Todo" => ["todo"] (gimnasio completo)
 material = (["todo"] if material_preset == "Todo" else material_personalizado)
 limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
-                superseries_ok = st.checkbox("Permitir superseries", value=True)
+superseries_ok = st.checkbox("Permitir superseries", value=True)
                 deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
                 unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
                 idioma = st.selectbox("Idioma", ["es","en"], index=0)
