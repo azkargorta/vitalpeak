@@ -22,12 +22,24 @@ def build_system() -> str:
 def build_prompt(datos: Dict[str, Any]) -> str:
     return f"""
 Genera una rutina semanal siguiendo estas reglas:
-{RULES_TEXT.format(dur=datos.get('duracion', 60))}
+{RULES_TEXT.format(dur=datos.get('duracion', 60))} + f"""
 
-Notas adicionales del usuario:
-- Agrupación preferida: {datos.get("agrupacion","no especificado")}
-- Comentarios: {datos.get("comentarios","")}
-
+REGLAS ESTRICTAS (debes cumplirlas sí o sí):
+- Agrupación pedida: {datos.get("agrupacion","Varios grupos principales por día")}
+- Si es "Un solo grupo principal por día":
+  * EXACTAMENTE 1 grupo principal por día.
+  * No mezclar dos grupos principales (por ejemplo, "pecho" y "espalda" juntos) en el mismo día.
+  * Puedes añadir accesorios SUPEDITADOS a ese principal (ej.: bíceps en día de espalda), pero no contarlos como principales.
+- Si es "Varios grupos principales por día":
+  * Máximo 2 (como push/pull o torso/pierna) salvo que el usuario pida explícitamente 3.
+  * Evitar solapar el mismo grupo dos días consecutivos si el volumen es alto.
+- Material:
+  * Si material incluye "todo": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).
+  * Si es personalizado, usa SOLO el material listado.
+- Respeta siempre los límites de lesiones/limitaciones.
+- Ajusta volumen y selección de ejercicios al objetivo indicado.
+{("\nNotas del usuario: " + datos.get("comentarios","")) if datos.get("comentarios") else ""}
+"""
 
 
 ENTRADA (datos del usuario, JSON):
