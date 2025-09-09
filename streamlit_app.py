@@ -52,13 +52,18 @@ with st.sidebar:
         st.success(f"Conectado como **{st.session_state['user']}**")
         if st.button("Cerrar sesión", use_container_width=True):
             logout()
-        st.markdown("---")
+        
+# ---------- Mostrar desde sesión ----------
+rutina_view = st.session_state.get("rutina_ia")
+if rutina_view is None:
+    rutina_view = {}
+st.markdown("---")
 st.subheader("📅 Nombra, asigna días y programa semanas")
 
 dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
 with st.form("planificacion_form", clear_on_submit=False):
     schedule = []
-    for i, dia in enumerate(rutina_view.get("dias", [])):
+    for i, dia in enumerate((rutina_view or {}).get("dias", [])):
         st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
         c1, c2 = st.columns(2)
         weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
