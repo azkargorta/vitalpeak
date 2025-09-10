@@ -3,6 +3,68 @@ from typing import Any, Dict
 from openai import OpenAI
 from .schema_rutina import validar_negocio
 
+
+def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, Any]:
+    """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
+    data = dict(raw) if isinstance(raw, dict) else {}
+
+    # --- META ---
+    if "meta" not in data or not isinstance(data.get("meta"), dict):
+        data["meta"] = {
+            "nivel": datos.get("nivel", "intermedio"),
+            "dias": int(datos.get("dias", 4) or 4),
+            "duracion_min": int(datos.get("duracion", 60) or 60),
+            "objetivo": datos.get("objetivo", "mixto"),
+        }
+
+    # --- PROGRESION ---
+    if "progresion" not in data or not isinstance(data.get("progresion"), str):
+        data["progresion"] = datos.get("progresion_preferida", "lineal")
+
+    # --- DIAS ---
+    def _norm_ej(e):
+        if not isinstance(e, dict):
+            return {"nombre": str(e), "series": 3, "reps": "10"}
+        nombre = e.get("nombre") or e.get("ejercicio") or e.get("name") or "Ejercicio"
+        try:
+            series = int(e.get("series", 3))
+        except Exception:
+            series = 3
+        reps_val = e.get("reps") or e.get("repeticiones") or e.get("rep") or "10"
+        reps = str(reps_val)
+        out = {"nombre": nombre, "series": series, "reps": reps}
+        # Campos opcionales si existen
+        for k in ("rir","rpe","descanso","notas","tempo"):
+            if k in e:
+                out[k] = e[k]
+        return out
+
+    if "dias" not in data or not isinstance(data.get("dias"), list) or not data["dias"]:
+        dias_list = []
+        # Posibles estructuras alternativas
+        if "rutina_semanal" in data and isinstance(data["rutina_semanal"], dict):
+            for dia_nombre, dia_val in data["rutina_semanal"].items():
+                ejercicios_src = dia_val.get("ejercicios") if isinstance(dia_val, dict) else dia_val
+                ejercicios = [_norm_ej(e) for e in (ejercicios_src or [])]
+                dias_list.append({"nombre": str(dia_nombre), "ejercicios": ejercicios})
+        elif "semanal" in data and isinstance(data["semanal"], dict):
+            for dia_nombre, ejercicios_src in data["semanal"].items():
+                ejercicios = [_norm_ej(e) for e in (ejercicios_src or [])]
+                dias_list.append({"nombre": str(dia_nombre), "ejercicios": ejercicios})
+        elif "plan" in data and isinstance(data["plan"], dict):
+            for dia_nombre, ejercicios_src in data["plan"].items():
+                ejercicios = [_norm_ej(e) for e in (ejercicios_src or [])]
+                dias_list.append({"nombre": str(dia_nombre), "ejercicios": ejercicios})
+        else:
+            # Último recurso: si el raw ya tiene aspecto de lista de días
+            if isinstance(raw, dict) and any(k.lower().startswith(("lunes","martes","miércoles","miercoles","jueves","viernes","sábado","sabado","domingo")) for k in raw.keys()):
+                for dia_nombre, ejercicios_src in raw.items():
+                    ejercicios = [_norm_ej(e) for e in (ejercicios_src or [])]
+                    dias_list.append({"nombre": str(dia_nombre), "ejercicios": ejercicios})
+
+        data["dias"] = dias_list
+
+    return data
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 RULES_TEXT = (
@@ -105,9 +167,10 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": f"JSON no válido: {e}", "raw": raw}
 
     # Validación de negocio
-    errs = validar_negocio(data)
+    coerced = _coerce_to_schema(data, datos)
+    errs = validar_negocio(coerced)
     if not errs:
-        return {"ok": True, "data": data}
+        return {"ok": True, "data": coerced}
 
     # Intento de REFINADO: devolver al modelo el JSON + errores para que lo corrija
     fix_prompt = f"""
@@ -128,4 +191,4 @@ JSON ORIGINAL:
     if errs2:
         return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed}
 
-    return {"ok": True, "data": fixed}
+    return {"ok": True, "data": coerced}
