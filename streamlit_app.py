@@ -4,10 +4,6 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
-import os
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Query params (Streamlit >= 1.30)
 params = st.query_params
 _u = params.get("user")
@@ -814,8 +810,8 @@ elif page == "📘 Rutinas":
                 placeholder="Ej.: evitar press militar por hombro • añadir 1 día de cardio + core • priorizar glúteo...",
                 height=120
             )
-        submitted = st.form_submit_button("Generar rutina")
 
+            submitted = st.form_submit_button("Generar rutina")
         # ---------- Función de render tipo PDF ----------
         def render_rutina_tabular(rutina: dict):
             st.subheader("Plan (vista tipo PDF)")
