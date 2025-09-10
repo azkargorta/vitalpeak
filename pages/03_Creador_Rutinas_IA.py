@@ -37,7 +37,7 @@ if submitted:
     error = None
 
     if api_key_ok:
-        with st.spinner("Generando con ChatGPT..."):
+        with st.spinner("Generando con IA..."):
             result = call_gpt(datos_usuario)
             if result.get("ok"):
                 data_out = result["data"]
@@ -51,7 +51,7 @@ if submitted:
 
     st.subheader("Rutina generada")
     if used_fallback:
-        st.warning("Se usó el plan de respaldo. Configura OPENAI_API_KEY para usar ChatGPT.")
+        st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
         if error:
             with st.expander("Detalle del error de IA"):
                 st.code(error)
