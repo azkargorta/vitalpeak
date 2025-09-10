@@ -63,4 +63,3 @@ if submitted:
         file_name="rutina.json",
         mime="application/json"
     )
-
