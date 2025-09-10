@@ -19,6 +19,17 @@ if _u and _t:
     st.session_state["_pending_token"] = _t
 import os, time, time
 
+# ---- Estado API OpenAI (mostrar en UI) ----
+try:
+    _api_ok = bool(os.getenv("OPENAI_API_KEY"))
+    if _api_ok:
+        st.info("🔐 OpenAI API Key detectada (via .env o variables de entorno).", icon="✅")
+    else:
+        st.warning("⚠️ Falta OPENAI_API_KEY. Añádela en .env o en variables del hosting.", icon="⚠️")
+except Exception as _e:
+    st.warning(f"⚠️ No se pudo comprobar la API Key: {_e}")
+
+
 from app.email_utils import send_email
 from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset
 
