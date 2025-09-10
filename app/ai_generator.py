@@ -180,7 +180,16 @@ def _chat(client: OpenAI, prompt: str) -> str:
     return resp.choices[0].message.content
 
 def _try_parse_json(text: str) -> Dict[str, Any]:
-    return json.loads(text)
+    """Intenta parsear JSON tolerante a respuestas con texto adicional o fences."""
+    # Respuesta vacía -> error claro
+    if not text or not str(text).strip():
+        raise ValueError("Respuesta de OpenAI vacía")
+    try:
+        # Intento directo
+        return json.loads(text)
+    except Exception:
+        # Intento robusto: extraer bloque JSON o primer objeto balanceado
+        return _extract_json(text)
 
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
