@@ -879,10 +879,13 @@ elif page == "📘 Rutinas":
                     if result.get("ok"):
                         st.session_state["rutina_ia"] = result["data"]
                     else:
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                        st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
-                        st.session_state["ia_error"] = result.get("error","Error desconocido")
-                        st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
+    st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+    err = result.get("error","Error desconocido")
+    if not os.getenv("OPENAI_API_KEY"):
+        st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
+    else:
+        st.warning("Se usó el plan de respaldo por fallo al generar con OpenAI.")
+    st.error(f"Fallo al generar con OpenAI: {err}")
             else:
                 st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
                 st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")

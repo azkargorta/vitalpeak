@@ -1,3 +1,29 @@
+import json
+import re
+JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
+
+def _extract_json(text: str):
+    """
+    Extrae JSON de una respuesta de la IA intentando:
+    1) bloque ```json ... ```
+    2) primer objeto { ... } balanceado
+    3) parseo directo
+    """
+    if not text or not str(text).strip():
+        raise ValueError("Respuesta vacía")
+
+    m = JSON_BLOCK_RE.search(text)
+    if m:
+        cand = m.group(1).strip()
+        return json.loads(cand)
+
+    first = text.find("{"); last = text.rfind("}")
+    if first != -1 and last != -1 and last > first:
+        cand = text[first:last+1]
+        cand = re.sub(r",\s*([}\]])", r"\1", cand)  # arregla comas colgantes simples
+        return json.loads(cand)
+
+    return json.loads(text)
 import os, json
 from typing import Any, Dict
 from openai import OpenAI
