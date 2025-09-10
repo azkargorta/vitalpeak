@@ -30,6 +30,45 @@ from openai import OpenAI
 from .schema_rutina import validar_negocio
 
 
+
+def _ensure_descanso_for_ej(ej: Dict[str, Any]) -> Dict[str, Any]:
+    # Normaliza un ejercicio garantizando 'descanso'
+    if not isinstance(ej, dict):
+        return {"nombre": str(ej), "series": 3, "reps": "10", "descanso": "60-90s"}
+    nombre = ej.get("nombre") or ej.get("ejercicio") or ej.get("name") or "Ejercicio"
+    try:
+        series = int(ej.get("series", 3))
+    except Exception:
+        series = 3
+    reps = str(ej.get("reps") or ej.get("repeticiones") or ej.get("rep") or "10")
+    out = {"nombre": nombre, "series": series, "reps": reps}
+    # Descanso por defecto si no viene
+    def _infer_rest(reps_str: str) -> str:
+        import re as _re
+        s = reps_str.strip()
+        m = _re.match(r"^(\d{1,2})\s*[–-]\s*(\d{1,2})$", s)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            avg = (a + b) / 2
+        else:
+            try:
+                avg = float(s)
+            except Exception:
+                avg = 10
+        if avg <= 6:
+            return "120-180s"
+        if avg <= 10:
+            return "60-90s"
+        return "45-75s"
+    if "descanso" in ej and str(ej.get("descanso")).strip():
+        out["descanso"] = str(ej.get("descanso"))
+    else:
+        out["descanso"] = _infer_rest(reps)
+    # Extras si existen
+    for k in ("rir","rpe","notas","tempo","intensidad"):
+        if k in ej:
+            out[k] = ej[k]
+    return out
 def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, Any]:
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
@@ -44,8 +83,54 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
         }
 
     # --- PROGRESION ---
-    if "progresion" not in data or not isinstance(data.get("progresion"), str):
-        data["progresion"] = datos.get("progresion_preferida", "lineal")
+    pref_in = data.get("progresion")
+    if isinstance(pref_in, dict) and {"principales","accesorios","deload_semana"} <= set(pref_in.keys()):
+        pass
+    else:
+        pref = str(pref_in or datos.get("progresion_preferida", "lineal")).lower()
+        if "doble" in pref:
+            data["progresion"] = {
+                "principales": "doble progresión en carga o repeticiones",
+                "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
+                "deload_semana": 5
+            }
+        elif "lineal" in pref:
+            data["progresion"] = {
+                "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
+                "accesorios": "mantén técnica y suma reps gradualmente",
+                "deload_semana": 6
+            }
+        else:
+            data["progresion"] = {
+                "principales": "progresión simple: subir reps o carga cada semana si es posible",
+                "accesorios": "reps adicionales o pausas más cortas",
+                "deload_semana": 6
+            }
+
+    
+    # Asegurar que progresion sea dict válido
+    pref_in = data.get("progresion")
+    if not isinstance(pref_in, dict):
+        pref = str(pref_in or datos.get("progresion_preferida", "lineal")).lower()
+        if "doble" in pref:
+            data["progresion"] = {
+                "principales": "doble progresión en carga o repeticiones",
+                "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
+                "deload_semana": 5
+            }
+        elif "lineal" in pref:
+            data["progresion"] = {
+                "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
+                "accesorios": "mantén técnica y suma reps gradualmente",
+                "deload_semana": 6
+            }
+        else:
+            data["progresion"] = {
+                "principales": "progresión simple: subir reps o carga cada semana si es posible",
+                "accesorios": "reps adicionales o pausas más cortas",
+                "deload_semana": 6
+            }
+
 
     # --- DIAS ---
     def _norm_ej(e):
@@ -59,8 +144,30 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
         reps_val = e.get("reps") or e.get("repeticiones") or e.get("rep") or "10"
         reps = str(reps_val)
         out = {"nombre": nombre, "series": series, "reps": reps}
+        # Descanso por defecto si no viene
+        def _infer_rest(reps_str: str) -> str:
+            import re as _re
+            s = reps_str.strip()
+            m = _re.match(r"^(\d{1,2})\s*[–-]\s*(\d{1,2})$", s)
+            if m:
+                a, b = int(m.group(1)), int(m.group(2))
+                avg = (a + b) / 2
+            else:
+                try:
+                    avg = float(s)
+                except Exception:
+                    avg = 10
+            if avg <= 6:
+                return "120-180s"
+            if avg <= 10:
+                return "60-90s"
+            return "45-75s"
+        if "descanso" in e and str(e.get("descanso")).strip():
+            out["descanso"] = str(e.get("descanso"))
+        else:
+            out["descanso"] = _infer_rest(reps)
         # Campos opcionales si existen
-        for k in ("rir","rpe","descanso","notas","tempo"):
+        for k in ("rir","rpe","notas","tempo"):
             if k in e:
                 out[k] = e[k]
         return out
@@ -89,6 +196,20 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
                     dias_list.append({"nombre": str(dia_nombre), "ejercicios": ejercicios})
 
         data["dias"] = dias_list
+
+    # Normalización SIEMPRE sobre dias si existen
+    if isinstance(data.get("dias"), list):
+        fixed_dias = []
+        for dia in data["dias"]:
+            nombre_dia = (dia.get("nombre") if isinstance(dia, dict) else str(dia)) or "Día"
+            ejercicios_src = []
+            if isinstance(dia, dict):
+                ejercicios_src = dia.get("ejercicios") or []
+            elif isinstance(dia, list):
+                ejercicios_src = dia
+            ejercicios = [_ensure_descanso_for_ej(ej) for ej in (ejercicios_src or [])]
+            fixed_dias.append({"nombre": nombre_dia, "ejercicios": ejercicios, "notas": dia.get("notas","") if isinstance(dia, dict) else ""})
+        data["dias"] = fixed_dias
 
     return data
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
