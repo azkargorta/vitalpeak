@@ -7,6 +7,8 @@ import streamlit as st
 from dotenv import load_dotenv
 import os
 load_dotenv()
+if os.getenv("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Query params (Streamlit >= 1.30)
 params = st.query_params

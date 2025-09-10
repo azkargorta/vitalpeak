@@ -4,30 +4,6 @@ from openai import OpenAI
 from .schema_rutina import validar_negocio
 
 
-
-# --- OpenAI client helper (always uses env key) ---
-def _get_openai_client():
-    try:
-        from openai import OpenAI
-    except Exception:
-        OpenAI = None
-    import os
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        raise RuntimeError("OPENAI_API_KEY no está configurada en el entorno.")
-    client = None
-    if OpenAI is not None:
-        try:
-            client = _get_openai_client()
-        except Exception:
-            client = None
-    try:
-        import openai as _openai
-        _openai.api_key = key
-    except Exception:
-        pass
-    return client
-
 def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, Any]:
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
