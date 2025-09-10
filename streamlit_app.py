@@ -810,8 +810,8 @@ elif page == "📘 Rutinas":
                 placeholder="Ej.: evitar press militar por hombro • añadir 1 día de cardio + core • priorizar glúteo...",
                 height=120
             )
-        submitted = st.form_submit_button("Generar rutina")
 
+            submitted = st.form_submit_button("Generar rutina")
         # ---------- Función de render tipo PDF ----------
         def render_rutina_tabular(rutina: dict):
             st.subheader("Plan (vista tipo PDF)")
