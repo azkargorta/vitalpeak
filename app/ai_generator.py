@@ -324,6 +324,7 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
 
     # Validación de negocio
     coerced = _coerce_to_schema(data, datos)
+    coerced = _sanitize_plan_reps(coerced)
     errs = validar_negocio(coerced)
     if not errs:
         return {"ok": True, "data": coerced}
@@ -348,3 +349,46 @@ JSON ORIGINAL:
         return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed}
 
     return {"ok": True, "data": coerced}
+
+
+import re as _re2
+
+def _sanitize_reps_value(val) -> str:
+    """
+    Normaliza reps para cumplir regex esperado: "5" o "6-8" o "10-12".
+    - Reemplaza guiones largos/en-dash por "-"
+    - Quita texto como "reps", "por lado", "cada lado", etc.
+    - Si hay >1 número, devuelve "a-b" (primer-par). Si solo 1, devuelve "n".
+    """
+    if val is None:
+        return ""
+    s = str(val).strip().lower()
+    s = s.replace("–", "-").replace("—", "-")
+    # Limpia palabras comunes
+    for t in ["reps", "rep", "por lado", "cada lado", "lado", "c/u", "por brazo", "por pierna"]:
+        s = s.replace(t, "")
+    # Quita paréntesis residuales
+    s = s.replace("(", " ").replace(")", " ")
+    # Extrae números
+    nums = _re2.findall(r"\d+", s)
+    if not nums:
+        return ""
+    if len(nums) == 1:
+        return nums[0]
+    # Usa los dos primeros números como rango coherente
+    a, b = int(nums[0]), int(nums[1])
+    if a > b:
+        a, b = b, a
+    return f"{a}-{b}"
+
+def _sanitize_plan_reps(plan: dict) -> dict:
+    try:
+        for d in plan.get("dias", []):
+            for ej in d.get("ejercicios", []):
+                repv = ej.get("reps", "")
+                rep_clean = _sanitize_reps_value(repv)
+                if rep_clean:
+                    ej["reps"] = rep_clean
+    except Exception:
+        pass
+    return plan
