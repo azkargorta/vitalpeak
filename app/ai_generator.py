@@ -226,36 +226,7 @@ RULES_TEXT = (
 )
 
 def build_system() -> str:
-    return (
-        "Eres un entrenador personal experto. Prioridades, en orden estricto: "
-        "1) REGLAS ESTRICTAS y CONDICIONES_USUARIO (MUST/NEVER). "
-        "2) Preferencias del usuario (nice-to-have). "
-        "Si hay conflicto, prioriza 1 sobre 2 y ajusta volumen/selección para seguir cumpliendo. "
-        "Responde EXCLUSIVAMENTE con JSON válido, sin explicaciones ni texto extra."
-    )
-
-def _compile_user_conditions(notas: str) -> dict:
-    """
-    Convierte comentarios del usuario en reglas accionables:
-    - MUST: requisitos obligatorios (p. ej., "siempre incluir gemelos 2x/semana")
-    - NEVER: prohibiciones (p. ej., "evitar peso muerto", "sin press militar")
-    - LIMITS: límites cuantitativos (p. ej., "máximo: 18 series por sesión")
-    """
-    import re as _re
-    must, never, limits = [], [], {}
-    if not notas:
-        return {"MUST": must, "NEVER": never, "LIMITS": limits}
-    lines = [l.strip("-•* ").strip() for l in notas.splitlines() if l.strip()]
-    for l in lines:
-        low = l.lower()
-        if any(t in low for t in ["no hacer", "evitar", "prohib", "sin "]):
-            never.append(l)
-        elif any(t in low for t in ["siempre", "oblig", "incluir", "asegúrate"]):
-            must.append(l)
-        m = _re.search(r"(máx(?:imo)?|min(?:imo)?)\s*:\s*(\d+)", low)
-        if m:
-            limits[m.group(1)] = int(m.group(2))
-    return {"MUST": must, "NEVER": never, "LIMITS": limits}
+    return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
 def build_prompt(datos: Dict[str, Any]) -> str:
     """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
@@ -264,50 +235,6 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     notas = datos.get("comentarios", "")
     objetivo = datos.get("objetivo", "mixto")
     nivel = datos.get("nivel", "intermedio")
-
-    schema_hint = """
-ESQUEMA_SALIDA (obligatorio):
-{
-  "meta": { "nivel": "principiante|intermedio|avanzado", "dias": 1-6, "duracion_min": 30-120, "objetivo": "fuerza|hipertrofia|resistencia|mixto" },
-  "progresion": { "principales": "string", "accesorios": "string", "deload_semana": 4-8 },
-  "dias": [
-    { "nombre": "string",
-      "ejercicios": [
-        { "nombre": "string", "series": 2-6, "reps": "5|6-8|8-10|10-12", "descanso": "45-180s", "intensidad": "RPE 6-9|%1RM 60-85" }
-      ]
-    }
-  ],
-  "verificacion": { "cumple_must": true, "cumple_never": true, "duracion_ok": true }
-}
-No incluyas texto fuera del JSON.
-"""
-
-    fewshot = """
-EJEMPLO — Comentario 'evitar peso muerto' y 'incluir gemelos 2x/semana':
-ENTRADA: nivel=intermedio, dias=3, objetivo=mixto, material=["todo"]
-COMENTARIOS:
-- Evitar peso muerto
-- Siempre incluir gemelos 2x/semana
-SALIDA (esqueleto, sin texto extra):
-{
-  "meta": {"nivel":"intermedio","dias":3,"duracion_min":60,"objetivo":"mixto"},
-  "progresion": {"principales":"sube reps o carga semanal","accesorios":"añade reps","deload_semana":6},
-  "dias": [
-    {"nombre":"Lower A (cuádriceps)","ejercicios":[
-      {"nombre":"Sentadilla trasera","series":4,"reps":"4-6","descanso":"120-180s"},
-      {"nombre":"Prensa","series":3,"reps":"8-10","descanso":"90-120s"},
-      {"nombre":"Elevación de talones en máquina","series":3,"reps":"10-12","descanso":"60-90s"}
-    ]},
-    {"nombre":"Upper (empuje/tirón balanceado)","ejercicios":[{"nombre":"Press banca","series":4,"reps":"6-8","descanso":"120s"}]},
-    {"nombre":"Lower B (bisagra sin peso muerto)","ejercicios":[
-      {"nombre":"Hip thrust","series":4,"reps":"6-8","descanso":"120s"},
-      {"nombre":"Curl femoral tumbado","series":3,"reps":"10-12","descanso":"60-90s"},
-      {"nombre":"Elevación de talones de pie","series":3,"reps":"10-12","descanso":"60-90s"}
-    ]}
-  ],
-  "verificacion":{"cumple_must":true,"cumple_never":true,"duracion_ok":true}
-}
-"""
 
     reglas_estrictas = f"""
 REGLAS ESTRICTAS (debes cumplirlas sí o sí):
@@ -327,17 +254,6 @@ REGLAS ESTRICTAS (debes cumplirlas sí o sí):
 {("Notas del usuario: " + notas) if notas else ""}
 """.strip("\n")
 
-    # Compila comentarios en reglas MUST/NEVER/LIMITS
-    conds = _compile_user_conditions(notas)
-    cond_block = f"""
-CONDICIONES_USUARIO — ESTRICTAS:
-- MUST (obligatorio): {conds['MUST'] or '[]'}
-- NEVER (prohibido): {conds['NEVER'] or '[]'}
-- LIMITS: {conds['LIMITS'] or '{}'}
-Si alguna NEVER choca con otros requisitos, reemplaza por alternativa equivalente y mantén la prohibición.
-"""
-
-
     prompt = f"""
 Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
 
@@ -345,10 +261,6 @@ Genera una rutina semanal siguiendo estas reglas base:
 {RULES_TEXT.format(dur=datos.get('duracion', 60))}
 
 {reglas_estrictas}
-{cond_block}
-{schema_hint}
-{fewshot}
-
 
 ENTRADA DEL USUARIO (estructura):
 - Nivel: {nivel}
@@ -370,7 +282,6 @@ ENTRADA DEL USUARIO (estructura):
 - Calentamiento: {datos.get('calentamiento','')}
 - Agrupación: {agrup}
 
-Antes de responder, verifica internamente que las NEVER están ausentes, los MUST se cumplen y la duración total ≈ duracion_min; ajusta volumen/descansos si no.
 SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
 """
     return prompt
