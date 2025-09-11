@@ -227,6 +227,12 @@ RULES_TEXT = (
 
 def build_system() -> str:
     return (
+        "Eres un entrenador personal experto. Prioridades, en orden estricto: "
+        "1) REGLAS ESTRICTAS y CONDICIONES_USUARIO (MUST/NEVER). "
+        "2) Preferencias del usuario (nice-to-have). "
+        "Si hay conflicto, prioriza 1 sobre 2 y ajusta volumen/selección para seguir cumpliendo. "
+        "Responde EXCLUSIVAMENTE con JSON válido, sin explicaciones ni texto extra."
+    )
 
 def _compile_user_conditions(notas: str) -> dict:
     """
@@ -250,13 +256,6 @@ def _compile_user_conditions(notas: str) -> dict:
         if m:
             limits[m.group(1)] = int(m.group(2))
     return {"MUST": must, "NEVER": never, "LIMITS": limits}
-
-        "Eres un entrenador personal experto. Prioridades, en orden estricto: "
-        "1) REGLAS ESTRICTAS y CONDICIONES_USUARIO (MUST/NEVER). "
-        "2) Preferencias del usuario (nice-to-have). "
-        "Si hay conflicto, prioriza 1 sobre 2 y ajusta volumen/selección para seguir cumpliendo. "
-        "Responde EXCLUSIVAMENTE con JSON válido, sin explicaciones ni texto extra."
-    )
 
 def build_prompt(datos: Dict[str, Any]) -> str:
     """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
