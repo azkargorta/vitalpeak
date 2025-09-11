@@ -19,7 +19,7 @@ with st.form("form_datos"):
         objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
         material = st.multiselect("Material disponible", ["barra","mancuernas","poleas","máquinas","banco","rack","ninguno"])
         limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
-        comentarios = st.text_area("Comentarios (se respetan al 100%)", placeholder="Ej: solo 1 día de pierna, más ejercicios de bíceps, menos ejercicios de pecho")
+        comentarios = st.text_area("Comentarios (se respetan al 100%)", placeholder="Ej: solo 1 día de pierna, más ejercicios de bíceps, menos ejercicios de pecho, no repetir ejercicios, máximo 8 ejercicios por sesión, etc.")
     submitted = st.form_submit_button("Generar rutina")
 
 if submitted:
