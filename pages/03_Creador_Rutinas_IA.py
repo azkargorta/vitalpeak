@@ -1,7 +1,7 @@
 
 import os, json
 import streamlit as st
-from app.ai_generator import call_gpt
+from app.ai_generator import call_gpt, build_prompt
 from app.rules_fallback import generate_fallback
 from app.pdf_export import rutina_a_pdf_bytes
 
@@ -19,6 +19,7 @@ with st.form("form_datos"):
         objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
         material = st.multiselect("Material disponible", ["barra","mancuernas","poleas","máquinas","banco","rack","ninguno"])
         limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+        comentarios = st.text_area("Comentarios (se respetan al 100%)", placeholder="Ej: solo 1 día de pierna, más ejercicios de bíceps, menos ejercicios de pecho")
     submitted = st.form_submit_button("Generar rutina")
 
 if submitted:
@@ -28,7 +29,8 @@ if submitted:
         "duracion": int(duracion),
         "objetivo": objetivo,
         "material": material,
-        "limitaciones": limitaciones.strip()
+        "limitaciones": limitaciones.strip(),
+        "comentarios": comentarios.strip()
     }
 
     api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
@@ -49,7 +51,16 @@ if submitted:
         used_fallback = True
         data_out = generate_fallback(datos_usuario)
 
-    st.subheader("Rutina generada")
+    
+# Mostrar prompt utilizado
+try:
+    _prompt_used = result.get("prompt") if isinstance(result, dict) else build_prompt(datos_usuario)
+    with st.expander("🧠 Ver prompt construido con tus parámetros"):
+        st.code(_prompt_used)
+except Exception:
+    pass
+
+st.subheader("Rutina generada")
     if used_fallback:
         st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
         if error:

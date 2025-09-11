@@ -251,7 +251,7 @@ REGLAS ESTRICTAS (debes cumplirlas sí o sí):
   * Si es personalizado, usa SOLO el material listado.
 - Respeta lesiones/limitaciones y el objetivo indicado.
 - Ajusta volumen y selección de ejercicios al objetivo ({objetivo}) y nivel ({nivel}).
-{("Notas del usuario: " + notas) if notas else ""}
+{("\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  " + notas) if notas else ""}
 """.strip("\n")
 
     prompt = f"""
@@ -312,9 +312,81 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
         # Intento robusto: extraer bloque JSON o primer objeto balanceado
         return _extract_json(text)
 
+
+# === Reglas adicionales derivadas de 'comentarios' del usuario ===
+MUSCLES_SYNONYMS = {
+    "bíceps": ["bíceps","biceps","curl","martillo"],
+    "tríceps": ["tríceps","triceps","fondos","jalón tríceps","jalon triceps","extensión tríceps","extension triceps"],
+    "pecho": ["pecho","press banca","aperturas","inclinado","cruce"],
+    "espalda": ["espalda","remo","dominad","jalón","jalon","pull"],
+    "hombro": ["hombro","deltoid","elevación lateral","press militar"],
+    "pierna": ["pierna","piernas","lower","inferior","sentadilla","prensa","zancada","femoral","peso muerto rumano","gemelos","glúteo","gluteo","cuádriceps","cuadriceps"]
+}
+
+def _count_days_for_group(plan: dict, group_key: str) -> int:
+    keys = MUSCLES_SYNONYMS.get(group_key, [group_key])
+    total = 0
+    for d in plan.get("dias", []):
+        name = (d.get("nombre","") or "").lower()
+        if any(k in name for k in keys):
+            total += 1
+    return total
+
+def _count_exercises_for_group(plan: dict, group_key: str) -> int:
+    keys = MUSCLES_SYNONYMS.get(group_key, [group_key])
+    c = 0
+    for d in plan.get("dias", []):
+        for ej in d.get("ejercicios", []):
+            n = (ej.get("nombre","") or "").lower()
+            if any(k in n for k in keys):
+                c += 1
+    return c
+
+def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
+    """
+    Aplica verificaciones duras a partir de frases comunes en 'comentarios'.
+    Si una regla no se cumple, devuelve errores para que el refinado lo corrija.
+    """
+    if not comentarios or not str(comentarios).strip():
+        return []
+    errs = []
+    txt = comentarios.lower()
+
+    # Regla: "solo 1 dia de pierna" (o variantes)
+    import re as _re
+    m = _re.search(r"solo\s+(\d+)\s*d[ií]a[s]?\s+de\s+(pierna|piernas|lower|inferior)", txt)
+    if m:
+        n = int(m.group(1))
+        current = _count_days_for_group(plan, "pierna")
+        if current != n:
+            errs.append(f"El plan debe tener exactamente {n} día(s) de pierna, pero tiene {current}.")
+
+    # Regla genérica: "más ejercicios de [grupo]"
+    m = _re.search(r"m[aá]s\s+ejercicios\s+de\s+([a-záéíóúñ]+)", txt)
+    if m:
+        g = m.group(1)
+        cnt = _count_exercises_for_group(plan, g)
+        # Exigimos al menos 3 ejercicios totales del grupo en la semana
+        if cnt < 3:
+            errs.append(f"Incluir más ejercicios de {g}: hay {cnt}, se requieren ≥3 en total en la semana.")
+
+    # Regla genérica: "menos ejercicios de [grupo]"
+    m = _re.search(r"menos\s+ejercicios\s+de\s+([a-záéíóúñ]+)", txt)
+    if m:
+        g = m.group(1)
+        cnt = _count_exercises_for_group(plan, g)
+        # Como límite blando: máximo 2 ejercicios totales del grupo en la semana
+        if cnt > 2:
+            errs.append(f"Reducir ejercicios de {g}: hay {cnt}, como máximo 2 en total en la semana.")
+
+    return errs
+
+
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
-    raw = _chat(client, build_prompt(datos))
+    _system = build_system()
+    _prompt = build_prompt(datos)
+    raw = _chat(client, _prompt)
 
     # Primer intento de parseo
     try:
@@ -326,8 +398,13 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     coerced = _coerce_to_schema(data, datos)
     coerced = _sanitize_plan_reps(coerced)
     errs = validar_negocio(coerced)
+    # Reglas de comentarios del usuario
+    try:
+        errs += validar_comentarios(coerced, datos.get("comentarios",""))
+    except Exception:
+        pass
     if not errs:
-        return {"ok": True, "data": coerced}
+        return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
 
     # Intento de REFINADO: devolver al modelo el JSON + errores para que lo corrija
     fix_prompt = f"""
@@ -342,13 +419,13 @@ JSON ORIGINAL:
     try:
         fixed = _try_parse_json(fixed_raw)
     except Exception as e:
-        return {"ok": False, "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw}
+        return {"ok": False, "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw, "prompt": _prompt, "system": _system}
 
     errs2 = validar_negocio(fixed)
     if errs2:
-        return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed}
+        return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed, "prompt": _prompt, "system": _system}
 
-    return {"ok": True, "data": coerced}
+    return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
 
 
 import re as _re2
