@@ -823,7 +823,12 @@ elif page == "📘 Rutinas":
             if not dias:
                 st.info("No hay días en la rutina.")
                 return
-            tabs = tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias), '📈 Progreso de ejercicios']
+            # Crear lista de pestañas desde los días
+tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias)]
+# Añadir la pestaña extra de progreso
+tab_labels.append("📈 Progreso de ejercicios")
+# Crear las tabs con la lista final
+tabs = st.tabs(tab_labels)
 tab_labels.append('📈 Progreso de ejercicios')
 tabs = st.tabs(tab_labels)
             for i, dia in enumerate(dias):
