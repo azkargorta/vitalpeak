@@ -56,30 +56,6 @@ if submitted:
             with st.expander("Detalle del error de IA"):
                 st.code(error)
     st.json(data_out)
-    # --- Características usadas en el prompt (debajo del entreno) ---
-    try:
-        _prompt = result.get("prompt_used") if 'result' in locals() else None
-        _system = result.get("system_prompt") if 'result' in locals() else None
-        if _prompt:
-            with st.expander("Características usadas en el prompt", expanded=False):
-                import re as _re_ui
-                st.caption("Resumen de parámetros y reglas inyectadas en la generación.")
-                _params_match = _re_ui.search(r"=== PARAMS ===\s*(.*?)\s*=== /PARAMS ===", _prompt, flags=_re_ui.DOTALL)
-                if _params_match:
-                    st.markdown("**Parámetros**")
-                    for line in _params_match.group(1).splitlines():
-                        st.code(line.strip(), language="")
-                _conds_match = _re_ui.search(r"CONDICIONES_USUARIO[^\n]*:\s*(.*?)(?:\n{2,}|SALIDA \(JSON\)|$)", _prompt, flags=_re_ui.DOTALL)
-                if _conds_match:
-                    st.markdown("**Condiciones del usuario interpretadas**")
-                    st.code(_conds_match.group(1).strip(), language="")
-                st.markdown("**Prompt completo (auditoría)**")
-                st.code(_prompt, language="")
-        else:
-            st.info("No se pudo capturar el prompt usado en esta ejecución.")
-    except Exception as _e:
-        st.warning(f"No se pudo mostrar el prompt usado: {_e}")
-
 
     st.download_button(
         "📥 Descargar JSON",

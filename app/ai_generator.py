@@ -254,7 +254,7 @@ REGLAS ESTRICTAS (debes cumplirlas sí o sí):
 {("Notas del usuario: " + notas) if notas else ""}
 """.strip("\n")
 
-    prompt = f"""\n=== PARAMS ===\nnivel={nivel} | dias={dias} | objetivo={objetivo} | duracion_min={duracion_min} | material={material}\nsexo={sexo} | edad={edad} | peso={peso} | altura={altura} | lesiones={lesiones}\nexperiencia={experiencia} | tiempo_disponible={tiempo_disponible}\n=== /PARAMS ===\n\n
+    prompt = f"""
 Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
 
 Genera una rutina semanal siguiendo estas reglas base:
@@ -320,17 +320,17 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     try:
         data = _try_parse_json(raw)
     except Exception as e:
-        return {"ok": False, "prompt_used": (locals().get("prompt") if "prompt" in locals() else None), "system_prompt": build_system(), "error": f"JSON no válido: {e}", "raw": raw}
+        return {"ok": False, "error": f"JSON no válido: {e}", "raw": raw}
 
     # Validación de negocio
     coerced = _coerce_to_schema(data, datos)
     coerced = _sanitize_plan_reps(coerced)
     errs = validar_negocio(coerced)
     if not errs:
-        return {"ok": True, "data": coerced, "prompt_used": prompt, "system_prompt": build_system()}
+        return {"ok": True, "data": coerced}
 
     # Intento de REFINADO: devolver al modelo el JSON + errores para que lo corrija
-    fix_prompt = f"""\n=== PARAMS ===\nnivel={nivel} | dias={dias} | objetivo={objetivo} | duracion_min={duracion_min} | material={material}\nsexo={sexo} | edad={edad} | peso={peso} | altura={altura} | lesiones={lesiones}\nexperiencia={experiencia} | tiempo_disponible={tiempo_disponible}\n=== /PARAMS ===\n\n
+    fix_prompt = f"""
 Corrige el siguiente JSON de rutina para cumplir las reglas. Devuelve solo JSON válido.
 ERRORES:
 {json.dumps(errs, ensure_ascii=False, indent=2)}
@@ -342,13 +342,13 @@ JSON ORIGINAL:
     try:
         fixed = _try_parse_json(fixed_raw)
     except Exception as e:
-        return {"ok": False, "prompt_used": (locals().get("prompt") if "prompt" in locals() else None), "system_prompt": build_system(), "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw}
+        return {"ok": False, "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw}
 
     errs2 = validar_negocio(fixed)
     if errs2:
-        return {"ok": False, "prompt_used": (locals().get("prompt") if "prompt" in locals() else None), "system_prompt": build_system(), "error": f"Refinado aún con errores: {errs2}", "raw": fixed}
+        return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed}
 
-    return {"ok": True, "data": coerced, "prompt_used": prompt, "system_prompt": build_system()}
+    return {"ok": True, "data": coerced}
 
 
 import re as _re2
