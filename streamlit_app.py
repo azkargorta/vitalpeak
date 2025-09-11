@@ -823,7 +823,9 @@ elif page == "📘 Rutinas":
             if not dias:
                 st.info("No hay días en la rutina.")
                 return
-            tabs = st.tabs([d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias), '📈 Progreso de ejercicios'])
+            tabs = tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias), '📈 Progreso de ejercicios']
+tab_labels.append('📈 Progreso de ejercicios')
+tabs = st.tabs(tab_labels)
             for i, dia in enumerate(dias):
                 with tabs[i]:
                     rows = [{
