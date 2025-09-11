@@ -878,21 +878,21 @@ elif page == "📘 Rutinas":
                     result = call_gpt(datos_usuario)
                     if result.get("ok"):
                         st.session_state["rutina_ia"] = result["data"]
-            # Guardamos el prompt y system para mostrarlo después
-            try:
-                st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
-            except Exception:
-                st.session_state["ia_prompt"] = None
-            st.session_state["ia_system"] = result.get("system")
-                    else:
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                        err = result.get("error","Error desconocido")
-                        # También intentamos conservar el prompt usado para depurar
+                        # Guardar prompt/system para depurar
                         try:
                             st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
                         except Exception:
                             st.session_state["ia_prompt"] = None
                         st.session_state["ia_system"] = result.get("system")
+                    else:
+                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                        # Guardar prompt/system aunque haya fallo
+                        try:
+                            st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
+                        except Exception:
+                            st.session_state["ia_prompt"] = build_prompt(datos_usuario)
+                        st.session_state["ia_system"] = result.get("system")
+                        err = result.get("error","Error desconocido")
                         if not os.getenv("OPENAI_API_KEY"):
                             st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
                         else:
@@ -900,12 +900,12 @@ elif page == "📘 Rutinas":
                         st.error(f"Fallo al generar con OpenAI: {err}")
             else:
                 st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
                 try:
                     st.session_state["ia_prompt"] = build_prompt(datos_usuario)
                 except Exception:
                     st.session_state["ia_prompt"] = None
                 st.session_state["ia_system"] = None
+                st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
                 st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
                 st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
 
@@ -977,13 +977,12 @@ elif page == "📘 Rutinas":
                 except Exception as e:
                     st.error(f"Error al programar: {e}")
 
-            
-# 🧠 Mostrar prompt utilizado para la IA
-if st.session_state.get("ia_prompt"):
-    with st.expander("🧠 Ver prompt construido con tus parámetros", expanded=False):
-        st.code(st.session_state.get("ia_prompt"))
+            # 🧠 Mostrar prompt utilizado para la IA
+            if st.session_state.get("ia_prompt"):
+                with st.expander("🧠 Ver prompt construido con tus parámetros", expanded=False):
+                    st.code(st.session_state.get("ia_prompt"))
 
-        with st.expander("Ver JSON (avanzado)", expanded=False):
+            with st.expander("Ver JSON (avanzado)", expanded=False):
                 st.json(rutina_view)
 
     with st.expander("Exportar rutina (PDF)", expanded=False):
