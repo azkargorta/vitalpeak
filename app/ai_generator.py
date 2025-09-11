@@ -314,23 +314,30 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
 
 
 # === Reglas adicionales derivadas de 'comentarios' del usuario ===
+
 MUSCLES_SYNONYMS = {
     "bíceps": ["bíceps","biceps","curl","martillo"],
     "tríceps": ["tríceps","triceps","fondos","jalón tríceps","jalon triceps","extensión tríceps","extension triceps"],
-    "pecho": ["pecho","press banca","aperturas","inclinado","cruce"],
-    "espalda": ["espalda","remo","dominad","jalón","jalon","pull"],
-    "hombro": ["hombro","deltoid","elevación lateral","press militar"],
-    "pierna": ["pierna","piernas","lower","inferior","sentadilla","prensa","zancada","femoral","peso muerto rumano","gemelos","glúteo","gluteo","cuádriceps","cuadriceps"]
+    "pecho": ["pecho","press banca","aperturas","inclinado","cruce","press"],
+    "espalda": ["espalda","remo","dominad","jalón","jalon","pull","pullover"],
+    "hombro": ["hombro","deltoid","elevación lateral","elevacion lateral","press militar","arnold"],
+    "pierna": ["pierna","piernas","lower","inferior","sentadilla","prensa","zancada","femoral","peso muerto rumano","gemelos","cuádriceps","cuadriceps"],
+    "glúteo": ["glúteo","gluteo","glutes","glute","hip thrust","puente de glúteo","puente de gluteo"]
 }
 
-def _count_days_for_group(plan: dict, group_key: str) -> int:
+def _day_has_group(d: dict, group_key: str) -> bool:
     keys = MUSCLES_SYNONYMS.get(group_key, [group_key])
-    total = 0
-    for d in plan.get("dias", []):
-        name = (d.get("nombre","") or "").lower()
-        if any(k in name for k in keys):
-            total += 1
-    return total
+    name = (d.get("nombre","") or "").lower()
+    if any(k in name for k in keys):
+        return True
+    for ej in d.get("ejercicios", []):
+        n = (ej.get("nombre","") or "").lower()
+        if any(k in n for k in keys):
+            return True
+    return False
+
+def _count_days_for_group(plan: dict, group_key: str) -> int:
+    return sum(1 for d in plan.get("dias", []) if _day_has_group(d, group_key))
 
 def _count_exercises_for_group(plan: dict, group_key: str) -> int:
     keys = MUSCLES_SYNONYMS.get(group_key, [group_key])
@@ -342,18 +349,81 @@ def _count_exercises_for_group(plan: dict, group_key: str) -> int:
                 c += 1
     return c
 
+
+def _norm(x: str) -> str:
+    return (x or "").lower()
+
+CARDIO_KEYWORDS = ["cardio","cinta","trote","correr","run","running","elíptica","eliptica","bicicleta","spinning","remo","erg","hiit","saltos","jumping jacks","burpees","saltar comba","comba","escaladora","stepper","air bike"]
+
+MACHINE_KEYWORDS = ["máquina","maquina","machine","prensa","polea","cable","smith","hack squat","pec deck","contractora","extensión de cuádriceps","extension de cuadriceps","curl femoral","jalón en polea","jalon en polea","cruce en polea","pulldown"]
+BARBELL_KEYWORDS = ["barra","barbell"]
+DUMBBELL_KEYWORDS = ["mancuerna","mancuernas","dumbbell","db"]
+
+def _is_cardio_exercise(ej: dict) -> bool:
+    n = _norm(ej.get("nombre",""))
+    return any(k in n for k in CARDIO_KEYWORDS)
+
+def _exercise_minutes(ej: dict) -> int | None:
+    for k in ["duracion_minutos","duración_minutos","tiempo_minutos","minutos"]:
+        v = ej.get(k)
+        try:
+            if isinstance(v, (int,float)) and v > 0:
+                return int(v)
+            if isinstance(v, str):
+                import re as _re
+                m = _re.search(r"(\d+)\s*(?:min|mins|minutos|’|')", v.lower())
+                if m:
+                    return int(m.group(1))
+        except Exception:
+            pass
+    import re as _re
+    text = " ".join([_norm(ej.get("nombre","")), _norm(ej.get("descripcion","")), _norm(ej.get("notas",""))])
+    m = _re.search(r"(\d+)\s*(?:min|mins|minutos|’|')", text)
+    if m:
+        return int(m.group(1))
+    return None
+
+def _day_has_cardio_minutes(dia: dict, min_minutes: int) -> bool:
+    ok = False
+    for ej in dia.get("ejercicios", []):
+        if _is_cardio_exercise(ej):
+            mins = _exercise_minutes(ej)
+            if mins is not None and mins >= min_minutes:
+                return True
+            ok = True
+    return False
+
+def _exercise_uses_any(ej: dict, keywords: list[str]) -> bool:
+    n = _norm(ej.get("nombre",""))
+    return any(k in n for k in keywords)
+
+def _list_all_exercises(plan: dict) -> list[dict]:
+    lst = []
+    for d in plan.get("dias", []):
+        for ej in d.get("ejercicios", []):
+            lst.append(ej)
+    return lst
+
+def _max_exercises_per_day(plan: dict) -> int:
+    return max((len(d.get("ejercicios", [])) for d in plan.get("dias", [])), default=0)
+
 def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
-    """
-    Aplica verificaciones duras a partir de frases comunes en 'comentarios'.
-    Si una regla no se cumple, devuelve errores para que el refinado lo corrija.
-    """
     if not comentarios or not str(comentarios).strip():
         return []
     errs = []
     txt = comentarios.lower()
 
-    # Regla: "solo 1 dia de pierna" (o variantes)
     import re as _re
+
+    # Total days exact
+    m = _re.search(r"solo\s+(\d+)\s*d[ií]as(?:\s+por\s+semana)?", txt)
+    if m:
+        n = int(m.group(1))
+        total_days = len(plan.get("dias", []))
+        if total_days != n:
+            errs.append(f"El plan debe tener exactamente {n} día(s) totales, pero tiene {total_days}.")
+
+    # Exact legs days
     m = _re.search(r"solo\s+(\d+)\s*d[ií]a[s]?\s+de\s+(pierna|piernas|lower|inferior)", txt)
     if m:
         n = int(m.group(1))
@@ -361,25 +431,127 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         if current != n:
             errs.append(f"El plan debe tener exactamente {n} día(s) de pierna, pero tiene {current}.")
 
-    # Regla genérica: "más ejercicios de [grupo]"
+    # More exercises of X
     m = _re.search(r"m[aá]s\s+ejercicios\s+de\s+([a-záéíóúñ]+)", txt)
     if m:
         g = m.group(1)
         cnt = _count_exercises_for_group(plan, g)
-        # Exigimos al menos 3 ejercicios totales del grupo en la semana
         if cnt < 3:
-            errs.append(f"Incluir más ejercicios de {g}: hay {cnt}, se requieren ≥3 en total en la semana.")
+            errs.append(f"Incluir más ejercicios de {g}: hay {cnt}, se requieren ≥3 en la semana.")
 
-    # Regla genérica: "menos ejercicios de [grupo]"
+    # Fewer exercises of X
     m = _re.search(r"menos\s+ejercicios\s+de\s+([a-záéíóúñ]+)", txt)
     if m:
         g = m.group(1)
         cnt = _count_exercises_for_group(plan, g)
-        # Como límite blando: máximo 2 ejercicios totales del grupo en la semana
         if cnt > 2:
-            errs.append(f"Reducir ejercicios de {g}: hay {cnt}, como máximo 2 en total en la semana.")
+            errs.append(f"Reducir ejercicios de {g}: hay {cnt}, máximo 2 en la semana.")
+
+    # No consecutive days with X
+    m = _re.search(r"(?:no\s+repetir\s+|no\s+)([a-záéíóúñ]+)\s+(?:dos|2)\s+d[ií]as\s+seguidos", txt)
+    if not m:
+        m = _re.search(r"no\s+([a-záéíóúñ]+)\s+en\s+d[ií]as\s+consecutivos", txt)
+    if m:
+        g = m.group(1)
+        dias = plan.get("dias", [])
+        for i in range(len(dias)-1):
+            if _day_has_group(dias[i], g) and _day_has_group(dias[i+1], g):
+                errs.append(f"No repetir {g} en días consecutivos: aparece en los días {i+1} y {i+2}.")
+                break
+
+    # Exactly N times X in the week (days)
+    m = _re.search(r"(?:meter|incluir|hacer)\s+([a-záéíóúñ]+)\s+(\d+)\s+veces", txt)
+    if m:
+        g = m.group(1)
+        n = int(m.group(2))
+        c = _count_days_for_group(plan, g)
+        if c != n:
+            errs.append(f"{g.capitalize()} debe aparecer exactamente {n} día(s) a la semana, pero aparece {c}.")
+
+# --- No repetir ejercicio exacto en la semana ---
+if _re.search(r"no\\s+repetir\\s+ejercicio[s]?(?:\\s+exacto[s]?)?\\s+en\\s+la\\s+semana|no\\s+repetir\\s+ejercicios", txt):
+    seen = {}
+    duplicates = set()
+    for d in plan.get("dias", []):
+        for ej in d.get("ejercicios", []):
+            n = _norm(ej.get("nombre",""))
+            if not n:
+                continue
+            if n in seen:
+                duplicates.add(n)
+            else:
+                seen[n] = True
+    if duplicates:
+        errs.append("No repetir ejercicios exactos en la semana. Repetidos: " + ", ".join(sorted(duplicates)[:10]))
+
+# --- Máximo N ejercicios por sesión/día ---
+m = _re.search(r"(?:máximo|max|como\\s+mucho)\\s+(\\d+)\\s+ejercicios\\s+por\\s+(?:sesión|sesion|d[ií]a|dia)", txt)
+if m:
+    limit = int(m.group(1))
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        cnt = len(d.get("ejercicios", []))
+        if cnt > limit:
+            errs.append(f"Máximo {limit} ejercicios por sesión: el día {i} tiene {cnt}.")
+
+# --- Incluir calentamiento de N min (cada día) ---
+m = _re.search(r"(?:incluir|añadir|meter)\\s+calentamiento\\s+de\\s+(\\d+)\\s*(?:min|mins|minutos)(?:\\s+cada\\s+d[ií]a)?", txt)
+if m:
+    need = int(m.group(1))
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        found = False
+        for ej in d.get("ejercicios", []):
+            if "calentamiento" in _norm(ej.get("nombre","")):
+                mins = _exercise_minutes(ej)
+                if mins is None or mins < need:
+                    errs.append(f"Calentamiento de {need} min requerido en día {i}.")
+                found = True
+                break
+        if not found:
+            errs.append(f"Incluir calentamiento de {need} min en el día {i}.")
+
+# --- Añadir estiramientos ---
+if _re.search(r"(?:incluir|añadir|meter)\\s+estiramientos", txt):
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        ok = any("estir" in _norm(ej.get("nombre","")) for ej in d.get("ejercicios", []))
+        if not ok:
+            errs.append(f"Incluir estiramientos al final del día {i}.")
+
+# --- Cardio: mínimo M minutos N días ---
+m = _re.search(r"m[ií]nimo\\s+(\\d+)\\s*(?:min|mins|’|')\\s+de\\s+cardio\\s+(\\d+)\\s+d[ií]as?", txt)
+if m:
+    mins = int(m.group(1))
+    days = int(m.group(2))
+    ok_days = 0
+    for d in plan.get("dias", []):
+        if _day_has_cardio_minutes(d, mins):
+            ok_days += 1
+    if ok_days < days:
+        errs.append(f"Cardio de al menos {mins} min en {days} días: detectados {ok_days}. Añadir bloques explícitos con duración.")
+
+# --- No máquinas / Solo peso libre / No poleas / No smith / No barras / No mancuernas ---
+if _re.search(r"no\\s+m[aá]quinas|s[oó]lo\\s+peso\\s+libre|solo\\s+peso\\s+libre|no\\s+poleas|no\\s+smith|no\\s+barras|no\\s+mancuernas", txt):
+    no_machines = _re.search(r"no\\s+m[aá]quinas|s[oó]lo\\s+peso\\s+libre|solo\\s+peso\\s+libre", txt) is not None
+    no_poleas = _re.search(r"no\\s+poleas", txt) is not None
+    no_smith = _re.search(r"no\\s+smith", txt) is not None
+    no_bar = _re.search(r"no\\s+barras", txt) is not None
+    no_db = _re.search(r"no\\s+mancuernas", txt) is not None
+
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for ej in d.get("ejercicios", []):
+            name = _norm(ej.get("nombre",""))
+            if no_machines and _exercise_uses_any(ej, MACHINE_KEYWORDS + ["cable","polea","smith"]):
+                errs.append(f"Sin máquinas/poleas/smith: '{ej.get('nombre','')}' en día {i}. Sustituir por peso libre.")
+            if no_poleas and ("polea" in name or "cable" in name):
+                errs.append(f"Sin poleas/cables: '{ej.get('nombre','')}' en día {i}.")
+            if no_smith and "smith" in name:
+                errs.append(f"Sin Smith: '{ej.get('nombre','')}' en día {i}.")
+            if no_bar and any(k in name for k in BARBELL_KEYWORDS):
+                errs.append(f"Sin barra: '{ej.get('nombre','')}' en día {i}.")
+            if no_db and any(k in name for k in DUMBBELL_KEYWORDS):
+                errs.append(f"Sin mancuernas: '{ej.get('nombre','')}' en día {i}.")
 
     return errs
+
 
 
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
@@ -398,7 +570,6 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     coerced = _coerce_to_schema(data, datos)
     coerced = _sanitize_plan_reps(coerced)
     errs = validar_negocio(coerced)
-    # Reglas de comentarios del usuario
     try:
         errs += validar_comentarios(coerced, datos.get("comentarios",""))
     except Exception:

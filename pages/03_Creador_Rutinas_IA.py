@@ -61,6 +61,7 @@ except Exception:
     pass
 
 st.subheader("Rutina generada")
+
     if used_fallback:
         st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
         if error:
