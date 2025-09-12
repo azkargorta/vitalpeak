@@ -45,7 +45,6 @@ from app.routines import (
 
 
 # === Progreso de ejercicios: función ===
-
 def pagina_progreso():
     import os, sqlite3
     from typing import List, Optional
@@ -60,7 +59,7 @@ def pagina_progreso():
         for root, _, files in os.walk(base_dir):
             for f in files:
                 low = f.lower()
-                if low.endswith(('.db', '.sqlite', '.sqlite3')):
+                if low.endswith(('.db','.sqlite','.sqlite3')):
                     dbs.append(os.path.join(root, f))
                 if low.endswith('.csv'):
                     csvs.append(os.path.join(root, f))
@@ -69,7 +68,8 @@ def pagina_progreso():
     def _pick(cols, *opts):
         l = [c.lower() for c in cols]
         for o in opts:
-            if o in l: return cols[l.index(o)]
+            if o in l:
+                return cols[l.index(o)]
         return None
 
     def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
@@ -85,7 +85,7 @@ def pagina_progreso():
                 col_w  = _pick(cols, 'peso','weight','kg')
                 col_r  = _pick(cols, 'reps','repeticiones','rep')
                 if col_ex and (col_w or col_r):
-                    cur.execute(f"SELECT DISTINCT {col_ex} FROM '{t}' WHERE {col_ex} IS NOT NULL AND TRIM({col_ex})<>'' LIMIT 2000")
+                    cur.execute(f"SELECT DISTINCT {col_ex} FROM '{t}' WHERE {col_ex} IS NOT NULL AND TRIM({col_ex})<>'' LIMIT 5000")
                     exercises.update([r[0] for r in cur.fetchall()])
             con.close()
             return sorted(e for e in exercises if e)
@@ -118,21 +118,21 @@ def pagina_progreso():
             if not frames: return None
             out = pd.concat(frames, ignore_index=True)
             out = out.dropna(how='all', subset=['Fecha','Peso','Reps'])
-            out = out.sort_values('Fecha') if out['Fecha'].notna().any() else out.reset_index(drop=True)
+            if out['Fecha'].notna().any():
+                out = out.sort_values('Fecha')
+            else:
+                out = out.reset_index(drop=True)
             return out
         except Exception:
             return None
 
-    def _from_csvs_all_exercises(csv_paths: list) -> list:
+    def _from_csvs_all(csv_paths: list) -> list:
         exs = set()
         for p in csv_paths:
-            try:
-                df = pd.read_csv(p)
+            try: df = pd.read_csv(p)
             except Exception:
-                try:
-                    df = pd.read_csv(p, sep=';')
-                except Exception:
-                    continue
+                try: df = pd.read_csv(p, sep=';')
+                except Exception: continue
             lcols = [c.lower() for c in df.columns]
             if 'ejercicio' in lcols:
                 col = df.columns[lcols.index('ejercicio')]
@@ -148,13 +148,10 @@ def pagina_progreso():
     def _from_csvs_progress(csv_paths: list, exercise: str) -> Optional[pd.DataFrame]:
         frames = []
         for p in csv_paths:
-            try:
-                df = pd.read_csv(p)
+            try: df = pd.read_csv(p)
             except Exception:
-                try:
-                    df = pd.read_csv(p, sep=';')
-                except Exception:
-                    continue
+                try: df = pd.read_csv(p, sep=';')
+                except Exception: continue
             lcols = [c.lower() for c in df.columns]
             def pick_df(*opts):
                 for o in opts:
@@ -175,28 +172,29 @@ def pagina_progreso():
         if not frames: return None
         out = pd.concat(frames, ignore_index=True)
         out = out.dropna(how='all', subset=['Fecha','Peso','Reps'])
-        out = out.sort_values('Fecha') if out['Fecha'].notna().any() else out.reset_index(drop=True)
+        if out['Fecha'].notna().any():
+            out = out.sort_values('Fecha')
+        else:
+            out = out.reset_index(drop=True)
         return out
 
     base_dir = os.path.dirname(__file__)
     dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, '..')))
 
-    detected = set()
+    ejercicios = set()
     for db in dbs:
         try:
             exs = _fetch_exercises_from_sqlite(db)
-            if exs: detected.update(exs)
-        except Exception:
-            pass
-    if csvs:
-        detected.update(_from_csvs_all_exercises(csvs))
+            if exs: ejercicios.update(exs)
+        except Exception: pass
+    ejercicios.update(_from_csvs_all(csvs))
+    ejercicios = sorted([e for e in ejercicios if e])
 
-    detected = sorted([e for e in detected if e])
-    if not detected:
-        st.warning('No se detectaron ejercicios en tus datos (SQLite/CSV). Añade registros para habilitar el selector.')
+    if not ejercicios:
+        st.warning('No se detectaron ejercicios en tus datos (SQLite/CSV).')
         return
 
-    ejercicio = st.selectbox('Ejercicio', detected, index=0)
+    ejercicio = st.selectbox('Ejercicio', ejercicios, index=0)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -214,19 +212,24 @@ def pagina_progreso():
     if (df is None or df.empty) and csvs:
         df = _from_csvs_progress(csvs, ejercicio)
 
-    if df is not None and not df.empty:
-        if 'Fecha' in df.columns:
-            if fecha_ini:
-                df = df[df['Fecha'] >= pd.to_datetime(fecha_ini)]
-            if fecha_fin:
-                df = df[df['Fecha'] <= pd.to_datetime(fecha_fin)]
-            if df['Fecha'].notna().any():
-                df = df.sort_values('Fecha')
-        st.dataframe(df, use_container_width=True)
-        st.download_button('📥 Descargar CSV', df.to_csv(index=False).encode('utf-8'),
-                           file_name=f'progreso_{ejercicio}.csv', mime='text/csv')
-    else:
+    if df is None or df.empty:
         st.info('No hay registros de progresión para el ejercicio seleccionado.')
+        return
+
+    if 'Fecha' in df.columns:
+        if fecha_ini:
+            df = df[df['Fecha'] >= pd.to_datetime(fecha_ini)]
+        if fecha_fin:
+            df = df[df['Fecha'] <= pd.to_datetime(fecha_fin)]
+        if df['Fecha'].notna().any():
+            df = df.sort_values('Fecha')
+
+    st.dataframe(df, use_container_width=True)
+
+    plot_df = df.copy()
+    if 'Fecha' in plot_df.columns and plot_df['Fecha'].notna().any():
+        plot_df = plot_df.set_index('Fecha')
+    st.line_chart(plot_df[['Peso','Reps']].dropna(how='all'), use_container_width=True)
 
 
     st.subheader("📈 Progreso de ejercicios")
@@ -630,8 +633,7 @@ elif page == "🏋️ Añadir entrenamiento":
 elif page == "📚 Gestor de ejercicios":
     require_auth()
     st.title("Gestor de ejercicios")
-    
-    tabs = st.tabs(['Listado', '📈 Progreso de ejercicios'])
+
 # Pestañas para Gestor de ejercicios (incluye Progreso)
     tab_labels = ['Listado', '', '📈 Progreso de ejercicios']
 
