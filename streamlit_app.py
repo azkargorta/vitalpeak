@@ -45,6 +45,7 @@ from app.routines import (
 
 
 # === Progreso de ejercicios: función ===
+
 def pagina_progreso():
     import os, sqlite3
     from typing import List, Optional
@@ -631,63 +632,18 @@ elif page == "🏋️ Añadir entrenamiento":
         st.info("Primero crea una rutina en la sección 📘 Rutinas.")
 
 elif page == "📚 Gestor de ejercicios":
-    require_auth()
-    st.title("Gestor de ejercicios")
 
+    # UI minimal del gestor: solo tabs y Progreso
 
     tabs = st.tabs(['Listado', '📈 Progreso de ejercicios'])
 
     with tabs[0]:
+
         st.empty()
-    # Render Progreso solo dentro de la pestaña
+
     with tabs[-1]:
+
         pagina_progreso()
-    user = st.session_state["user"]
-    all_ex = list_all_exercises(user)
-    st.write(f"Total ejercicios: **{len(all_ex)}**")
-
-    st.subheader("Añadir ejercicio personalizado")
-    new_name = st.text_input("Nombre del ejercicio nuevo")
-    if st.button("Añadir") and new_name:
-        add_custom_exercise(user, new_name)
-        st.success(f"Añadido: {new_name}")
-        st.rerun()
-
-    st.subheader("Editar meta (grupo, imagen)")
-    ex = st.selectbox("Ejercicio", options=all_ex, key="meta_select")
-    meta = get_exercise_meta(user, ex)
-    grupo = st.selectbox("Grupo muscular", options=GRUPOS, index=GRUPOS.index(meta.get("grupo","Otro")) if meta.get("grupo") in GRUPOS else GRUPOS.index("Otro"))
-    img_up = st.file_uploader("Imagen del ejercicio (opcional)", type=["png","jpg","jpeg","webp"])
-    img_rel = meta.get("imagen")
-    if img_up is not None:
-        img_rel = store_exercise_image(user, img_up.name, img_up.getbuffer())
-    if st.button("Guardar meta"):
-        save_exercise_meta(user, ex, grupo, img_rel)
-        st.success("Meta guardada.")
-    if img_rel:
-        st.image(str(img_rel), caption=f"Imagen {ex}", width=240)
-
-    st.subheader("Renombrar / Eliminar")
-    col1, col2 = st.columns(2)
-    with col1:
-        to_rename = st.selectbox("Ejercicio a renombrar", options=all_ex, key="rename_select")
-        new_name2 = st.text_input("Nuevo nombre")
-        if st.button("Renombrar"):
-            if new_name2:
-                rename_custom_exercise(user, to_rename, new_name2)
-                st.success("Renombrado.")
-                st.rerun()
-            else:
-                st.warning("Escribe un nuevo nombre.")
-    with col2:
-        del_name = st.text_input("Nombre exacto a eliminar (personalizado)")
-        if st.button("Eliminar"):
-            if del_name and del_name not in set(list_all_exercises(user)[:len(list_all_exercises(user))]):
-                remove_custom_exercise(user, del_name)
-                st.success("Eliminado.")
-                st.rerun()
-            else:
-                st.warning("Solo se pueden eliminar personalizados.")
 
 elif page == "📈 Tabla de entrenamientos":
     require_auth()
@@ -1173,6 +1129,7 @@ elif page == "📘 Rutinas":
                 st.info("No hay días en la rutina.")
                 return
             # Construcción de tabs segura
+            tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias)]
             tab_labels.append("📈 Progreso de ejercicios")
             tabs = st.tabs(tab_labels)
 
