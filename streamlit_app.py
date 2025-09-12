@@ -634,9 +634,11 @@ elif page == "📚 Gestor de ejercicios":
     require_auth()
     st.title("Gestor de ejercicios")
 
-# Pestañas para Gestor de ejercicios (incluye Progreso)
-    tab_labels = ['Listado', '', '📈 Progreso de ejercicios']
 
+    tabs = st.tabs(['Listado', '📈 Progreso de ejercicios'])
+
+    with tabs[0]:
+        st.empty()
     # Render Progreso solo dentro de la pestaña
     with tabs[-1]:
         pagina_progreso()
@@ -1171,7 +1173,6 @@ elif page == "📘 Rutinas":
                 st.info("No hay días en la rutina.")
                 return
             # Construcción de tabs segura
-            tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias)]
             tab_labels.append("📈 Progreso de ejercicios")
             tabs = st.tabs(tab_labels)
 
