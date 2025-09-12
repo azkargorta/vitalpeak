@@ -36,8 +36,21 @@ from app.health import (
     add_weight, list_weights,
 )
 from app.routines import (
+
+# === Progreso de ejercicios: función ===
+
+
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
+
+
+# === Progreso de ejercicios: función ===
+def pagina_progreso():
+    import os, math, sqlite3
+    from typing import List, Optional
+    import pandas as pd
+    import streamlit as st
+
 
 st.set_page_config(page_title="Gym App Web", page_icon="🏋️", layout="wide")
 ensure_base_dirs()
@@ -1093,11 +1106,6 @@ elif page == "👤 Perfil":
 
 # === Nueva sección integrada: Progreso de ejercicios ===
 
-def pagina_progreso():
-    import os, math, sqlite3
-    from typing import List, Optional
-    import pandas as pd
-    import streamlit as st
 
     st.subheader("📈 Progreso de ejercicios")
     st.caption("Visualiza la evolución de peso y repeticiones por ejercicio.")
