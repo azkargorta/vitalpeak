@@ -293,6 +293,12 @@ elif page == "🏋️ Añadir entrenamiento":
 elif page == "📚 Gestor de ejercicios":
     require_auth()
     st.title("Gestor de ejercicios")
+    # Pestañas para Gestor de ejercicios (incluye Progreso)
+    tab_labels = ['Listado', 'Alta', '📈 Progreso de ejercicios']
+    tabs = st.tabs(tab_labels)
+    with tabs[-1]:
+        pagina_progreso()
+
     user = st.session_state["user"]
     all_ex = list_all_exercises(user)
     st.write(f"Total ejercicios: **{len(all_ex)}**")
