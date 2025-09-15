@@ -493,7 +493,8 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     objetivo = datos.get("objetivo", "mixto")
     nivel = datos.get("nivel", "intermedio")
 
-    reglas_estrictas = f"""
+    extra_notas = f"\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  {notas}" if notas else ""
+reglas_estrictas = f"""
 REGLAS ESTRICTAS (debes cumplirlas sí o sí):
 - Agrupación pedida: {agrup}
 - Si es "Un solo grupo principal por día":
@@ -508,7 +509,7 @@ REGLAS ESTRICTAS (debes cumplirlas sí o sí):
   * Si es personalizado, usa SOLO el material listado.
 - Respeta lesiones/limitaciones y el objetivo indicado.
 - Ajusta volumen y selección de ejercicios al objetivo ({objetivo}) y nivel ({nivel}).
-{("\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  " + notas) if notas else ""}
+{extra_notas}
 """.strip("\n")
 
     prompt = f"""
@@ -968,7 +969,6 @@ if C.get("days_per_week") is not None:
         errs.append(
             f"Se solicitaron {C['days_per_week']} días/semana y la rutina tiene {n}."
         )
-
 # Duración objetivo/máx/mín por sesión (si el plan provee 'duracion_min_dia' o suma de 'minutos')
 for i, d in enumerate(plan.get("dias", []), start=1):
     dur = d.get("duracion_min_dia")
