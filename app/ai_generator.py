@@ -3,18 +3,18 @@ import json
 # --- NUEVO: extracción de constraints desde comentarios (cumplimiento 100%) ---
 import re as _re
 
+
 def extract_constraints(comentarios_txt: str):
     """
-    Devuelve un dict con constraints normalizados que el modelo debe cumplir 100%.
-    Ejemplos detectados:
-    - "solo un día de pierna"
-    - "al menos 4 ejercicios de bíceps" / "mínimo N de bíceps" / "más bíceps" (por defecto 3)
-    - "máximo 6 ejercicios por día"
-    - "solo peso libre" / "no máquinas / no smith / no poleas"
-    - "no superseries" / "no clusters" / "no al fallo"
-    - "cardio al menos 20 min 3 días"
-    - "split: pecho-tríceps, espalda-bíceps, pierna-glúteo, core/cardio"
+    Devuelve un dict con constraints normalizados.
+    Entiende frases naturales: días/semana, duraciones, descansos, tempo, RIR/RPE,
+    progresión, splits, calentamiento/movilidad/core, cardio (tipo y min),
+    equipo preferido, evitar ejercicios, weekdays, volumen por grupo,
+    reglas de orden y series/reps por defecto.
     """
+    import re as _re
+    import json as _json
+
     def _norm(s): return (s or "").strip().lower()
     txt = _norm(comentarios_txt)
     C = {"raw": comentarios_txt or ""}
@@ -59,205 +59,160 @@ def extract_constraints(comentarios_txt: str):
         C["cardio_min_minutes"] = int(m.group(1))
         C["cardio_min_days"] = int(m.group(2))
 
-    # Split clásico detectado (tolerante a guiones/espacios)
+    # Días por semana: "rutina de 4 días"
+    m = _re.search(r"(?:rutina|entreno|entrenamiento).{0,10}?(\d+)\s*d[ií]as", txt)
+    if m:
+        C["days_per_week"] = int(m.group(1))
+
+    # Duración por sesión
+    m = _re.search(r"(?:sesiones?|duraci[oó]n).{0,6}?(\d+)\s*min", txt)
+    if m:
+        C["session_target_minutes"] = int(m.group(1))
+    m = _re.search(r"(?:no\s+m[aá]s\s+de|m[aá]ximo)\s*(\d+)\s*min", txt)
+    if m:
+        C["session_max_minutes"] = int(m.group(1))
+    m = _re.search(r"(?:al\s+menos|min[ií]mo)\s*(\d+)\s*min", txt)
+    if m and "session_min_minutes" not in C:
+        C["session_min_minutes"] = int(m.group(1))
+
+    # Descansos
+    m = _re.search(r"descansos?\s+de\s*(\d+)\s*-\s*(\d+)\s*s", txt)
+    if m:
+        C["rest_seconds_range"] = (int(m.group(1)), int(m.group(2)))
+    m = _re.search(r"descansos?\s+de\s*(\d+)\s*s", txt)
+    if m and "rest_seconds_range" not in C:
+        C["rest_seconds_range"] = (int(m.group(1)), int(m.group(1)))
+
+    # Tempo
+    m = _re.search(r"tempo\s+(\d[\-\d]*)", txt)
+    if m:
+        C["default_tempo"] = m.group(1)
+
+    # RIR/RPE
+    m = _re.search(r"rir\s*(\d)\s*-\s*(\d)", txt)
+    if m:
+        C["rir_range"] = (int(m.group(1)), int(m.group(2)))
+    m = _re.search(r"rpe\s*(\d)\s*-\s*(\d)", txt)
+    if m:
+        C["rpe_range"] = (int(m.group(1)), int(m.group(2)))
+
+    # Progresión
+    if "progresi" in txt:
+        if _re.search(r"lineal", txt):
+            C["progression"] = "lineal"
+        elif _re.search(r"doble", txt):
+            C["progression"] = "doble"
+        elif _re.search(r"ondulante|undulating|dup", txt):
+            C["progression"] = "ondulante"
+        elif _re.search(r"5\s*/\s*3\s*/\s*1", txt):
+            C["progression"] = "531"
+
+    # Splits
+    if _re.search(r"push\s*[-/]\s*pull\s*[-/]\s*legs|ppl", txt):
+        C["preferred_split"] = "PPL"
+    if _re.search(r"upper\s*[-/]\s*lower|torso\s*[-/]\s*pierna", txt):
+        C["preferred_split"] = "UL"
+    if _re.search(r"full\s*body|cuerpo\s*entero", txt):
+        C["preferred_split"] = "FB"
     if _re.search(r"pecho\s*[-/]\s*tr[íi]ceps", txt) or _re.search(r"espalda\s*[-/]\s*b[ií]ceps", txt) or _re.search(r"pierna\s*[-/]\s*gl[úu]teo", txt):
         C["preferred_split"] = "PT-EB-PG"
 
-# --- Ampliación de comprensión de lenguaje natural ---
-# Días por semana: "X días", "entreno 4 dias", "rutina de 3 días"
-m = _re.search(r"(?:rutina|entreno|entrenamiento).{0,10}?(\d+)\s*d[ií]as", txt)
-if m:
-    C["days_per_week"] = int(m.group(1))
-
-# Duración por sesión: "sesiones de 60 min", "no más de 75 minutos"
-m = _re.search(r"(?:sesiones?|duraci[oó]n).{0,6}?(\d+)\s*min", txt)
-if m:
-    C["session_target_minutes"] = int(m.group(1))
-m = _re.search(r"(?:no\s+m[aá]s\s+de|m[aá]ximo)\s*(\d+)\s*min", txt)
-if m:
-    C["session_max_minutes"] = int(m.group(1))
-m = _re.search(r"(?:al\s+menos|min[ií]mo)\s*(\d+)\s*min", txt)
-if m and "session_min_minutes" not in C:
-    C["session_min_minutes"] = int(m.group(1))
-
-# Descansos: "descansos de 60-90s", "descanso 90 s"
-m = _re.search(r"descansos?\s+de\s*(\d+)\s*-\s*(\d+)\s*s", txt)
-if m:
-    C["rest_seconds_range"] = (int(m.group(1)), int(m.group(2)))
-m = _re.search(r"descansos?\s+de\s*(\d+)\s*s", txt)
-if m and "rest_seconds_range" not in C:
-    C["rest_seconds_range"] = (int(m.group(1)), int(m.group(1)))
-
-# Tempo: "tempo 3-1-1" (aplica como valor por defecto si no se especifica por ejercicio)
-m = _re.search(r"tempo\s+(\d[\-\d]*)", txt)
-if m:
-    C["default_tempo"] = m.group(1)
-
-# RIR/RPE globales: "RIR 2-3", "RPE 7-8"
-m = _re.search(r"rir\s*(\d)\s*-\s*(\d)", txt)
-if m:
-    C["rir_range"] = (int(m.group(1)), int(m.group(2)))
-m = _re.search(r"rpe\s*(\d)\s*-\s*(\d)", txt)
-if m:
-    C["rpe_range"] = (int(m.group(1)), int(m.group(2)))
-
-# Progresión: "progresión lineal", "doble progresión", "ondulante", "5/3/1"
-if "progresi" in txt:
-    if _re.search(r"lineal", txt):
-        C["progression"] = "lineal"
-    elif _re.search(r"doble", txt):
-        C["progression"] = "doble"
-    elif _re.search(r"ondulante|undulating|dup", txt):
-        C["progression"] = "ondulante"
-    elif _re.search(r"5\s*/\s*3\s*/\s*1", txt):
-        C["progression"] = "531"
-
-# Splits comunes
-if _re.search(r"push\s*[-/]\s*pull\s*[-/]\s*legs|ppl", txt):
-    C["preferred_split"] = "PPL"
-if _re.search(r"upper\s*[-/]\s*lower|torso\s*[-/]\s*pierna", txt):
-    C["preferred_split"] = "UL"
-if _re.search(r"full\s*body|cuerpo\s*entero", txt):
-    C["preferred_split"] = "FB"
-
-# Incluir calentamiento / movilidad / core
-if _re.search(r"incluir\s+calentamiento|con\s+calentamiento", txt):
-    C["include_warmup"] = True
-m = _re.search(r"calentamiento\s*(\d+)\s*min", txt)
-if m:
-    C["warmup_minutes"] = int(m.group(1))
-if _re.search(r"(incluir|con)\s+movilidad|movilidad\s+articular", txt):
-    C["include_mobility"] = True
-if _re.search(r"(incluir|con)\s+core|abdominales", txt):
-    C["include_core"] = True
-m = _re.search(r"core\s*(\d+)\s*d[ií]as", txt)
-if m:
-    C["core_days_min"] = int(m.group(1))
-
-# Cardio con tipo: LISS/HIIT
-if _re.search(r"hiit", txt):
-    C["cardio_type"] = "HIIT"
-if _re.search(r"liss|suave|zona\s*2", txt):
-    C["cardio_type"] = "LISS"
-
-# Preferencia de equipo: solo mancuernas / solo barra / domicilio
-if _re.search(r"solo\s+mancuernas?", txt):
-    C["equipment_only_dumbbells"] = True
-if _re.search(r"solo\s+barra", txt):
-    C["equipment_only_barbell"] = True
-if _re.search(r"(en\s+casa|domicilio|home)\s+(sin\s+)?m[aá]quinas?", txt):
-    C["home_gym_minimal"] = True
-
-# Evitar ejercicios concretos: "no sentadilla", "evitar peso muerto"
-avoid = []
-for m in _re.finditer(r"(?:no|evitar)\s+([a-záéíóúüñ\s]+?)(?:,|\.|;|$)", txt):
-    ex = m.group(1).strip()
-    if ex and len(ex) < 40:
-        avoid.append(ex)
-if avoid:
-    C["avoid_exercises"] = list(set(avoid))
-
-# Días nominales: "entreno lunes, miércoles y viernes"
-days_map = {"lunes":"mon","martes":"tue","miercoles":"wed","miércoles":"wed","jueves":"thu","viernes":"fri","sabado":"sat","sábado":"sat","domingo":"sun"}
-chosen = []
-for k in days_map.keys():
-    if _re.search(rf"\\b{k}\\b", txt):
-        chosen.append(days_map[k])
-if chosen:
-    C["weekdays"] = sorted(list(set(chosen)))
-
-# Series/volumen por grupo: "bíceps 10-14 series", "pecho al menos 12 series", "hombros máximo 9 series"
-vol = {}
-for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+(\d+)(?:\s*-\s*(\d+))?\s*series", txt):
-    mus = mm.group(1).strip()
-    lo = int(mm.group(2)) if mm.group(2) else None
-    hi = int(mm.group(3)) if mm.group(3) else None
-    vol[mus] = (lo,hi)
-for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+al\s+menos\s+(\d+)\s*series", txt):
-    mus = mm.group(1).strip(); lo=int(mm.group(2)); vol[mus]=(lo,None)
-for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+m[aá]ximo\s+(\d+)\s*series", txt):
-    mus = mm.group(1).strip(); hi=int(mm.group(2)); vol[mus]=(None,hi)
-if vol: C["volumen_series"]=vol
-
-# Orden ejercicios: bilaterales primero, básicos antes accesorios
-if _re.search(r"bilateral(es)?\s+primero", txt):
-    C.setdefault("order_rules",{})["bilateral_first"]=True
-if _re.search(r"b[aá]sicos?\s+antes\s+que\s+accesorios", txt):
-    C.setdefault("order_rules",{})["basics_first"]=True
-
-# Series/reps objetivo global: "3-4 series de 8-10 repeticiones"
-m = _re.search(r"(\d+)\s*-\s*(\d+)\s*series.*?(\d+)\s*-\s*(\d+)\s*rep", txt)
-if m:
-    C["default_series_reps"]={"series":(int(m.group(1)),int(m.group(2))),"reps":(int(m.group(3)),int(m.group(4)))}
-m = _re.search(r"(?:hipertrofia|fuerza).*?(\d+)\s*-\s*(\d+)\s*rep", txt)
-if m:
-    C.setdefault("default_series_reps",{})["reps"]=(int(m.group(1)),int(m.group(2)))
-
-# Volumen por grupo (series/semana): "bíceps 10–14 series", "pecho al menos 12 series", "hombros máximo 9 series"
-grupos = {
-    "pecho":["pecho","chest","pectorales","pectoral"],
-    "espalda":["espalda","back","dorsal","lats"],
-    "hombro":["hombro","hombros","deltoide","deltoides","shoulder"],
-    "bíceps":["bíceps","biceps","bicep"],
-    "tríceps":["tríceps","triceps","tricep"],
-    "pierna":["pierna","piernas","legs","cuádriceps","cuadriceps","isquio","femoral","glúteo","gluteo"],
-    "glúteo":["glúteo","gluteo","glutes"],
-    "core":["core","abdominal","abdominales","abs"],
-    "gemelo":["gemelo","gemelos","pantorrilla","pantorrillas","calf"]
-}
-vol = {}
-# patrones: "<grupo> 10-14 series", "<grupo> al menos 12 series", "<grupo> maximo 9 series"
-for g, aliases in grupos.items():
-    for alias in aliases:
-        # rango
-        m = _re.search(rf"\\b{alias}\\b\\s*(\\d+)\\s*[-–]\\s*(\\d+)\\s*series", txt)
-        if m:
-            vol[g] = (int(m.group(1)), int(m.group(2)))
-        # minimo
-        m = _re.search(rf"\\b{alias}\\b.*?(?:al\\s+menos|min[ií]mo|como\\s+min[ií]mo)\\s*(\\d+)\\s*series", txt)
-        if m:
-            lo = int(m.group(1)); hi = vol.get(g, (None,None))[1]
-            vol[g] = (lo, hi)
-        # maximo
-        m = _re.search(rf"\\b{alias}\\b.*?(?:m[aá]ximo|no\\s+m[aá]s\\s+de)\\s*(\\d+)\\s*series", txt)
-        if m:
-            hi = int(m.group(1)); lo = vol.get(g, (None,None))[0]
-            vol[g] = (lo, hi)
-if vol:
-    C["volumen_series"] = vol
-
-# Orden de ejercicios
-if _re.search(r"bilaterales?\\s+primero", txt):
-    C.setdefault("order_rules", {})["bilateral_first"] = True
-if _re.search(r"(b[aá]sicos|compuestos)\\s+antes\\s+que\\s+(accesorios|aislados?)", txt):
-    C.setdefault("order_rules", {})["basics_first"] = True
-
-# Series/Reps globales por defecto: "3-4 series de 8-10 repeticiones", "fuerza: 4-6 reps"
-m = _re.search(r"(\\d+)\\s*[-–]\\s*(\\d+)\\s*series.*?(\\d+)\\s*[-–]\\s*(\\d+)\\s*(rep|reps|repeticiones)", txt)
-if m:
-    C["default_series_reps"] = {"series": (int(m.group(1)), int(m.group(2))), "reps": (int(m.group(3)), int(m.group(4)))}
-else:
-    # solo reps
-    m = _re.search(r"(?:fuerza|hipertrofia|resistencia)?.*?(\\d+)\\s*[-–]\\s*(\\d+)\\s*(rep|reps|repeticiones)", txt)
+    # Calentamiento / movilidad / core
+    if _re.search(r"incluir\s+calentamiento|con\s+calentamiento", txt):
+        C["include_warmup"] = True
+    m = _re.search(r"calentamiento\s*(\d+)\s*min", txt)
     if m:
-        C["default_series_reps"] = {"reps": (int(m.group(1)), int(m.group(2)))}
-    m = _re.search(r"(?:series)\\s*(\\d+)\\s*[-–]\\s*(\\d+)", txt)
+        C["warmup_minutes"] = int(m.group(1))
+    if _re.search(r"(incluir|con)\s+movilidad|movilidad\s+articular", txt):
+        C["include_mobility"] = True
+    if _re.search(r"(incluir|con)\s+core|abdominales", txt):
+        C["include_core"] = True
+    m = _re.search(r"core\s*(\d+)\s*d[ií]as", txt)
     if m:
-        dsr = C.get("default_series_reps", {})
-        dsr["series"] = (int(m.group(1)), int(m.group(2)))
-        C["default_series_reps"] = dsr
+        C["core_days_min"] = int(m.group(1))
 
+    # Cardio con tipo
+    if _re.search(r"hiit", txt):
+        C["cardio_type"] = "HIIT"
+    if _re.search(r"liss|suave|zona\s*2", txt):
+        C["cardio_type"] = "LISS"
 
+    # Preferencias de equipo
+    if _re.search(r"solo\s+mancuernas?", txt):
+        C["equipment_only_dumbbells"] = True
+    if _re.search(r"solo\s+barra", txt):
+        C["equipment_only_barbell"] = True
+    if _re.search(r"(en\s+casa|domicilio|home)\s+(sin\s+)?m[aá]quinas?", txt):
+        C["home_gym_minimal"] = True
 
+    # Evitar ejercicios concretos (lista libre tras "no"/"evitar")
+    avoid = []
+    for m in _re.finditer(r"(?:no|evitar)\s+([a-záéíóúüñ\s]+?)(?:,|\.|;|$)", txt):
+        ex = m.group(1).strip()
+        if ex and len(ex) < 40:
+            avoid.append(ex)
+    if avoid:
+        C["avoid_exercises"] = list(set(avoid))
 
+    # Días nominales
+    days_map = {"lunes":"mon","martes":"tue","miercoles":"wed","miércoles":"wed","jueves":"thu","viernes":"fri","sabado":"sat","sábado":"sat","domingo":"sun"}
+    chosen = []
+    for k in days_map.keys():
+        if _re.search(rf"\b{k}\b", txt):
+            chosen.append(days_map[k])
+    if chosen:
+        C["weekdays"] = sorted(list(set(chosen)))
 
+    # Volumen por grupo (series/semana)
+    grupos = {
+        "pecho":["pecho","chest","pectorales","pectoral"],
+        "espalda":["espalda","back","dorsal","lats"],
+        "hombro":["hombro","hombros","deltoide","deltoides","shoulder"],
+        "bíceps":["bíceps","biceps","bicep"],
+        "tríceps":["tríceps","triceps","tricep"],
+        "pierna":["pierna","piernas","legs","cuádriceps","cuadriceps","isquio","femoral","glúteo","gluteo"],
+        "glúteo":["glúteo","gluteo","glutes"],
+        "core":["core","abdominal","abdominales","abs"],
+        "gemelo":["gemelo","gemelos","pantorrilla","pantorrillas","calf"]
+    }
+    vol = {}
+    for g, aliases in grupos.items():
+        for alias in aliases:
+            m = _re.search(rf"\b{alias}\b\s*(\d+)\s*[-–]\s*(\d+)\s*series", txt)
+            if m:
+                vol[g] = (int(m.group(1)), int(m.group(2)))
+            m = _re.search(rf"\b{alias}\b.*?(?:al\s+menos|min[ií]mo|como\s+min[ií]mo)\s*(\d+)\s*series", txt)
+            if m:
+                lo = int(m.group(1)); hi = vol.get(g, (None,None))[1]
+                vol[g] = (lo, hi)
+            m = _re.search(rf"\b{alias}\b.*?(?:m[aá]ximo|no\s+m[aá]s\s+de)\s*(\d+)\s*series", txt)
+            if m:
+                hi = int(m.group(1)); lo = vol.get(g, (None,None))[0]
+                vol[g] = (lo, hi)
+    if vol:
+        C["volumen_series"] = vol
 
+    # Orden de ejercicios
+    if _re.search(r"bilaterales?\s+primero", txt):
+        C.setdefault("order_rules", {})["bilateral_first"] = True
+    if _re.search(r"(b[aá]sicos|compuestos)\s+antes\s+que\s+(accesorios|aislados?)", txt):
+        C.setdefault("order_rules", {})["basics_first"] = True
+
+    # Series/Reps globales por defecto
+    m = _re.search(r"(\d+)\s*[-–]\s*(\d+)\s*series.*?(\d+)\s*[-–]\s*(\d+)\s*(rep|reps|repeticiones)", txt)
+    if m:
+        C["default_series_reps"] = {"series": (int(m.group(1)), int(m.group(2))), "reps": (int(m.group(3)), int(m.group(4)))}
+    else:
+        m = _re.search(r"(?:fuerza|hipertrofia|resistencia)?.*?(\d+)\s*[-–]\s*(\d+)\s*(rep|reps|repeticiones)", txt)
+        if m:
+            C["default_series_reps"] = {"reps": (int(m.group(1)), int(m.group(2)))}
+        m = _re.search(r"(?:series)\s*(\d+)\s*[-–]\s*(\d+)", txt)
+        if m:
+            dsr = C.get("default_series_reps", {})
+            dsr["series"] = (int(m.group(1)), int(m.group(2)))
+            C["default_series_reps"] = dsr
 
     return C
-
-
-import re
-JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 
 def _extract_json(text: str):
     """
@@ -966,13 +921,13 @@ def validar_constraints(plan, C):
 
     def _norm(s): return (s or "").strip().lower()
 
-    # 1) Días por semana exactos
+    # Días por semana exactos
     if C.get("days_per_week") is not None:
         n = len(plan.get("dias", []))
         if n != int(C["days_per_week"]):
             errs.append(f"Se solicitaron {C['days_per_week']} días/semana y la rutina tiene {n}.")
 
-    # 2) Duración por sesión (si el plan expone minutos por día/ejercicio)
+    # Duración por sesión (si disponible)
     for i, d in enumerate(plan.get("dias", []), start=1):
         dur = d.get("duracion_min_dia")
         if dur is None:
@@ -989,7 +944,7 @@ def validar_constraints(plan, C):
             if C.get("session_min_minutes") and dur < int(C["session_min_minutes"]):
                 errs.append(f"Día {i} no alcanza el mínimo de {C['session_min_minutes']} min (tiene {dur}).")
 
-    # 3) Descansos rango
+    # Descansos
     if C.get("rest_seconds_range"):
         lo, hi = C["rest_seconds_range"]
         for i, d in enumerate(plan.get("dias", []), start=1):
@@ -1002,14 +957,14 @@ def validar_constraints(plan, C):
                 if rest is not None and not (lo <= rest <= hi):
                     errs.append(f"Descanso fuera de rango en día {i}, '{e.get('nombre','')}' ({rest}s no está en {lo}-{hi}s).")
 
-    # 4) Tempo por defecto
+    # Tempo
     if C.get("default_tempo"):
         for i, d in enumerate(plan.get("dias", []), start=1):
             for e in d.get("ejercicios", []):
                 if not (e.get("tempo") or "").strip():
                     errs.append(f"Falta tempo en día {i}, '{e.get('nombre','')}' (se pidió default {C['default_tempo']}).")
 
-    # 5) RIR/RPE rangos
+    # RIR / RPE
     import re as _re
     if C.get("rir_range"):
         lo, hi = C["rir_range"]
@@ -1033,7 +988,7 @@ def validar_constraints(plan, C):
                 if rpe is not None and not (lo <= rpe <= hi):
                     errs.append(f"RPE {rpe} fuera de rango {lo}-{hi} en día {i}, '{e.get('nombre','')}'.")
 
-    # 6) Inclusiones
+    # Inclusiones
     if C.get("include_warmup"):
         has = any("calentamiento" in _norm(e.get("nombre","")) for d in plan.get("dias", []) for e in d.get("ejercicios", []))
         if not has: errs.append("Se pidió incluir calentamiento y no se detecta.")
@@ -1053,7 +1008,7 @@ def validar_constraints(plan, C):
         if got < need:
             errs.append(f"Se pidieron {need} días con core y hay {got}.")
 
-    # 7) Cardio tipo
+    # Cardio tipo
     if C.get("cardio_type") == "HIIT":
         found = any(any("hiit" in _norm(e.get("nombre","")) for e in d.get("ejercicios", [])) for d in plan.get("dias", []))
         if not found: errs.append("Se pidió cardio HIIT y no se detecta.")
@@ -1062,7 +1017,7 @@ def validar_constraints(plan, C):
                     for d in plan.get("dias", []) for e in d.get("ejercicios", []))
         if not found: errs.append("Se pidió cardio LISS/zona 2 y no se detecta.")
 
-    # 8) Equipo preferido / home gym (básico)
+    # Equipo/home gym
     if C.get("equipment_only_dumbbells") or C.get("equipment_only_barbell") or C.get("home_gym_minimal"):
         allowed = []
         if C.get("equipment_only_dumbbells"): allowed += ["mancuerna","mancuernas","dumbbell"]
@@ -1075,7 +1030,7 @@ def validar_constraints(plan, C):
                     if not any(t in nm for t in ("flexiones","dominadas","zancadas","plancha","hip thrust")):
                         errs.append(f"Ejercicio no acorde al equipo solicitado en día {i}: '{e.get('nombre','')}'.")
 
-    # 9) Evitar ejercicios
+    # Evitar ejercicios
     if C.get("avoid_exercises"):
         avoid = [a.strip().lower() for a in C["avoid_exercises"] if a.strip()]
         for i, d in enumerate(plan.get("dias", []), start=1):
@@ -1085,12 +1040,12 @@ def validar_constraints(plan, C):
                     errs.append(f"Se pidió evitar '{a}' y aparece en día {i}: '{e.get('nombre','')}'.")
                     break
 
-    # 10) Weekdays (solo chequeo de conteo)
+    # Weekdays count
     if C.get("weekdays"):
         if len(C["weekdays"]) != len(plan.get("dias", [])):
             errs.append(f"Se indicaron {len(C['weekdays'])} días específicos pero la rutina tiene {len(plan.get('dias',[]))}.")
 
-    # 11) Volumen por grupo (opcional)
+    # Volumen por grupo
     if C.get("volumen_series"):
         grupos = {
             "pecho":["pecho","pectorales","press banca","aperturas"],
@@ -1125,7 +1080,7 @@ def validar_constraints(plan, C):
             if hi is not None and val > hi:
                 errs.append(f"Volumen excesivo para {g}: {val} series (> {hi}).")
 
-    # 12) Orden de ejercicios (opcional)
+    # Orden de ejercicios
     if C.get("order_rules"):
         def is_unilateral(nm):
             nm = _norm(nm)
@@ -1159,7 +1114,7 @@ def validar_constraints(plan, C):
                 if first_acc is not None and (first_basic is None or first_acc < first_basic):
                     errs.append(f"Orden incorrecto día {i}: hay accesorios antes que básicos.")
 
-    # 13) Series/Reps por defecto (opcional)
+    # Series/Reps por defecto
     if C.get("default_series_reps"):
         s_rng = C["default_series_reps"].get("series")
         r_rng = C["default_series_reps"].get("reps")
