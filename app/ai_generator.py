@@ -963,9 +963,11 @@ def validar_constraints(plan, C):
 
 # Días por semana exactos
 if C.get("days_per_week") is not None:
-    n = len(plan.get("dias", []))
-    if n != int(C["days_per_week"]):
-        errs.append(f"Se solicitaron {C['days_per_week']} días/semana y la rutina tiene {n}.")
+    n = len(plan.get('dias', []))
+    if n != int(C['days_per_week']):
+        errs.append(
+            f"Se solicitaron {C['days_per_week']} días/semana y la rutina tiene {n}."
+        )
 
 # Duración objetivo/máx/mín por sesión (si el plan provee 'duracion_min_dia' o suma de 'minutos')
 for i, d in enumerate(plan.get("dias", []), start=1):
