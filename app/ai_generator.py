@@ -1444,4 +1444,3 @@ def enforce_simple_constraints(plan, C):
                 di += 1
 
     return plan
-
