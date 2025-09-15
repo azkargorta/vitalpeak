@@ -1,4 +1,261 @@
 import json
+
+# --- NUEVO: extracción de constraints desde comentarios (cumplimiento 100%) ---
+import re as _re
+
+def extract_constraints(comentarios_txt: str):
+    """
+    Devuelve un dict con constraints normalizados que el modelo debe cumplir 100%.
+    Ejemplos detectados:
+    - "solo un día de pierna"
+    - "al menos 4 ejercicios de bíceps" / "mínimo N de bíceps" / "más bíceps" (por defecto 3)
+    - "máximo 6 ejercicios por día"
+    - "solo peso libre" / "no máquinas / no smith / no poleas"
+    - "no superseries" / "no clusters" / "no al fallo"
+    - "cardio al menos 20 min 3 días"
+    - "split: pecho-tríceps, espalda-bíceps, pierna-glúteo, core/cardio"
+    """
+    def _norm(s): return (s or "").strip().lower()
+    txt = _norm(comentarios_txt)
+    C = {"raw": comentarios_txt or ""}
+
+    # Pierna: solo un día
+    if _re.search(r"solo\s+un\s+d[íi]a\s+de\s+pierna", txt):
+        C["legs_days_max"] = 1
+
+    # Bíceps: mínimo N o "más bíceps" (fallback 3)
+    m = _re.search(r"(?:al\s+menos|min[ií]mo|como\s+min[ií]mo)\s*(\d+)\s*(?:ejercicios?\s+)?de\s+b[ií]ceps", txt)
+    if m:
+        C["biceps_min_total"] = int(m.group(1))
+    elif _re.search(r"(m[aá]s\s+ejercicios\s+de\s+b[ií]ceps|quiero\s+m[aá]s\s+b[ií]ceps|m[aá]s\s+b[ií]ceps)", txt):
+        C["biceps_min_total"] = 3
+
+    # Máximo ejercicios por día
+    m = _re.search(r"max(?:imo)?\s*(\d+)\s*ejercicios?\s*por\s*d[ií]a", txt)
+    if m:
+        C["max_exercises_per_day"] = int(m.group(1))
+
+    # Material
+    if _re.search(r"solo\s+peso\s+libre", txt):
+        C["equipment_only_free_weights"] = True
+    if _re.search(r"no\s+m[aá]quinas", txt):
+        C["forbid_machines"] = True
+    if _re.search(r"no\s+smith", txt):
+        C["forbid_smith"] = True
+    if _re.search(r"no\s+poleas|no\s+cables?", txt):
+        C["forbid_cables"] = True
+
+    # Métodos
+    if _re.search(r"no\s+superseries?", txt):
+        C["forbid_supersets"] = True
+    if _re.search(r"no\s+clusters?", txt):
+        C["forbid_clusters"] = True
+    if _re.search(r"no\s+(?:ir\s+a\s+fallo|fallar\s+series|al\s+fallo)", txt):
+        C["forbid_failure"] = True
+
+    # Cardio: "al menos 20 min 3 días"
+    m = _re.search(r"cardio\s+(?:al\s+menos|min[ií]mo)\s*(\d+)\s*min(?:utos)?\s*(\d+)\s*d[ií]as", txt)
+    if m:
+        C["cardio_min_minutes"] = int(m.group(1))
+        C["cardio_min_days"] = int(m.group(2))
+
+    # Split clásico detectado (tolerante a guiones/espacios)
+    if _re.search(r"pecho\s*[-/]\s*tr[íi]ceps", txt) or _re.search(r"espalda\s*[-/]\s*b[ií]ceps", txt) or _re.search(r"pierna\s*[-/]\s*gl[úu]teo", txt):
+        C["preferred_split"] = "PT-EB-PG"
+
+# --- Ampliación de comprensión de lenguaje natural ---
+# Días por semana: "X días", "entreno 4 dias", "rutina de 3 días"
+m = _re.search(r"(?:rutina|entreno|entrenamiento).{0,10}?(\d+)\s*d[ií]as", txt)
+if m:
+    C["days_per_week"] = int(m.group(1))
+
+# Duración por sesión: "sesiones de 60 min", "no más de 75 minutos"
+m = _re.search(r"(?:sesiones?|duraci[oó]n).{0,6}?(\d+)\s*min", txt)
+if m:
+    C["session_target_minutes"] = int(m.group(1))
+m = _re.search(r"(?:no\s+m[aá]s\s+de|m[aá]ximo)\s*(\d+)\s*min", txt)
+if m:
+    C["session_max_minutes"] = int(m.group(1))
+m = _re.search(r"(?:al\s+menos|min[ií]mo)\s*(\d+)\s*min", txt)
+if m and "session_min_minutes" not in C:
+    C["session_min_minutes"] = int(m.group(1))
+
+# Descansos: "descansos de 60-90s", "descanso 90 s"
+m = _re.search(r"descansos?\s+de\s*(\d+)\s*-\s*(\d+)\s*s", txt)
+if m:
+    C["rest_seconds_range"] = (int(m.group(1)), int(m.group(2)))
+m = _re.search(r"descansos?\s+de\s*(\d+)\s*s", txt)
+if m and "rest_seconds_range" not in C:
+    C["rest_seconds_range"] = (int(m.group(1)), int(m.group(1)))
+
+# Tempo: "tempo 3-1-1" (aplica como valor por defecto si no se especifica por ejercicio)
+m = _re.search(r"tempo\s+(\d[\-\d]*)", txt)
+if m:
+    C["default_tempo"] = m.group(1)
+
+# RIR/RPE globales: "RIR 2-3", "RPE 7-8"
+m = _re.search(r"rir\s*(\d)\s*-\s*(\d)", txt)
+if m:
+    C["rir_range"] = (int(m.group(1)), int(m.group(2)))
+m = _re.search(r"rpe\s*(\d)\s*-\s*(\d)", txt)
+if m:
+    C["rpe_range"] = (int(m.group(1)), int(m.group(2)))
+
+# Progresión: "progresión lineal", "doble progresión", "ondulante", "5/3/1"
+if "progresi" in txt:
+    if _re.search(r"lineal", txt):
+        C["progression"] = "lineal"
+    elif _re.search(r"doble", txt):
+        C["progression"] = "doble"
+    elif _re.search(r"ondulante|undulating|dup", txt):
+        C["progression"] = "ondulante"
+    elif _re.search(r"5\s*/\s*3\s*/\s*1", txt):
+        C["progression"] = "531"
+
+# Splits comunes
+if _re.search(r"push\s*[-/]\s*pull\s*[-/]\s*legs|ppl", txt):
+    C["preferred_split"] = "PPL"
+if _re.search(r"upper\s*[-/]\s*lower|torso\s*[-/]\s*pierna", txt):
+    C["preferred_split"] = "UL"
+if _re.search(r"full\s*body|cuerpo\s*entero", txt):
+    C["preferred_split"] = "FB"
+
+# Incluir calentamiento / movilidad / core
+if _re.search(r"incluir\s+calentamiento|con\s+calentamiento", txt):
+    C["include_warmup"] = True
+m = _re.search(r"calentamiento\s*(\d+)\s*min", txt)
+if m:
+    C["warmup_minutes"] = int(m.group(1))
+if _re.search(r"(incluir|con)\s+movilidad|movilidad\s+articular", txt):
+    C["include_mobility"] = True
+if _re.search(r"(incluir|con)\s+core|abdominales", txt):
+    C["include_core"] = True
+m = _re.search(r"core\s*(\d+)\s*d[ií]as", txt)
+if m:
+    C["core_days_min"] = int(m.group(1))
+
+# Cardio con tipo: LISS/HIIT
+if _re.search(r"hiit", txt):
+    C["cardio_type"] = "HIIT"
+if _re.search(r"liss|suave|zona\s*2", txt):
+    C["cardio_type"] = "LISS"
+
+# Preferencia de equipo: solo mancuernas / solo barra / domicilio
+if _re.search(r"solo\s+mancuernas?", txt):
+    C["equipment_only_dumbbells"] = True
+if _re.search(r"solo\s+barra", txt):
+    C["equipment_only_barbell"] = True
+if _re.search(r"(en\s+casa|domicilio|home)\s+(sin\s+)?m[aá]quinas?", txt):
+    C["home_gym_minimal"] = True
+
+# Evitar ejercicios concretos: "no sentadilla", "evitar peso muerto"
+avoid = []
+for m in _re.finditer(r"(?:no|evitar)\s+([a-záéíóúüñ\s]+?)(?:,|\.|;|$)", txt):
+    ex = m.group(1).strip()
+    if ex and len(ex) < 40:
+        avoid.append(ex)
+if avoid:
+    C["avoid_exercises"] = list(set(avoid))
+
+# Días nominales: "entreno lunes, miércoles y viernes"
+days_map = {"lunes":"mon","martes":"tue","miercoles":"wed","miércoles":"wed","jueves":"thu","viernes":"fri","sabado":"sat","sábado":"sat","domingo":"sun"}
+chosen = []
+for k in days_map.keys():
+    if _re.search(rf"\\b{k}\\b", txt):
+        chosen.append(days_map[k])
+if chosen:
+    C["weekdays"] = sorted(list(set(chosen)))
+
+# Series/volumen por grupo: "bíceps 10-14 series", "pecho al menos 12 series", "hombros máximo 9 series"
+vol = {}
+for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+(\d+)(?:\s*-\s*(\d+))?\s*series", txt):
+    mus = mm.group(1).strip()
+    lo = int(mm.group(2)) if mm.group(2) else None
+    hi = int(mm.group(3)) if mm.group(3) else None
+    vol[mus] = (lo,hi)
+for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+al\s+menos\s+(\d+)\s*series", txt):
+    mus = mm.group(1).strip(); lo=int(mm.group(2)); vol[mus]=(lo,None)
+for mm in _re.finditer(r"([a-záéíóúüñ]+)\s+m[aá]ximo\s+(\d+)\s*series", txt):
+    mus = mm.group(1).strip(); hi=int(mm.group(2)); vol[mus]=(None,hi)
+if vol: C["volumen_series"]=vol
+
+# Orden ejercicios: bilaterales primero, básicos antes accesorios
+if _re.search(r"bilateral(es)?\s+primero", txt):
+    C.setdefault("order_rules",{})["bilateral_first"]=True
+if _re.search(r"b[aá]sicos?\s+antes\s+que\s+accesorios", txt):
+    C.setdefault("order_rules",{})["basics_first"]=True
+
+# Series/reps objetivo global: "3-4 series de 8-10 repeticiones"
+m = _re.search(r"(\d+)\s*-\s*(\d+)\s*series.*?(\d+)\s*-\s*(\d+)\s*rep", txt)
+if m:
+    C["default_series_reps"]={"series":(int(m.group(1)),int(m.group(2))),"reps":(int(m.group(3)),int(m.group(4)))}
+m = _re.search(r"(?:hipertrofia|fuerza).*?(\d+)\s*-\s*(\d+)\s*rep", txt)
+if m:
+    C.setdefault("default_series_reps",{})["reps"]=(int(m.group(1)),int(m.group(2)))
+
+# Volumen por grupo (series/semana): "bíceps 10–14 series", "pecho al menos 12 series", "hombros máximo 9 series"
+grupos = {
+    "pecho":["pecho","chest","pectorales","pectoral"],
+    "espalda":["espalda","back","dorsal","lats"],
+    "hombro":["hombro","hombros","deltoide","deltoides","shoulder"],
+    "bíceps":["bíceps","biceps","bicep"],
+    "tríceps":["tríceps","triceps","tricep"],
+    "pierna":["pierna","piernas","legs","cuádriceps","cuadriceps","isquio","femoral","glúteo","gluteo"],
+    "glúteo":["glúteo","gluteo","glutes"],
+    "core":["core","abdominal","abdominales","abs"],
+    "gemelo":["gemelo","gemelos","pantorrilla","pantorrillas","calf"]
+}
+vol = {}
+# patrones: "<grupo> 10-14 series", "<grupo> al menos 12 series", "<grupo> maximo 9 series"
+for g, aliases in grupos.items():
+    for alias in aliases:
+        # rango
+        m = _re.search(rf"\\b{alias}\\b\\s*(\\d+)\\s*[-–]\\s*(\\d+)\\s*series", txt)
+        if m:
+            vol[g] = (int(m.group(1)), int(m.group(2)))
+        # minimo
+        m = _re.search(rf"\\b{alias}\\b.*?(?:al\\s+menos|min[ií]mo|como\\s+min[ií]mo)\\s*(\\d+)\\s*series", txt)
+        if m:
+            lo = int(m.group(1)); hi = vol.get(g, (None,None))[1]
+            vol[g] = (lo, hi)
+        # maximo
+        m = _re.search(rf"\\b{alias}\\b.*?(?:m[aá]ximo|no\\s+m[aá]s\\s+de)\\s*(\\d+)\\s*series", txt)
+        if m:
+            hi = int(m.group(1)); lo = vol.get(g, (None,None))[0]
+            vol[g] = (lo, hi)
+if vol:
+    C["volumen_series"] = vol
+
+# Orden de ejercicios
+if _re.search(r"bilaterales?\\s+primero", txt):
+    C.setdefault("order_rules", {})["bilateral_first"] = True
+if _re.search(r"(b[aá]sicos|compuestos)\\s+antes\\s+que\\s+(accesorios|aislados?)", txt):
+    C.setdefault("order_rules", {})["basics_first"] = True
+
+# Series/Reps globales por defecto: "3-4 series de 8-10 repeticiones", "fuerza: 4-6 reps"
+m = _re.search(r"(\\d+)\\s*[-–]\\s*(\\d+)\\s*series.*?(\\d+)\\s*[-–]\\s*(\\d+)\\s*(rep|reps|repeticiones)", txt)
+if m:
+    C["default_series_reps"] = {"series": (int(m.group(1)), int(m.group(2))), "reps": (int(m.group(3)), int(m.group(4)))}
+else:
+    # solo reps
+    m = _re.search(r"(?:fuerza|hipertrofia|resistencia)?.*?(\\d+)\\s*[-–]\\s*(\\d+)\\s*(rep|reps|repeticiones)", txt)
+    if m:
+        C["default_series_reps"] = {"reps": (int(m.group(1)), int(m.group(2)))}
+    m = _re.search(r"(?:series)\\s*(\\d+)\\s*[-–]\\s*(\\d+)", txt)
+    if m:
+        dsr = C.get("default_series_reps", {})
+        dsr["series"] = (int(m.group(1)), int(m.group(2)))
+        C["default_series_reps"] = dsr
+
+
+
+
+
+
+
+    return C
+
+
 import re
 JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 
@@ -697,3 +954,494 @@ def _sanitize_plan_reps(plan: dict) -> dict:
 
 
 # Aviso: no se detectó patrón de validación; añade HARD-FAIL wrapper si usas otra función de generación.
+
+
+# --- NUEVO: validador de constraints estructurados ---
+def validar_constraints(plan, C):
+    errs = []
+    if not isinstance(C, dict):
+
+# Días por semana exactos
+if C.get("days_per_week") is not None:
+    n = len(plan.get("dias", []))
+    if n != int(C["days_per_week"]):
+        errs.append(f"Se solicitaron {C['days_per_week']} días/semana y la rutina tiene {n}.")
+
+# Duración objetivo/máx/mín por sesión (si el plan provee 'duracion_min_dia' o suma de 'minutos')
+for i, d in enumerate(plan.get("dias", []), start=1):
+    dur = d.get("duracion_min_dia")
+    if dur is None:
+        # estimar via ejercicios (minutos o duracion_min)
+        minutes = 0
+        for e in d.get("ejercicios", []):
+            try:
+                minutes += int(e.get("minutos", e.get("duracion_min", 0)) or 0)
+            except Exception:
+                pass
+        dur = minutes if minutes > 0 else None
+    if dur is not None:
+        if C.get("session_max_minutes") and dur > int(C["session_max_minutes"]):
+            errs.append(f"Día {i} excede el máximo de {C['session_max_minutes']} min (tiene {dur}).")
+        if C.get("session_min_minutes") and dur < int(C["session_min_minutes"]):
+            errs.append(f"Día {i} no alcanza el mínimo de {C['session_min_minutes']} min (tiene {dur}).")
+
+# Descansos entre series
+if C.get("rest_seconds_range"):
+    lo, hi = C["rest_seconds_range"]
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            rest = e.get("descanso_s") or e.get("descanso") or None
+            try:
+                rest = int(str(rest).replace("s","").strip()) if rest is not None else None
+            except Exception:
+                rest = None
+            if rest is not None and not (lo <= rest <= hi):
+                errs.append(f"Descanso fuera de rango en día {i}, '{e.get('nombre','')}' ({rest}s no está en {lo}-{hi}s).")
+
+# Tempo por defecto: exigir que exista si se definió
+if C.get("default_tempo"):
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            tempo = (e.get("tempo") or "").strip()
+            if not tempo:
+                errs.append(f"Falta tempo en día {i}, ejercicio '{e.get('nombre','')}' (se pidió default {C['default_tempo']}).")
+
+# RIR/RPE rango global (si los ejercicios lo incluyen)
+if C.get("rir_range"):
+    lo, hi = C["rir_range"]
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            rir = str(e.get("rir","")).strip().lower()
+            if rir and rir not in ("fallo","-1","0"):
+                try:
+                    val = int(re.sub(r"[^0-9-]", "", rir))
+                    if not (lo <= val <= hi):
+                        errs.append(f"RIR {rir} fuera de rango {lo}-{hi} en día {i}, '{e.get('nombre','')}'.")
+                except Exception:
+                    pass
+if C.get("rpe_range"):
+    lo, hi = C["rpe_range"]
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            rpe = e.get("rpe")
+            try:
+                if rpe is not None:
+                    val = float(rpe)
+                    if not (lo <= val <= hi):
+                        errs.append(f"RPE {rpe} fuera de rango {lo}-{hi} en día {i}, '{e.get('nombre','')}'.")
+            except Exception:
+                pass
+
+# Split preferido: solo verificaciones básicas
+if C.get("preferred_split") in ("PPL","UL","FB"):
+    # Contaje de días con grupos característicos
+    def _norm(s): return (s or "").strip().lower()
+    if C["preferred_split"] == "PPL":
+        # Debe existir al menos un día 'empuje', uno 'tirón', uno 'pierna'
+        cats = {"push":0,"pull":0,"legs":0}
+        push_terms = ("pecho","hombro","tríceps","triceps","empuje","press")
+        pull_terms = ("espalda","bíceps","biceps","remo","jalón","tirón")
+        leg_terms = ("pierna","glúteo","gluteo","cuádriceps","isquio","femoral","sentadilla","zancada","peso muerto")
+        for d in plan.get("dias", []):
+            names = " ".join([_norm(e.get("nombre","")) for e in d.get("ejercicios", [])])
+            gp = _norm(d.get("grupo_principal",""))
+            if any(t in gp or t in names for t in push_terms): cats["push"] += 1
+            if any(t in gp or t in names for t in pull_terms): cats["pull"] += 1
+            if any(t in gp or t in names for t in leg_terms): cats["legs"] += 1
+        for k,v in cats.items():
+            if v == 0:
+                errs.append(f"Split PPL solicitado, pero falta día de {k}.")
+    elif C["preferred_split"] == "UL":
+        # Debe existir al menos un día upper y uno lower
+        up_terms = ("pecho","hombro","espalda","bíceps","tríceps","biceps","triceps")
+        lo_terms = ("pierna","glúteo","gluteo","cuádriceps","isquio","femoral")
+        has_up = has_lo = False
+        for d in plan.get("dias", []):
+            gp = _norm(d.get("grupo_principal",""))
+            if any(t in gp for t in up_terms): has_up = True
+            if any(t in gp for t in lo_terms): has_lo = True
+        if not has_up: errs.append("Split UL solicitado: falta día de torso.")
+        if not has_lo: errs.append("Split UL solicitado: falta día de pierna.")
+    elif C["preferred_split"] == "FB":
+        # Mínimo 2 días con mezcla multi-grupo
+        mixed = 0
+        for d in plan.get("dias", []):
+            gps = set()
+            for e in d.get("ejercicios", []):
+                gps.add(_norm(e.get("musculo_principal","")) or _norm(e.get("grupo","")))
+            if len([g for g in gps if g]) >= 3:
+                mixed += 1
+        if mixed < 2:
+            errs.append("Full Body solicitado: se esperaban ≥2 días con 3+ grupos diferentes.")
+
+# Inclusiones
+if C.get("include_warmup"):
+    has = False
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = (e.get("nombre","") or "").lower()
+            if any(t in name for t in ("calentamiento","activación","activacion","movilidad")):
+                has = True; break
+    if not has:
+        errs.append("Se pidió incluir calentamiento y no se detecta.")
+if C.get("warmup_minutes"):
+    need = int(C["warmup_minutes"])
+    has_min = False
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = (e.get("nombre","") or "").lower()
+            if "calentamiento" in name:
+                try:
+                    mins = int(e.get("minutos", e.get("duracion_min", 0)) or 0)
+                    if mins >= need: has_min = True
+                except Exception:
+                    pass
+    if not has_min:
+        errs.append(f"Calentamiento de ≥{need} min solicitado y no se cumple.")
+
+if C.get("include_mobility"):
+    has = False
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = (e.get("nombre","") or "").lower()
+            if "movilidad" in name:
+                has = True; break
+    if not has:
+        errs.append("Se pidió incluir movilidad y no se detecta.")
+
+if C.get("include_core"):
+    has = False
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = (e.get("nombre","") or "").lower()
+            if any(t in name for t in ("plancha","abdominal","core","hollow","dead bug","pallof")):
+                has = True; break
+    if not has:
+        errs.append("Se pidió incluir core/abdominales y no se detecta.")
+if C.get("core_days_min"):
+    need = int(C["core_days_min"]); got = 0
+    for d in plan.get("dias", []):
+        names = " ".join([ (e.get("nombre","") or "").lower() for e in d.get("ejercicios", []) ])
+        if any(t in names for t in ("plancha","abdominal","core","hollow","dead bug","pallof")):
+            got += 1
+    if got < need:
+        errs.append(f"Se pidieron {need} días con core y hay {got}.")
+
+# Cardio tipo
+if C.get("cardio_type"):
+    typ = C["cardio_type"]
+    if typ == "HIIT":
+        found = any(any("hiit" in (e.get("nombre","") or "").lower() for e in d.get("ejercicios", [])) for d in plan.get("dias", []))
+        if not found: errs.append("Se pidió cardio HIIT y no se detecta.")
+    if typ == "LISS":
+        # buscar caminata, bici suave, elíptica suave, z2
+        found = False
+        for d in plan.get("dias", []):
+            for e in d.get("ejercicios", []):
+                nm = (e.get("nombre","") or "").lower()
+                if any(t in nm for t in ("liss","caminata","zona 2","z2","suave","bici","elíptica","eliptica","carrera suave")):
+                    found = True; break
+        if not found: errs.append("Se pidió cardio LISS/zona 2 y no se detecta.")
+
+# Equipo preferido / home gym
+if C.get("equipment_only_dumbbells") or C.get("equipment_only_barbell") or C.get("home_gym_minimal"):
+    allowed = []
+    if C.get("equipment_only_dumbbells"): allowed += ["mancuerna","mancuernas","dumbbell"]
+    if C.get("equipment_only_barbell"): allowed += ["barra","barbell"]
+    if C.get("home_gym_minimal"): allowed += ["mancuerna","mancuernas","barra","bandas","peso corporal","bodyweight"]
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            nm = (e.get("nombre","") or "").lower()
+            if not any(a in nm for a in allowed):
+                # permitir si es claramente peso corporal
+                if not any(t in nm for t in ("flexiones","dominadas","sentadilla búlgara","bulgara","zancadas","planchas","hip thrust")):
+                    errs.append(f"Ejercicio no acorde al equipo solicitado en día {i}: '{e.get('nombre','')}'.")
+
+# Evitar ejercicios concretos
+if C.get("avoid_exercises"):
+    avoid = [a.strip().lower() for a in C["avoid_exercises"] if a.strip()]
+    if avoid:
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            for e in d.get("ejercicios", []):
+                nm = (e.get("nombre","") or "").lower()
+                if any(a in nm for a in avoid):
+                    errs.append(f"Se pidió evitar '{a}' y aparece en día {i}: '{e.get('nombre','')}'.")
+                    break
+
+# Días nominales (solo verificar conteo si se dieron)
+if C.get("weekdays"):
+    if len(C["weekdays"]) != len(plan.get("dias", [])):
+        errs.append(f"Se indicaron días específicos ({len(C['weekdays'])}) pero la rutina tiene {len(plan.get('dias',[]))}.")
+
+# Volumen por grupo (sumar series por semana)
+if C.get("volumen_series"):
+    def _norm(s): return (s or "").strip().lower()
+    grupos = {
+        "pecho":["pecho","pectorales","pectoral","press banca","aperturas"],
+        "espalda":["espalda","dorsal","remo","jalón","dominadas","pull down","pull-up","remo con barra","remo con mancuerna"],
+        "hombro":["hombro","deltoide","militar","overhead","elevaciones laterales","elevaciones frontales"],
+        "bíceps":["bíceps","biceps","curl","martillo","predicador","inclinado"],
+        "tríceps":["tríceps","triceps","fondos","extensión tríceps","jalón tríceps","press cerrado"],
+        "pierna":["pierna","sentadilla","zancada","prensa","peso muerto","cuádriceps","isquio","femoral","glúteo","gluteo","hip thrust"],
+        "glúteo":["glúteo","gluteo","hip thrust","patada de glúteo"],
+        "core":["core","abdominal","plancha","hollow","dead bug","pallof"],
+        "gemelo":["gemelo","pantorrilla","calf"]
+    }
+    # Conteo de series por grupo
+    series_por_grupo = {g:0 for g in C["volumen_series"].keys()}
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = _norm(e.get("nombre",""))
+            gp = _norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+            s = e.get("series")
+            try:
+                s = int(str(s).strip()) if s is not None else None
+            except Exception:
+                s = None
+            for g in series_por_grupo.keys():
+                aliases = grupos.get(g, [g])
+                if g in gp or any(a in name for a in aliases):
+                    series_por_grupo[g] += (s or 0)
+                    break
+    # Validar rangos
+    for g, (lo, hi) in C["volumen_series"].items():
+        val = series_por_grupo.get(g, 0)
+        if lo is not None and val < lo:
+            errs.append(f"Volumen insuficiente para {g}: {val} series (< {lo}).")
+        if hi is not None and val > hi:
+            errs.append(f"Volumen excesivo para {g}: {val} series (> {hi}).")
+
+# Orden de ejercicios: bilaterales primero, básicos antes que accesorios
+if C.get("order_rules"):
+    def is_unilateral(nm):
+        nm = (nm or "").lower()
+        return any(t in nm for t in ("unilateral","a una mano","a una pierna","alterno","alternas","búlgar","bulgara","zancada","split squat"))
+    def is_basic(nm):
+        nm = (nm or "").lower()
+        basics = ("sentadilla","peso muerto","press banca","press militar","remo","dominadas","hip thrust","press inclinado","remo con barra","remo con mancuerna")
+        return any(t in nm for t in basics)
+    def is_accessory(nm):
+        nm = (nm or "").lower()
+        acc = ("curl","extensión tríceps","elevaciones","aperturas","cruces","pull over","face pull","patada tríceps","gemelo","pantorrilla")
+        return any(t in nm for t in acc)
+
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        names = [ (e.get("nombre","") or "") for e in d.get("ejercicios", []) ]
+        # bilateral_first: no puede haber un bilateral después de que haya aparecido un unilateral
+        if C["order_rules"].get("bilateral_first"):
+            seen_unilateral = False
+            for nm in names:
+                if is_unilateral(nm):
+                    seen_unilateral = True
+                elif seen_unilateral:
+                    errs.append(f"Orden incorrecto día {i}: ejercicio bilateral '{nm}' va después de un unilateral.")
+                    break
+        # basics_first: ningún accesorio antes que un básico
+        if C["order_rules"].get("basics_first"):
+            first_basic = None
+            first_accessory = None
+            for idx, nm in enumerate(names):
+                if is_basic(nm) and first_basic is None:
+                    first_basic = idx
+                if is_accessory(nm) and first_accessory is None:
+                    first_accessory = idx
+            if first_accessory is not None and (first_basic is None or first_accessory < first_basic):
+                errs.append(f"Orden incorrecto día {i}: hay accesorios antes que básicos.")
+# Series/Reps por defecto: comprobar rangos si están presentes
+if C.get("default_series_reps"):
+    s_rng = C["default_series_reps"].get("series")
+    r_rng = C["default_series_reps"].get("reps")
+    def parse_reps(val):
+        if val is None: return None, None
+        txt = str(val).lower().strip()
+        m = re.search(r"(\\d+)\\s*[-–x]\\s*(\\d+)", txt)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+        m = re.search(r"(\\d+)", txt)
+        if m:
+            v = int(m.group(1)); return v, v
+        return None, None
+    for i, d in enumerate(plan.get("dias", []), start=1):
+        for e in d.get("ejercicios", []):
+            # series
+            if s_rng:
+                s = e.get("series")
+                try:
+                    s = int(str(s).strip()) if s is not None else None
+                except Exception:
+                    s = None
+                if s is not None and not (s_rng[0] <= s <= s_rng[1]):
+                    errs.append(f"Series fuera de rango ({s}) en día {i}: '{e.get('nombre','')}', esperado {s_rng[0]}–{s_rng[1]}.")
+            # reps
+            if r_rng:
+                r_lo, r_hi = parse_reps(e.get("reps"))
+                if r_lo is not None and not (r_rng[0] <= r_lo <= r_rng[1] and r_rng[0] <= r_hi <= r_rng[1]):
+                    errs.append(f"Reps fuera de rango ({e.get('reps')}) en día {i}: '{e.get('nombre','')}', esperado {r_rng[0]}–{r_rng[1]}.")
+
+
+
+
+        return errs
+    def _norm(s): return (s or "").strip().lower()
+
+    # legs_days_max
+    if C.get("legs_days_max") is not None:
+        leg_terms = ("pierna", "glúteo", "gluteo", "cuádriceps", "cuadriceps", "isquio", "femoral", "glutes", "legs")
+        leg_days = 0
+        for d in plan.get("dias", []):
+            gp = _norm(d.get("grupo_principal", ""))
+            if any(t in gp for t in leg_terms):
+                leg_days += 1
+                continue
+            ej = d.get("ejercicios", [])
+            if ej:
+                leg_like = 0
+                for e in ej:
+                    name = _norm(e.get("nombre",""))
+                    if any(t in name for t in leg_terms):
+                        leg_like += 1
+                if leg_like >= max(1, round(len(ej) * 0.5)):
+                    leg_days += 1
+        if leg_days > int(C["legs_days_max"]):
+            errs.append(f"Se pidió 'solo {C['legs_days_max']}' día(s) de pierna y se detectan {leg_days}.")
+
+    # biceps_min_total
+    if C.get("biceps_min_total") is not None:
+        min_bi = int(C["biceps_min_total"])
+        bi_terms = ("bíceps", "biceps", "curl", "predicador", "martillo", "hammer curl", "inclinado con mancuernas")
+        total_bi = 0
+        for d in plan.get("dias", []):
+            for e in d.get("ejercicios", []):
+                name = _norm(e.get("nombre",""))
+                gp = _norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+                sp = _norm(e.get("musculo_secundario",""))
+                if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name:
+                    total_bi += 1
+                elif any(t in name for t in bi_terms):
+                    total_bi += 1
+                elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp:
+                    total_bi += 1
+        if total_bi < min_bi:
+            errs.append(f"Bíceps ≥ {min_bi} requerido y hay {total_bi}.")
+
+    # max_exercises_per_day
+    if C.get("max_exercises_per_day") is not None:
+        mx = int(C["max_exercises_per_day"])
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            n = len(d.get("ejercicios", []))
+            if n > mx:
+                errs.append(f"Día {i} supera el máximo de {mx} ejercicios ({n}).")
+
+    # equipment forbids
+    eq_forb = []
+    if C.get("equipment_only_free_weights"): eq_forb += ["máquina","maquina","polea","cable","smith"]
+    if C.get("forbid_machines"): eq_forb += ["máquina","maquina"]
+    if C.get("forbid_smith"): eq_forb += ["smith"]
+    if C.get("forbid_cables"): eq_forb += ["polea","cable"]
+    if eq_forb:
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            for e in d.get("ejercicios", []):
+                name = _norm(e.get("nombre",""))
+                if any(b in name for b in eq_forb):
+                    errs.append(f"Material prohibido detectado en día {i}: '{e.get('nombre','')}'.")
+
+    # methods forbids
+    if C.get("forbid_supersets"):
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            for e in d.get("ejercicios", []):
+                if "super" in _norm(e.get("nombre","")):
+                    errs.append(f"Se prohíben superseries y aparece '{e.get('nombre','')}' en día {i}.")
+    if C.get("forbid_clusters"):
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            for e in d.get("ejercicios", []):
+                if "cluster" in _norm(e.get("nombre","")):
+                    errs.append(f"Se prohíben clusters y aparece '{e.get('nombre','')}' en día {i}.")
+    if C.get("forbid_failure"):
+        for i, d in enumerate(plan.get("dias", []), start=1):
+            for e in d.get("ejercicios", []):
+                rir = str(e.get("rir","")).strip().lower()
+                if rir in ("0","-1","fallo"):
+                    errs.append(f"Se prohíbe ir al fallo y hay RIR {rir} en '{e.get('nombre','')}' día {i}.")
+
+    # cardio
+    if C.get("cardio_min_minutes") and C.get("cardio_min_days"):
+        need_min = int(C["cardio_min_minutes"])
+        need_days = int(C["cardio_min_days"])
+        got_days = 0
+        for d in plan.get("dias", []):
+            minutes = 0
+            for e in d.get("ejercicios", []):
+                name = _norm(e.get("nombre",""))
+                if "cardio" in name or "cinta" in name or "elíptica" in name or "eliptica" in name or "bicicleta" in name or "row" in name:
+                    try:
+                        minutes = max(minutes, int(e.get("minutos", e.get("duracion_min", 0)) or 0))
+                    except Exception:
+                        pass
+            if minutes >= need_min:
+                got_days += 1
+        if got_days < need_days:
+            errs.append(f"Cardio ≥ {need_min} min en {need_days} días requerido y solo hay {got_days}.")
+
+    # preferred_split is advisory in prompt; we do not hard-fail unless strict keyword present
+    return errs
+
+
+
+# --- NUEVO: auto-ajuste simple antes de hard-fail ---
+def enforce_simple_constraints(plan, C):
+    """
+    Realiza ajustes no destructivos y obvios para intentar cumplir:
+    - recortar a max_exercises_per_day
+    - si falta bíceps: añadir curls básicos al final del día de empuje/espalda (hasta cumplir mínimo)
+    (Esto solo se aplica si no rompe otras reglas; si no se puede, se deja a validación/refine.)
+    """
+    if not isinstance(plan, dict) or not isinstance(C, dict):
+        return plan
+    plan = json.loads(json.dumps(plan))  # deep copy
+
+    # Recorte por máximo ejercicios/día
+    mx = C.get("max_exercises_per_day")
+    if mx:
+        for d in plan.get("dias", []):
+            ej = d.get("ejercicios", [])
+            if len(ej) > mx:
+                d["ejercicios"] = ej[:mx]
+
+    # Añadir bíceps si falta
+    min_bi = C.get("biceps_min_total")
+    if min_bi:
+        def _norm(s): return (s or "").strip().lower()
+        bi_terms = ("bíceps","biceps","curl","predicador","martillo","hammer curl","inclinado con mancuernas")
+        def count_bi(p):
+            c=0
+            for d in p.get("dias", []):
+                for e in d.get("ejercicios", []):
+                    name=_norm(e.get("nombre",""))
+                    gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+                    sp=_norm(e.get("musculo_secundario",""))
+                    if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name:
+                        c+=1
+                    elif any(t in name for t in bi_terms):
+                        c+=1
+                    elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp:
+                        c+=1
+            return c
+        cur = count_bi(plan)
+        needed = int(min_bi) - cur
+        if needed > 0:
+            # Distribuir curls hasta cubrir
+            templates = [
+                {"nombre":"Curl con barra", "series":3, "reps":"8-12", "rir":"1-2", "musculo_principal":"bíceps"},
+                {"nombre":"Curl martillo con mancuernas", "series":3, "reps":"10-12", "rir":"1-2", "musculo_principal":"bíceps"},
+                {"nombre":"Curl en banco inclinado", "series":3, "reps":"10-12", "rir":"1-2", "musculo_principal":"bíceps"}
+            ]
+            di = 0
+            for _ in range(needed):
+                if not plan.get("dias"):
+                    break
+                d = plan["dias"][di % len(plan["dias"])]
+                d.setdefault("ejercicios", []).append(templates[_ % len(templates)])
+                di += 1
+
+    return plan
+
