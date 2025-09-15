@@ -551,8 +551,62 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
                 if no_db and any(k in name for k in DUMBBELL_KEYWORDS):
                     errs.append(f"Sin mancuernas: '{ej.get('nombre','')}' en día {i}.")
 
-    return errs
+    
 
+# Regla: "solo un día de pierna"
+if _re.search(r"solo\s+un\s+d[íi]a\s+de\s+pierna", txt):
+    leg_terms = ("pierna", "glúteo", "gluteo", "cuádriceps", "cuadriceps", "isquio", "femoral", "glutes", "legs")
+    leg_days = 0
+    for d in plan.get("dias", []):
+        gp = _norm(d.get("grupo_principal", ""))
+        if any(t in gp for t in leg_terms):
+            leg_days += 1
+            continue
+        ej = d.get("ejercicios", [])
+        if ej:
+            leg_like = 0
+            for e in ej:
+                name = _norm(e.get("nombre",""))
+                if any(t in name for t in leg_terms):
+                    leg_like += 1
+            if leg_like >= max(1, round(len(ej) * 0.5)):
+                leg_days += 1
+    if leg_days > 1:
+        errs.append(f"Pediste 'solo un día de pierna' y hay {leg_days} días de pierna detectados.")
+
+
+
+
+# Regla dinámica: "al menos N de bíceps" / "mínimo N bíceps" / "quiero más bíceps"
+min_bi = None
+m = _re.search(r"(?:al\s+menos|min[ií]mo|como\s+min[ií]mo)\s*(\d+)\s*(?:ejercicios?\s+)?de\s+b[ií]ceps", txt)
+if m:
+    try:
+        min_bi = int(m.group(1))
+    except Exception:
+        min_bi = None
+if _re.search(r"(m[aá]s\s+ejercicios\s+de\s+b[ií]ceps|quiero\s+m[aá]s\s+b[ií]ceps|m[aá]s\s+b[ií]ceps)", txt) or min_bi is not None:
+    if min_bi is None:
+        min_bi = 3
+    bi_terms = ("bíceps", "biceps", "curl", "predicador", "martillo", "hammer curl", "inclinado con mancuernas")
+    total_bi = 0
+    for d in plan.get("dias", []):
+        for e in d.get("ejercicios", []):
+            name = _norm(e.get("nombre",""))
+            gp = _norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+            sp = _norm(e.get("musculo_secundario",""))
+            if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name:
+                total_bi += 1
+            elif any(t in name for t in bi_terms):
+                total_bi += 1
+            elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp:
+                total_bi += 1
+    if total_bi < min_bi:
+        errs.append(f"Pediste bíceps ≥ {min_bi} y solo se detectan {total_bi} ejercicios de bíceps en la semana.")
+return errs
+
+
+MAX_REFINE = 2
 
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
@@ -640,3 +694,6 @@ def _sanitize_plan_reps(plan: dict) -> dict:
     except Exception:
         pass
     return plan
+
+
+# Aviso: no se detectó patrón de validación; añade HARD-FAIL wrapper si usas otra función de generación.
