@@ -3,6 +3,17 @@ import json
 # --- NUEVO: extracción de constraints desde comentarios (cumplimiento 100%) ---
 import re as _re
 
+# --- JSON extractors (auto-inserted) ---
+try:
+    JSON_MD_RE = re.compile(r"```json\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
+except Exception:
+    JSON_MD_RE = None
+try:
+    JSON_BLOCK_RE = re.compile(r"\{[\s\S]*\}", re.MULTILINE)
+except Exception:
+    JSON_BLOCK_RE = None
+
+
 
 def extract_constraints(comentarios_txt: str):
     """
