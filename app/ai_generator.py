@@ -1,20 +1,12 @@
+from __future__ import annotations
 import re
-import json
-
-JSON_MD_RE = re.compile(r"```json\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
-
-def _safe_json_search(regex, text):
-    try:
-        return regex.search(text) if regex else None
-    except Exception:
-        return None
-
 import json
 
 # --- NUEVO: extracción de constraints desde comentarios (cumplimiento 100%) ---
 import re as _re
 
 
+JSON_MD_RE = re.compile(r"```json\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
 def extract_constraints(comentarios_txt: str):
     """
     Devuelve un dict con constraints normalizados.
@@ -225,19 +217,21 @@ def extract_constraints(comentarios_txt: str):
 
     return C
 
+
 def _extract_json(text: str) -> str:
     if not isinstance(text, str) or not text.strip():
-        raise ValueError('Respuesta vacía')
+        raise ValueError("Respuesta vacía")
     m = _safe_json_search(JSON_MD_RE, text)
     if m:
         return m.group(1)
     m = _safe_json_search(JSON_BLOCK_RE, text)
     if m:
         return m.group(0)
-    start = text.find('{'); end = text.rfind('}')
+    start = text.find("{")
+    end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
         return text[start:end+1]
-    raise ValueError('No se encontró bloque JSON')
+    raise ValueError("No se encontró bloque JSON")
 def _ensure_descanso_for_ej(ej: Dict[str, Any]) -> Dict[str, Any]:
     # Normaliza un ejercicio garantizando 'descanso'
     if not isinstance(ej, dict):
@@ -605,7 +599,7 @@ def _exercise_uses_any(ej: dict, keywords: list[str]) -> bool:
 
 def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
     """
-    Reglas estrictas derivadas de 'comentarios' del usuario.
+    Reglas estrictas derivadas de 'comentarios' del usuario'.
     """
     errs: list[str] = []
     if not comentarios or not isinstance(comentarios, str):
@@ -625,16 +619,16 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
 
     def _day_has_cardio_minutes(d: dict, min_minutes: int) -> bool:
         for ej in d.get("ejercicios", []):
-            n = _norm(e.get("nombre", ""))
-            if any(k in n for k in ("cardio", "cinta", "trote", "correr", "bicic", "elípt", "elipt", "escalador", "remo")):
+            n = _norm(ej.get("nombre", ""))
+            if any(k in n for k in ("cardio","cinta","trote","correr","bicic","elípt","elipt","escalador","remo")):
                 mins = _exercise_minutes(ej)
                 if mins is not None and mins >= min_minutes:
                     return True
         return False
 
     # solo un día de pierna
-    if re.search(r"solo\s+un\s+d[ií]a\s+de\s+pierna", txt):
-        leg_terms = ("pierna", "glúteo", "gluteo", "cuádriceps", "cuadriceps", "isquio", "femoral", "gemelo", "glutes", "legs")
+    if re.search(r"solo\\s+un\\s+d[ií]a\\s+de\\s+pierna", txt):
+        leg_terms = ("pierna","glúteo","gluteo","cuádriceps","cuadriceps","isquio","femoral","gemelo","glutes","legs")
         leg_days = 0
         for d in plan.get("dias", []):
             ej = d.get("ejercicios", [])
@@ -642,10 +636,10 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
             if leg_like >= max(1, round(max(1, len(ej)) * 0.5)):
                 leg_days += 1
         if leg_days > 1:
-            errs.append(f"Pediste 'solo un día de pierna' y hay {leg_days} días de pierna detectados.")
+            errs.append(f"Pediste 'solo un día de pierna' y hay {leg_days} días tipo pierna.")
 
     # máximo N ejercicios por sesión/día
-    m = re.search(r"(?:m[áa]ximo|max|como\s+mucho)\s+(\d+)\s+ejercicios\s+por\s+(?:sesión|sesion|d[ií]a|dia)", txt)
+    m = re.search(r"(?:m[áa]ximo|max|como\\s+mucho)\\s+(\\d+)\\s+ejercicios\\s+por\\s+(?:sesión|sesion|d[ií]a|dia)", txt)
     if m:
         limit = int(m.group(1))
         for i, d in enumerate(plan.get("dias", []), start=1):
@@ -654,8 +648,8 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
                 errs.append(f"Máximo {limit} ejercicios por sesión: el día {i} tiene {cnt}.")
 
     # no repetir ejercicios exactos
-    if re.search(r"no\s+repetir\s+ejercicio[s]?(?:\s+exactos?)?\s+en\s+la\s+semana|no\s+repetir\s+ejercicios", txt):
-        seen = set(); dup = set()
+    if re.search(r"no\\s+repetir\\s+ejercicio[s]?(?:\\s+exactos?)?\\s+en\\s+la\\s+semana|no\\s+repetir\\s+ejercicios", txt):
+        seen = set(); dup=set()
         for d in plan.get("dias", []):
             for ej in d.get("ejercicios", []):
                 n = _norm(e.get("nombre",""))
@@ -666,78 +660,70 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
             errs.append(f"No repetir ejercicios exactos: '{n}'.")
 
     # incluir calentamiento de N min cada día
-    m = re.search(r"(?:incluir|a(?:ñ|n)adir|meter)\s+calentamiento\s+de\s+(\d+)\s*(?:min|mins|minutos)(?:\s+cada\s+d[ií]a)?", txt)
+    m = re.search(r"(?:incluir|a(?:ñ|n)adir|meter)\\s+calentamiento\\s+de\\s+(\\d+)\\s*(?:min|mins|minutos)(?:\\s+cada\\s+d[ií]a)?", txt)
     if m:
         need = int(m.group(1))
         for i, d in enumerate(plan.get("dias", []), start=1):
             found = False
             for ej in d.get("ejercicios", []):
-                if "calentamiento" in _norm(e.get("nombre","")):
+                if "calentamiento" in _norm(ej.get("nombre","")):
                     mins = _exercise_minutes(ej)
                     if mins is None or mins < need:
                         errs.append(f"Calentamiento de {need} min requerido en día {i}.")
-                    found = True
-                    break
+                    found = True; break
             if not found:
                 errs.append(f"Incluir calentamiento de {need} min en el día {i}.")
 
     # añadir estiramientos
-    if re.search(r"(?:incluir|a(?:ñ|n)adir|meter)\s+estiramientos", txt):
+    if re.search(r"(?:incluir|a(?:ñ|n)adir|meter)\\s+estiramientos", txt):
         for i, d in enumerate(plan.get("dias", []), start=1):
             ok = any("estir" in _norm(ej.get("nombre","")) for ej in d.get("ejercicios", []))
             if not ok:
                 errs.append(f"Incluir estiramientos al final del día {i}.")
 
     # mínimo M min de cardio N días
-    m = re.search(r"m[ií]nimo\s+(\d+)\s*(?:min|mins|’|')\s+de\s+cardio\s+(\d+)\s+d[ií]as?", txt)
+    m = re.search(r"m[ií]nimo\\s+(\\d+)\\s*(?:min|mins|’|')\\s+de\\s+cardio\\s+(\\d+)\\s+d[ií]as?", txt)
     if m:
         mins = int(m.group(1)); days = int(m.group(2))
         ok_days = sum(1 for d in plan.get("dias", []) if _day_has_cardio_minutes(d, mins))
         if ok_days < days:
             errs.append(f"Cardio mínimo {mins} min en {days} días: solo hay {ok_days} días OK.")
 
-    # más/menos ejercicios de X
-    m = re.search(r"m[aá]s\s+ejercicios\s+de\s+([a-záéíóúñ\s]+)", txt)
+    # más / menos ejercicios de X
+    m = re.search(r"m[aá]s\\s+ejercicios\\s+de\\s+([a-záéíóúñ\\s]+)", txt)
     if m:
         target = _norm(m.group(1)); count = 0
         for d in plan.get("dias", []):
             for e in d.get("ejercicios", []):
-                if target and target in _norm(e.get("nombre","")):
-                    count += 1
+                if target and target in _norm(e.get("nombre","")): count += 1
         if count < 3:
             errs.append(f"Pediste más ejercicios de '{target}': hay {count}, se esperaban ≥ 3.")
-    m = re.search(r"menos\s+ejercicios\s+de\s+([a-záéíóúñ\s]+)", txt)
+    m = re.search(r"menos\\s+ejercicios\\s+de\\s+([a-záéíóúñ\\s]+)", txt)
     if m:
         target = _norm(m.group(1)); count = 0
         for d in plan.get("dias", []):
             for e in d.get("ejercicios", []):
-                if target and target in _norm(e.get("nombre","")):
-                    count += 1
+                if target and target in _norm(e.get("nombre","")): count += 1
         if count > 2:
             errs.append(f"Pediste menos ejercicios de '{target}': hay {count}, se esperaban ≤ 2.")
 
     # incluir X N días
-    m = re.search(r"(?:meter|incluir|hacer)\s+([a-záéíóúñ\s]+?)\s+(\d+)\s+(?:veces|d[ií]as)", txt)
+    m = re.search(r"(?:meter|incluir|hacer)\\s+([a-záéíóúñ\\s]+?)\\s+(\\d+)\\s+(?:veces|d[ií]as)", txt)
     if m:
-        target = _norm(m.group(1)); N = int(m.group(2))
-        days_with = 0
+        target = _norm(m.group(1)); N = int(m.group(2)); days_with = 0
         for d in plan.get("dias", []):
-            if any(target in _norm(e.get("nombre","")) for e in d.get("ejercicios", [])):
-                days_with += 1
+            if any(target in _norm(e.get("nombre","")) for e in d.get("ejercicios", [])): days_with += 1
         if days_with != N:
             errs.append(f"'{target}' debe aparecer exactamente {N} días y aparece {days_with}.")
 
     # equipamiento prohibido
-    no_machines = bool(re.search(r"(?:no\s+máquinas|no\s+maquinas|solo\s+peso\s+libre)", txt))
-    no_cables   = bool(re.search(r"(?:no\s+poleas|no\s+cables?)", txt))
+    no_machines = bool(re.search(r"(?:no\\s+m[áa]quinas|no\\s+maquinas|solo\\s+peso\\s+libre)", txt))
+    no_cables   = bool(re.search(r"(?:no\\s+poleas|no\\s+cables?)", txt))
     no_smith    = "no smith" in txt or "sin smith" in txt
-    no_bar      = bool(re.search(r"(?:no\s+barra[s]?|sin\s+barra[s]?)", txt))
-    no_db       = bool(re.search(r"(?:no\s+mancuernas|sin\s+mancuernas)", txt))
-
-    BARBELL_KEYWORDS = ("barra", "barbell")
-    DUMBBELL_KEYWORDS = ("mancuerna", "mancuernas", "dumbbell", "db")
-    MACHINE_KEYWORDS = ("máquina", "maquina", "machine", "selectorizada")
-    CABLE_KEYWORDS   = ("polea", "poleas", "cable", "cables")
+    no_bar      = bool(re.search(r"(?:no\\s+barra[s]?|sin\\s+barra[s]?)", txt))
+    no_db       = bool(re.search(r"(?:no\\s+mancuernas|sin\\s+mancuernas)", txt))
+    BARBELL_KEYWORDS=("barra","barbell"); DUMBBELL_KEYWORDS=("mancuerna","mancuernas","dumbbell","db")
+    MACHINE_KEYWORDS=("máquina","maquina","machine","selectorizada"); CABLE_KEYWORDS=("polea","poleas","cable","cables")
 
     if any((no_machines, no_cables, no_smith, no_bar, no_db)):
         for i, d in enumerate(plan.get("dias", []), start=1):
@@ -754,33 +740,27 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
                 if no_db and any(k in name for k in DUMBBELL_KEYWORDS):
                     errs.append(f"Sin mancuernas: '{ej.get('nombre','')}' en día {i}.")
 
-    # mínimo N de bíceps
-    m = re.search(r"(?:al\s+menos|min[ií]mo|como\s+min[ií]mo)\s*(\d+)\s*(?:ejercicios?\s+)?de\s+b[ií]ceps", txt)
-    if m:
-        min_bi = int(m.group(1))
-    else:
-        min_bi = None
-    more_biceps = bool(re.search(r"(m[aá]s\s+ejercicios\s+de\s+b[ií]ceps|m[aá]s\s+b[ií]ceps)", txt))
-    if more_biceps or (min_bi is not None):
-        if min_bi is None:
-            min_bi = 3
+    # mínimo N de bíceps (o "más bíceps")
+    m = re.search(r"(?:al\\s+menos|min[ií]mo|como\\s+min[ií]mo)\\s*(\\d+)\\s*(?:ejercicios?\\s+)?de\\s+b[ií]ceps", txt)
+    more_biceps = bool(re.search(r"(m[aá]s\\s+ejercicios\\s+de\\s+b[ií]ceps|m[aá]s\\s+b[ií]ceps)", txt))
+    min_bi = int(m.group(1)) if m else (3 if more_biceps else None)
+    if min_bi is not None:
         total_bi = 0
-        bi_terms = ("curl", "predicador", "martillo", "hammer curl", "inclinado con mancuernas")
+        bi_terms=("curl","predicador","martillo","hammer curl","inclinado con mancuernas")
         for d in plan.get("dias", []):
             for e in d.get("ejercicios", []):
-                name = _norm(e.get("nombre",""))
-                gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
-                sp=_norm(e.get("musculo_secundario",""))
-                if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name:
-                    total_bi += 1
-                elif any(t in name for t in bi_terms):
-                    total_bi += 1
-                elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp:
-                    total_bi += 1
+                name=_norm(e.get("nombre","")); gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo","")); sp=_norm(e.get("musculo_secundario",""))
+                if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name: total_bi+=1
+                elif any(t in name for t in bi_terms): total_bi+=1
+                elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp: total_bi+=1
         if total_bi < min_bi:
             errs.append(f"Pediste bíceps ≥ {min_bi} y solo se detectan {total_bi} ejercicios de bíceps en la semana.")
 
     return errs
+
+
+MAX_REFINE = 2
+
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
     _system = build_system()
@@ -1159,3 +1139,10 @@ def enforce_simple_constraints(plan, C):
                 di += 1
 
     return plan
+
+
+def _safe_json_search(regex, text):
+    try:
+        return regex.search(text) if regex else None
+    except Exception:
+        return None
