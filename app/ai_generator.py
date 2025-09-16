@@ -381,6 +381,84 @@ RULES_TEXT = (
     "- Duración objetivo: {dur} minutos. Ajusta descansos/volumen para cumplir.\n"
 )
 
+
+def validar_negocio(plan: Dict[str, Any]) -> List[str]:
+    """Validación mínima de negocio para que el JSON sea utilizable por la app.
+    Devuelve una lista de errores (strings). Si la lista está vacía, el plan se considera válido.
+    """
+    errs: List[str] = []
+
+    if not isinstance(plan, dict):
+        return ["El plan debe ser un objeto JSON (dict)."]
+
+    # meta
+    meta = plan.get("meta", {})
+    if not isinstance(meta, dict):
+        errs.append("Falta 'meta' como objeto.")
+        meta = {}
+    dur = meta.get("duracion_min") or meta.get("duracion") or 60
+    try:
+        dur = int(dur)
+    except Exception:
+        errs.append("'meta.duracion_min' debe ser un número en minutos.")
+
+    # dias
+    dias = plan.get("dias")
+    if not isinstance(dias, list) or len(dias) == 0:
+        errs.append("'dias' debe ser una lista con al menos 1 día.")
+        return errs
+
+    for i, d in enumerate(dias, start=1):
+        if not isinstance(d, dict):
+            errs.append(f"Día {i}: el elemento debe ser un objeto.")
+            continue
+        ejercicios = d.get("ejercicios") or d.get("workout") or []
+        if not isinstance(ejercicios, list) or len(ejercicios) == 0:
+            errs.append(f"Día {i}: lista de 'ejercicios' vacía.")
+            continue
+
+        seen_names = set()
+        for j, ej in enumerate(ejercicios, start=1):
+            if not isinstance(ej, dict):
+                errs.append(f"Día {i} ej #{j}: debe ser un objeto.")
+                continue
+            nombre = ej.get("nombre") or ej.get("ejercicio") or ej.get("name")
+            if not nombre or not str(nombre).strip():
+                errs.append(f"Día {i} ej #{j}: falta 'nombre'.")
+            else:
+                nrm = str(nombre).strip().lower()
+                if nrm in seen_names:
+                    errs.append(f"Día {i}: ejercicio repetido '{nombre}'.")
+                seen_names.add(nrm)
+
+            # series (si está, validar)
+            if "series" in ej:
+                try:
+                    s = int(ej.get("series"))
+                    if s <= 0 or s > 10:
+                        errs.append(f"Día {i} '{nombre}': 'series' fuera de rango razonable (1–10)." )
+                except Exception:
+                    errs.append(f"Día {i} '{nombre}': 'series' debe ser entero.")
+
+            # reps (si está, validar formato básico)
+            if "reps" in ej or "repeticiones" in ej:
+                reps_val = str(ej.get("reps") or ej.get("repeticiones"))
+                if not reps_val.strip():
+                    errs.append(f"Día {i} '{nombre}': 'reps' vacío.")
+
+            # descanso (si falta, no bloqueamos; lo infiere _ensure_descanso_for_ej más tarde)
+            # pero si viene, chequear no vacío
+            if "descanso" in ej and not str(ej.get("descanso")).strip():
+                errs.append(f"Día {i} '{nombre}': 'descanso' está vacío.")
+
+        # tamaño del día (muy lax)
+        if len(ejercicios) < 3:
+            errs.append(f"Día {i}: muy pocos ejercicios (<3)." )
+        if len(ejercicios) > 12:
+            errs.append(f"Día {i}: demasiados ejercicios (>12)." )
+
+    return errs
+
 def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
