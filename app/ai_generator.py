@@ -1,5 +1,10 @@
-
 from __future__ import annotations
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None  # fallback to legacy openai package
+
+
 import os
 import re
 import json
@@ -1073,4 +1078,29 @@ def _extract_json(text: str) -> str:
     if start != -1 and end != -1 and end > start:
         return text[start:end+1]
     raise ValueError("No se encontró bloque JSON")
+
+
+
+def _client():
+    """Return an OpenAI client for both SDK v1+ and legacy v0.28.
+
+    If the modern class is not available, fall back to the legacy 'openai' module.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+    if OpenAI is not None:
+        # New SDK
+        if base_url:
+            return OpenAI(api_key=api_key, base_url=base_url)
+        return OpenAI(api_key=api_key)
+    else:
+        # Legacy SDK
+        import openai as _openai
+        _openai.api_key = api_key
+        if base_url:
+            try:
+                _openai.base_url = base_url
+            except Exception:
+                pass
+        return _openai
 
