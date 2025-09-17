@@ -476,6 +476,7 @@ def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
 def build_prompt(datos: Dict[str, Any]) -> str:
+    ia_detalles = (datos.get('ia_detalles') or '').strip()
     """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
     agrup = datos.get("agrupacion", "Varios grupos principales por día")
     material = datos.get("material", [])
@@ -484,6 +485,7 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     nivel = datos.get("nivel", "intermedio")
 
     extra_notas = f"\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  {notas}" if notas else ""
+    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
     reglas_estrictas = f"""
 REGLAS ESTRICTAS (debes cumplirlas sí o sí):
 - Agrupación pedida: {agrup}
@@ -530,8 +532,7 @@ ENTRADA DEL USUARIO (estructura):
 - Evitar: {datos.get('evitar',[])}
 - Calentamiento: {datos.get('calentamiento','')}
 - Agrupación: {agrup}
-
-SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
+\n" + detalles_usuario + f"\nSALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
 """
     return prompt
 
@@ -566,8 +567,7 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
 from typing import Any, Dict
 
 MUSCLES_SYNONYMS = {
-    "bíceps": ["bíceps","biceps","curl","martillo",
-            {"role": "user", "content": build_prompt(datos_usuario)}
+    "bíceps": ["bíceps","biceps","curl","martillo"
         ],
     "tríceps": ["tríceps","triceps","fondos","jalón tríceps","jalon triceps","extensión tríceps","extension triceps"],
     "pecho": ["pecho","press banca","aperturas","inclinado","cruce","press"],
