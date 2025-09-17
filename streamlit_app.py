@@ -1,3 +1,10 @@
+
+def _asegurar_dias_minimos(datos_usuario: dict):
+    dias = datos_usuario.get("dias")
+    if not dias or not isinstance(dias, (list, tuple)) or len(dias) == 0:
+        # Si el usuario no seleccionó nada, por defecto 3 días
+        datos_usuario["dias"] = ["Lunes", "Miércoles", "Viernes"]
+
 import matplotlib.pyplot as plt
 from datetime import date
 from pathlib import Path
@@ -1159,6 +1166,7 @@ elif page == "📘 Rutinas":
         # ---------- Llamada a IA / Fallback ----------
         if submitted:
             datos_usuario = {
+datos_usuario["ia_detalles"] = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas",""))
                 "nivel": nivel,
                 "dias": int(dias),
                 "duracion": int(duracion),
@@ -1196,8 +1204,8 @@ elif page == "📘 Rutinas":
                             st.session_state["ia_prompt"] = None
                         st.session_state["ia_system"] = result.get("system")
                     else:
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-
+                        _asegurar_dias_minimos(datos_usuario)
+st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
                         # Guardar prompt/system aunque haya fallo
                         try:
                             st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)

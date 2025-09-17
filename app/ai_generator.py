@@ -505,7 +505,6 @@ REGLAS ESTRICTAS (debes cumplirlas sí o sí):
     """.strip("\n")
 
     prompt = f"""
-prompt = build_prompt(datos_usuario, base_prompt=prompt)
 Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
 
 Genera una rutina semanal siguiendo estas reglas base:
@@ -531,8 +530,8 @@ ENTRADA DEL USUARIO (estructura):
 - Énfasis accesorios: {datos.get('enfasis_accesorios',[])}
 - Evitar: {datos.get('evitar',[])}
 - Calentamiento: {datos.get('calentamiento','')}
-- Agrupación: {agrup}
-\n" + detalles_usuario + f"\nSALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
+- Agrupación: {agrup}\n" + detalles_usuario + f"\n
+SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
 """
     return prompt
 
@@ -567,8 +566,7 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
 from typing import Any, Dict
 
 MUSCLES_SYNONYMS = {
-    "bíceps": ["bíceps","biceps","curl","martillo"
-        ],
+    "bíceps": ["bíceps","biceps","curl","martillo"],
     "tríceps": ["tríceps","triceps","fondos","jalón tríceps","jalon triceps","extensión tríceps","extension triceps"],
     "pecho": ["pecho","press banca","aperturas","inclinado","cruce","press"],
     "espalda": ["espalda","remo","dominad","jalón","jalon","pull","pullover"],
