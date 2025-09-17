@@ -1196,7 +1196,13 @@ elif page == "📘 Rutinas":
                             st.session_state["ia_prompt"] = None
                         st.session_state["ia_system"] = result.get("system")
                     else:
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                        st.session_state["rutina_ia"] = 
+# Inyectar detalles IA en datos_usuario (si existe)
+try:
+    datos_usuario["ia_detalles"] = datos_usuario.get("ia_detalles", "") or st.session_state.get("ia_notas","")
+except Exception:
+    pass
+generate_fallback(datos_usuario)
                         # Guardar prompt/system aunque haya fallo
                         try:
                             st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
