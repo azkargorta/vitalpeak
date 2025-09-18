@@ -49,4 +49,4 @@ def apply_routine(username: str, routine_name: str, date_iso: str) -> int:
         for s in range(1, sets + 1):
             add_training_set(username, date_iso, ex, s, reps, weight)
             count += 1
-            return count
+    return count

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 from .datastore import load_user, save_user
-import streamlit as st
 
 
 def add_training_set(username: str, date_iso: str, exercise: str, set_index: int, reps: int, weight: float) -> None:

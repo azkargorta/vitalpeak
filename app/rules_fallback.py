@@ -56,3 +56,4 @@ def generate_fallback(datos: Dict[str, Any]) -> Dict[str, Any]:
     dur = int(datos.get("duracion", 60))
     objetivo = str(datos.get("objetivo","fuerza"))
     return _upper_lower_template(dias, dur, objetivo)
+

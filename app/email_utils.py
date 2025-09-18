@@ -27,6 +27,6 @@ def send_email(to_email: str, subject: str, html: str, text: Optional[str] = Non
             server.starttls()
             server.login(user, password)
             server.send_message(msg)
-            return True, "Email enviado"
+        return True, "Email enviado"
     except Exception as e:
         return False, f"Fallo enviando email: {e}"
