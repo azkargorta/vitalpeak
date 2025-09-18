@@ -45,6 +45,7 @@ def ensure_user(username: str) -> Dict[str, Any]:
             "password": "",
             "email": None,
             "recovery_email": None,
+            "profile": {},
             "entrenamientos": [],
             "rutinas": [],
             "custom_exercises": [],
@@ -99,7 +100,7 @@ def set_password(username: str, new_password: str) -> None:
 
 def authenticate(username: str, password: str) -> bool:
     d = load_user(username)
-    if not d: 
+    if not d:
         return False
     stored = d.get("password", "")
     if _looks_pbkdf2(stored):
@@ -117,6 +118,7 @@ def register_user(username: str, password: str, email: Optional[str]=None) -> bo
         "password": _pbkdf2_hash(password),
         "email": email,
         "recovery_email": email,
+        "profile": {},
         "entrenamientos": [],
         "rutinas": [],
         "custom_exercises": [],
@@ -130,6 +132,20 @@ def set_account_email(username: str, email: str) -> None:
     d = ensure_user(username)
     d["email"] = email
     d.setdefault("recovery_email", email)
+    save_user(username, d)
+
+def set_recovery_email(username: str, email: str) -> None:
+    d = ensure_user(username)
+    d["recovery_email"] = email
+    save_user(username, d)
+
+def get_emails_for_user(username: str) -> dict:
+    d = load_user(username) or {}
+    return {"email": d.get("email"), "recovery_email": d.get("recovery_email")}
+
+def set_profile(username: str, profile: dict) -> None:
+    d = ensure_user(username)
+    d["profile"] = profile or {}
     save_user(username, d)
 
 def create_password_reset(username: str, *, ttl_seconds: int = 3600) -> dict | None:
