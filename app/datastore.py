@@ -169,3 +169,16 @@ def clear_password_reset(username: str) -> None:
     p = _reset_token_path(username)
     if p.exists():
         p.unlink()
+
+# Directory where exercise images (icons/diagrams) are stored or saved
+def exercise_image_dir(username: str | None = None) -> Path:
+    """Return the directory path for exercise images.
+    If username is provided, returns a user-scoped subfolder to avoid collisions.
+    Ensures the directory exists.
+    """
+    ensure_base_dirs()
+    base = BASE_DIR / "exercise_images"
+    if username:
+        base = base / username
+    base.mkdir(parents=True, exist_ok=True)
+    return base
