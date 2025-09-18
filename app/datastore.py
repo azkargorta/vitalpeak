@@ -1,137 +1,144 @@
 from __future__ import annotations
-import json
+import json, os, time, secrets, base64, hashlib, hmac
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any, Optional
 
 BASE_DIR = Path(".")
 USERS_DIR = BASE_DIR / "usuarios_data"
-
+RESET_DIR = USERS_DIR
 
 def ensure_base_dirs() -> None:
     USERS_DIR.mkdir(parents=True, exist_ok=True)
 
-
 def user_json_path(username: str) -> Path:
     return USERS_DIR / f"{username}.json"
 
+def _reset_token_path(username: str) -> Path:
+    return RESET_DIR / f"{username}.reset.json"
 
-def ensure_user(username: str) -> Dict:
+def load_user(username: str) -> Optional[Dict[str, Any]]:
     ensure_base_dirs()
-    path = user_json_path(username)
-    if not path.exists():
+    p = user_json_path(username)
+    if not p.exists():
+        pl = user_json_path(username.lower())
+        if pl.exists():
+            try:
+                return json.loads(pl.read_text(encoding="utf-8"))
+            except Exception:
+                return None
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+def save_user(username: str, data: Dict[str, Any]) -> None:
+    ensure_base_dirs()
+    p = user_json_path(username)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def ensure_user(username: str) -> Dict[str, Any]:
+    ensure_base_dirs()
+    p = user_json_path(username)
+    if not p.exists():
         data = {
             "password": "",
+            "email": None,
+            "recovery_email": None,
             "entrenamientos": [],
             "rutinas": [],
             "custom_exercises": [],
             "exercise_meta": {},
             "weights": [],
         }
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def load_user(username: str) -> Dict:
-    ensure_base_dirs()
-    path = user_json_path(username)
-    if not path.exists():
-        raise FileNotFoundError(f"User {username} does not exist.")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def save_user(username: str, data: Dict) -> None:
-    ensure_base_dirs()
-    path = user_json_path(username)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def register_user(username: str, password: str) -> bool:
-    ensure_base_dirs()
-    path = user_json_path(username)
-    if path.exists():
-        return False
-    data = ensure_user(username)
-    data["password"] = password  # NOTE: plaintext; cambia a hash si lo publicas
-    save_user(username, data)
-    return True
-
-
-def authenticate(username: str, password: str) -> bool:
-    try:
-        data = load_user(username)
-    except FileNotFoundError:
-        return False
-    return data.get("password", "") == password
-
-
-def exercise_image_dir(username: str) -> Path:
-    d = USERS_DIR / username / "exercise_images"
-    d.mkdir(parents=True, exist_ok=True)
+        save_user(username, data)
+        return data
+    d = load_user(username) or {}
     return d
 
+def _pbkdf2_hash(password: str, *, iterations: int = 310_000) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return "pbkdf2$sha256${it}${salt}${hash}".format(
+        it=iterations,
+        salt=base64.b64encode(salt).decode("ascii"),
+        hash=base64.b64encode(dk).decode("ascii"),
+    )
 
-# === Auth/Profile/Reset extensions ===
-from typing import Dict
-import json
-from pathlib import Path
+def _pbkdf2_verify(password: str, encoded: str) -> bool:
+    try:
+        scheme, algo, it_s, salt_b64, hash_b64 = encoded.split("$", 4)
+        if scheme != "pbkdf2" or algo != "sha256":
+            return False
+        iterations = int(it_s)
+        salt = base64.b64decode(salt_b64.encode("ascii"))
+        expected = base64.b64decode(hash_b64.encode("ascii"))
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+        return hmac.compare_digest(dk, expected)
+    except Exception:
+        return False
 
-def load_user(username: str) -> Dict:
-    p = user_json_path(username)
-    if not p.exists():
-        raise FileNotFoundError(username)
-    return json.loads(p.read_text(encoding="utf-8"))
+def _looks_pbkdf2(s: str) -> bool:
+    return isinstance(s, str) and s.startswith("pbkdf2$")
 
-def save_user(username: str, data: Dict) -> None:
-    ensure_base_dirs()
-    p = user_json_path(username)
-    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def _looks_sha256_hex(s: str) -> bool:
+    if not isinstance(s, str) or len(s) != 64: return False
+    try:
+        int(s, 16)
+        return True
+    except Exception:
+        return False
 
-def register_user(username: str, password: str, email: str | None = None) -> bool:
+def _sha256_hex(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def set_password(username: str, new_password: str) -> None:
+    d = ensure_user(username)
+    d["password"] = _pbkdf2_hash(new_password)
+    save_user(username, d)
+
+def authenticate(username: str, password: str) -> bool:
+    d = load_user(username)
+    if not d: 
+        return False
+    stored = d.get("password", "")
+    if _looks_pbkdf2(stored):
+        return _pbkdf2_verify(password, stored)
+    if _looks_sha256_hex(stored):
+        return _sha256_hex(password) == stored
+    return stored == password
+
+def register_user(username: str, password: str, email: Optional[str]=None) -> bool:
     ensure_base_dirs()
     p = user_json_path(username)
     if p.exists():
         return False
-    data = {"username": username, "password": password}
-    if email:
-        data["email"] = email
-        data["recovery_email"] = email
+    data = {
+        "password": _pbkdf2_hash(password),
+        "email": email,
+        "recovery_email": email,
+        "entrenamientos": [],
+        "rutinas": [],
+        "custom_exercises": [],
+        "exercise_meta": {},
+        "weights": [],
+    }
     save_user(username, data)
     return True
 
-def set_password(username: str, new_password: str) -> None:
-    data = load_user(username)
-    data["password"] = new_password
-    save_user(username, data)
+def set_account_email(username: str, email: str) -> None:
+    d = ensure_user(username)
+    d["email"] = email
+    d.setdefault("recovery_email", email)
+    save_user(username, d)
 
-def set_account_email(username: str, new_email: str) -> None:
-    data = load_user(username)
-    data["email"] = new_email
-    save_user(username, data)
-
-def set_recovery_email(username: str, new_email: str) -> None:
-    data = load_user(username)
-    data["recovery_email"] = new_email
-    save_user(username, data)
-
-def get_emails_for_user(username: str):
-    try:
-        data = load_user(username)
-        return data.get("email"), data.get("recovery_email") or data.get("email")
-    except FileNotFoundError:
-        return None, None
-
-def set_profile(username: str, profile: dict) -> None:
-    data = load_user(username)
-    data["profile"] = profile
-    save_user(username, data)
-
-def _reset_token_path(username: str) -> Path:
-    return USERS_DIR / f"{username}.reset.json"
-
-def create_password_reset(username: str, token: str, ttl_seconds: int = 3600) -> dict:
-    pl = {"token": token, "expires_at": int(__import__("time").time()) + ttl_seconds}
-    _reset_token_path(username).write_text(json.dumps(pl, ensure_ascii=False, indent=2), encoding="utf-8")
-    return pl
+def create_password_reset(username: str, *, ttl_seconds: int = 3600) -> dict | None:
+    if not load_user(username):
+        return None
+    token = secrets.token_urlsafe(24)
+    payload = {"token": token, "expires_at": int(time.time()) + ttl_seconds}
+    _reset_token_path(username).write_text(json.dumps(payload), encoding="utf-8")
+    return payload
 
 def get_password_reset(username: str) -> dict | None:
     p = _reset_token_path(username)
