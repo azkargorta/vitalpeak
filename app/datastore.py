@@ -28,7 +28,7 @@ def ensure_user(username: str) -> Dict:
             "weights": [],
         }
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_user(username: str) -> Dict:
@@ -36,7 +36,7 @@ def load_user(username: str) -> Dict:
     path = user_json_path(username)
     if not path.exists():
         raise FileNotFoundError(f"User {username} does not exist.")
-    return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
 
 
 def save_user(username: str, data: Dict) -> None:
@@ -61,7 +61,7 @@ def authenticate(username: str, password: str) -> bool:
         data = load_user(username)
     except FileNotFoundError:
         return False
-    return data.get("password", "") == password
+        return data.get("password", "") == password
 
 
 def exercise_image_dir(username: str) -> Path:
@@ -74,12 +74,13 @@ def exercise_image_dir(username: str) -> Path:
 from typing import Dict
 import json
 from pathlib import Path
+import streamlit as st
 
 def load_user(username: str) -> Dict:
     p = user_json_path(username)
     if not p.exists():
         raise FileNotFoundError(username)
-    return json.loads(p.read_text(encoding="utf-8"))
+        return json.loads(p.read_text(encoding="utf-8"))
 
 def save_user(username: str, data: Dict) -> None:
     ensure_base_dirs()

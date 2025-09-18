@@ -11,6 +11,7 @@ import re
 import json
 from typing import Any, Dict, List, Optional
 from openai import OpenAI
+import streamlit as st
 
 JSON_MD_RE = re.compile(r"```json\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
 JSON_BLOCK_RE = re.compile(r"\{[\s\S]*\}", re.MULTILINE)
@@ -171,7 +172,7 @@ def _safe_json_search(regex, text):
             dsr["series"] = (int(m.group(1)), int(m.group(2)))
             C["default_series_reps"] = dsr
 
-    return C
+            return C
 
 
 def _extract_json(text: str) -> str:
@@ -216,7 +217,7 @@ def _ensure_descanso_for_ej(ej: Dict[str, Any]) -> Dict[str, Any]:
             return "120-180s"
         if avg <= 10:
             return "60-90s"
-        return "45-75s"
+            return "45-75s"
     if "descanso" in ej and str(ej.get("descanso")).strip():
         out["descanso"] = str(ej.get("descanso"))
     else:
@@ -225,7 +226,7 @@ def _ensure_descanso_for_ej(ej: Dict[str, Any]) -> Dict[str, Any]:
     for k in ("rir","rpe","notas","tempo","intensidad"):
         if k in ej:
             out[k] = ej[k]
-    return out
+            return out
 def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, Any]:
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
@@ -318,7 +319,7 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
                 return "120-180s"
             if avg <= 10:
                 return "60-90s"
-            return "45-75s"
+                return "45-75s"
         if "descanso" in e and str(e.get("descanso")).strip():
             out["descanso"] = str(e.get("descanso"))
         else:
@@ -327,7 +328,7 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
         for k in ("rir","rpe","notas","tempo"):
             if k in e:
                 out[k] = e[k]
-        return out
+                return out
 
     if "dias" not in data or not isinstance(data.get("dias"), list) or not data["dias"]:
         dias_list = []
@@ -368,7 +369,7 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
             fixed_dias.append({"nombre": nombre_dia, "ejercicios": ejercicios, "notas": dia.get("notas","") if isinstance(dia, dict) else ""})
         data["dias"] = fixed_dias
 
-    return data
+        return data
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 RULES_TEXT = (
@@ -471,7 +472,7 @@ def validar_negocio(plan: Dict[str, Any]) -> List[str]:
         if len(ejercicios) > 12:
             errs.append(f"Día {i}: demasiados ejercicios (>12)." )
 
-    return errs
+            return errs
 def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
@@ -587,7 +588,7 @@ def _day_has_group(d: dict, group_key: str) -> bool:
         n = _norm(ej.get("nombre",""))
         if any(k in n for k in keys):
             return True
-    return False
+            return False
 
 def _count_days_for_group(plan: dict, group_key: str) -> int:
     return sum(1 for d in plan.get("dias", []) if _day_has_group(d, group_key))
@@ -600,7 +601,7 @@ def _count_exercises_for_group(plan: dict, group_key: str) -> int:
             n = _norm(ej.get("nombre",""))
             if any(k in n for k in keys):
                 c += 1
-    return c
+                return c
 
 CARDIO_KEYWORDS = ["cardio","cinta","trote","correr","run","running","elíptica","eliptica","bicicleta","spinning","remo","erg","hiit","saltos","jumping jacks","burpees","saltar comba","comba","escaladora","stepper","air bike"]
 MACHINE_KEYWORDS = ["máquina","maquina","machine","prensa","polea","cable","smith","hack squat","pec deck","contractora","extensión de cuádriceps","extension de cuadriceps","curl femoral","jalón en polea","jalon en polea","cruce en polea","pulldown"]
@@ -629,7 +630,7 @@ def _exercise_minutes(ej: dict) -> int | None:
     m = _re.search(r"(\\d+)\\s*(?:min|mins|minutos|’|')", text)
     if m:
         return int(m.group(1))
-    return None
+        return None
 
 def _day_has_cardio_minutes(dia: dict, min_minutes: int) -> bool:
     for ej in dia.get("ejercicios", []):
@@ -637,7 +638,7 @@ def _day_has_cardio_minutes(dia: dict, min_minutes: int) -> bool:
             mins = _exercise_minutes(ej)
             if mins is not None and mins >= min_minutes:
                 return True
-    return False
+                return False
 
 def _exercise_uses_any(ej: dict, keywords: list[str]) -> bool:
     n = _norm(ej.get("nombre",""))
@@ -671,7 +672,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
                 mins = _exercise_minutes(ej)
                 if mins is not None and mins >= min_minutes:
                     return True
-        return False
+                    return False
 
     if re.search(r"solo\\s+un\\s+d[ií]a\\s+de\\s+pierna", txt):
         leg_terms=("pierna","glúteo","gluteo","cuádriceps","cuadriceps","isquio","femoral","gemelo","glutes","legs")
@@ -775,7 +776,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
                 elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp: total_bi+=1
         if total_bi<min_bi: errs.append(f"Pediste bíceps ≥ {min_bi} y solo se detectan {total_bi} ejercicios de bíceps en la semana.")
 
-    return errs
+        return errs
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
     _system = build_system()
@@ -818,7 +819,7 @@ JSON ORIGINAL:
     if errs2:
         return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed, "prompt": _prompt, "system": _system}
 
-    return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
+        return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
 
 
 import re as _re2
@@ -849,7 +850,7 @@ def _sanitize_reps_value(val) -> str:
     a, b = int(nums[0]), int(nums[1])
     if a > b:
         a, b = b, a
-    return f"{a}-{b}"
+        return f"{a}-{b}"
 
 def _sanitize_plan_reps(plan: dict) -> dict:
     try:
@@ -861,7 +862,7 @@ def _sanitize_plan_reps(plan: dict) -> dict:
                     ej["reps"] = rep_clean
     except Exception:
         pass
-    return plan
+        return plan
 
 
 # Aviso: no se detectó patrón de validación; añade HARD-FAIL wrapper si usas otra función de generación.
@@ -1096,7 +1097,7 @@ def validar_constraints(plan, C):
                     if r_lo is not None and not (r_rng[0] <= r_lo <= r_rng[1] and r_rng[0] <= r_hi <= r_rng[1]):
                         errs.append(f"Reps fuera de rango ({e.get('reps')}) en día {i}: '{e.get('nombre','')}', esperado {r_rng[0]}–{r_rng[1]}.")
 
-    return errs
+                        return errs
 
 def enforce_simple_constraints(plan, C):
     """
@@ -1135,7 +1136,7 @@ def enforce_simple_constraints(plan, C):
                         c+=1
                     elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp:
                         c+=1
-            return c
+                        return c
         cur = count_bi(plan)
         needed = int(min_bi) - cur
         if needed > 0:
@@ -1153,7 +1154,7 @@ def enforce_simple_constraints(plan, C):
                 d.setdefault("ejercicios", []).append(templates[_ % len(templates)])
                 di += 1
 
-    return plan
+                return plan
 
 
 def _extract_json(text: str) -> str:
@@ -1184,7 +1185,7 @@ def _client():
         # New SDK
         if base_url:
             return OpenAI(api_key=api_key, base_url=base_url)
-        return OpenAI(api_key=api_key)
+            return OpenAI(api_key=api_key)
     else:
         # Legacy SDK
         import openai as _openai
@@ -1194,5 +1195,4 @@ def _client():
                 _openai.base_url = base_url
             except Exception:
                 pass
-        return _openai
-
+                return _openai

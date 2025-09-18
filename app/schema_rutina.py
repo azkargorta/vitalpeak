@@ -79,4 +79,4 @@ def validar_negocio(data: Dict[str, Any]) -> list[str]:
         if not (5 <= len(dia.ejercicios) <= 7):
             errors.append(f"'{dia.nombre}' tiene {len(dia.ejercicios)} ejercicios (recomendado 6–7).")
 
-    return errors
+            return errors

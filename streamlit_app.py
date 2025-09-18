@@ -11,6 +11,15 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+# ##__DATOS_USUARIO_BOOTSTRAP__
+try:
+    if "datos_usuario" not in st.session_state:
+        st.session_state["datos_usuario"] = {}
+    datos_usuario = st.session_state["datos_usuario"]
+except Exception:
+    pass
+
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -71,14 +80,14 @@ def pagina_progreso():
                     dbs.append(os.path.join(root, f))
                 if low.endswith('.csv'):
                     csvs.append(os.path.join(root, f))
-        return dbs, csvs
+                    return dbs, csvs
 
     def _pick(cols, *opts):
         l = [c.lower() for c in cols]
         for o in opts:
             if o in l:
                 return cols[l.index(o)]
-        return None
+                return None
 
     def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
         try:
@@ -130,7 +139,7 @@ def pagina_progreso():
                 out = out.sort_values('Fecha')
             else:
                 out = out.reset_index(drop=True)
-            return out
+                return out
         except Exception:
             return None
 
@@ -151,7 +160,7 @@ def pagina_progreso():
             else:
                 continue
             exs.update(df[col].dropna().astype(str).str.strip().unique())
-        return sorted([e for e in exs if e])
+            return sorted([e for e in exs if e])
 
     def _from_csvs_progress(csv_paths: list, exercise: str) -> Optional[pd.DataFrame]:
         frames = []
@@ -164,7 +173,7 @@ def pagina_progreso():
             def pick_df(*opts):
                 for o in opts:
                     if o in lcols: return df.columns[lcols.index(o)]
-                return None
+                    return None
             col_ex = pick_df('ejercicio','exercise','nombre_ejercicio')
             if col_ex is None: continue
             sub = df[df[col_ex].astype(str).str.strip() == exercise].copy()
@@ -184,7 +193,7 @@ def pagina_progreso():
             out = out.sort_values('Fecha')
         else:
             out = out.reset_index(drop=True)
-        return out
+            return out
 
     base_dir = os.path.dirname(__file__)
     dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, '..')))
@@ -252,13 +261,13 @@ def pagina_progreso():
                     dbs.append(os.path.join(root, f))
                 if low.endswith(".csv"):
                     csvs.append(os.path.join(root, f))
-        return dbs, csvs
+                    return dbs, csvs
 
     def _pick(cols, *opts):
         l = [c.lower() for c in cols]
         for o in opts:
             if o in l: return cols[l.index(o)]
-        return None
+            return None
 
     def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
         try:
@@ -707,7 +716,7 @@ elif page == "📈 Tabla de entrenamientos":
                             ws.write(row, 0, f"Fecha: {dt.isoformat()}"); row += 1
                             g2.to_excel(writer, sheet_name=sheet, index=False, startrow=row)
                             row += len(g2) + 2
-            return out.getvalue()
+                            return out.getvalue()
 
         if st.button("Exportar a Excel (consolidado)", use_container_width=True):
             try:
@@ -1165,8 +1174,12 @@ elif page == "📘 Rutinas":
 
         # ---------- Llamada a IA / Fallback ----------
         if submitted:
+            if "datos_usuario" not in st.session_state:
+                st.session_state["datos_usuario"] = {}
+            ia_detalles_value = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas", ""))
             datos_usuario = {
-datos_usuario["ia_detalles"] = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas",""))
+                "ia_detalles": ia_detalles_value,
+"ia_detalles": ia_detalles_value,
                 "nivel": nivel,
                 "dias": int(dias),
                 "duracion": int(duracion),
@@ -1205,7 +1218,7 @@ datos_usuario["ia_detalles"] = " " + (ia_notas if "ia_notas" in locals() else st
                         st.session_state["ia_system"] = result.get("system")
                     else:
                         _asegurar_dias_minimos(datos_usuario)
-st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
                         # Guardar prompt/system aunque haya fallo
                         try:
                             st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
@@ -1260,6 +1273,7 @@ st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
                 weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
                 guardar = cC.form_submit_button("💾 Guardar y programar")
 
+                submitted = st.form_submit_button('Enviar')
             if guardar:
                 existing = [r["name"] for r in list_routines(user)]
                 def _ensure_unique(name, existing_names):
@@ -1415,7 +1429,7 @@ elif page == "👤 Perfil":
                     dbs.append(os.path.join(root, f))
                 if low.endswith(".csv"):
                     csvs.append(os.path.join(root, f))
-        return dbs, csvs
+                    return dbs, csvs
 
     def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
         try:
@@ -1456,7 +1470,7 @@ elif page == "👤 Perfil":
                     for o in opts:
                         if o in lcols:
                             return cols[lcols.index(o)]
-                    return None
+                            return None
                 col_ex = pick("ejercicio","exercise","nombre_ejercicio")
                 col_date = pick("fecha","date","created_at","day","session_date")
                 col_weight = pick("peso","weight","kg")
@@ -1506,7 +1520,7 @@ elif page == "👤 Perfil":
                 out = out.sort_values("Fecha")
             else:
                 out = out.reset_index(drop=True)
-            return out
+                return out
         except Exception:
             return None
 
@@ -1525,11 +1539,11 @@ elif page == "👤 Perfil":
                 for o in opts:
                     if o in lcols:
                         return df.columns[lcols.index(o)]
-                return None
+                        return None
             col_ex = pick("ejercicio","exercise","nombre_ejercicio")
             if col_ex is not None:
                 exs.update(df[col_ex].dropna().astype(str).str.strip().unique().tolist())
-        return sorted(e for e in exs if e)
+                return sorted(e for e in exs if e)
 
     def _progress_from_csvs(csv_paths: List[str], exercise: str) -> Optional[pd.DataFrame]:
         frames = []
@@ -1546,7 +1560,7 @@ elif page == "👤 Perfil":
                 for o in opts:
                     if o in lcols:
                         return df.columns[lcols.index(o)]
-                return None
+                        return None
             col_ex = pick("ejercicio","exercise","nombre_ejercicio")
             if col_ex is None:
                 continue
@@ -1587,7 +1601,7 @@ elif page == "👤 Perfil":
             out = out.sort_values("Fecha")
         else:
             out = out.reset_index(drop=True)
-        return out
+            return out
 
     base_dir = os.path.dirname(__file__)
     dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, "..")))

@@ -14,7 +14,7 @@ def _load_base_from_file() -> List[str]:
             if not line or line.startswith("#"):
                 continue
             exs.append(line)
-    return exs
+            return exs
 
 # Fallback si no hay archivo
 DEFAULT_BASE = [
@@ -38,7 +38,7 @@ def list_all_exercises(username: str) -> List[str]:
         if name not in seen:
             seen.add(name)
             merged.append(name)
-    return merged
+            return merged
 
 
 def add_custom_exercise(username: str, name: str) -> None:
