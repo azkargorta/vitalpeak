@@ -1185,11 +1185,9 @@ elif page == "📘 Rutinas":
                 "deload_preferido_semana": int(deload_semana_pref),
                 "unidades": unidades,
                 "idioma": idioma,
-                "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto,
-        "agrupacion": agrupacion
-    ,
-        "comentarios": (detalles_ia or "").strip()
-    },
+                "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto,},
+                "agrupacion": agrupacion,
+                "comentarios": (detalles_ia or "").strip(),
                 "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
                 "enfasis_accesorios": enfasis,
                 "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],

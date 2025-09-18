@@ -530,9 +530,7 @@ ENTRADA DEL USUARIO (estructura):
 - Énfasis accesorios: {datos.get('enfasis_accesorios',[])}
 - Evitar: {datos.get('evitar',[])}
 - Calentamiento: {datos.get('calentamiento','')}
-- Agrupación: {agrup}
-{detalles_usuario}
-
+- Agrupación: {agrup}\n" + detalles_usuario + f"\n
 SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
 """
     return prompt
