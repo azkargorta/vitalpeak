@@ -1165,12 +1165,8 @@ elif page == "📘 Rutinas":
 
         # ---------- Llamada a IA / Fallback ----------
         if submitted:
-            if "datos_usuario" not in st.session_state:
-                st.session_state["datos_usuario"] = {}
-            ia_detalles_value = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas", ""))
             datos_usuario = {
-                "ia_detalles": ia_detalles_value,
-
+datos_usuario["ia_detalles"] = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas",""))
                 "nivel": nivel,
                 "dias": int(dias),
                 "duracion": int(duracion),
@@ -1209,7 +1205,7 @@ elif page == "📘 Rutinas":
                         st.session_state["ia_system"] = result.get("system")
                     else:
                         _asegurar_dias_minimos(datos_usuario)
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
                         # Guardar prompt/system aunque haya fallo
                         try:
                             st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
