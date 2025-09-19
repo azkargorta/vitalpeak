@@ -57,3 +57,74 @@ def generate_fallback(datos: Dict[str, Any]) -> Dict[str, Any]:
     objetivo = str(datos.get("objetivo","fuerza"))
     return _upper_lower_template(dias, dur, objetivo)
 
+
+
+def wants_single_leg_day(datos: dict) -> bool:
+    txt = (str(datos.get("ia_detalles","")) + " " + str(datos.get("comentarios",""))).lower()
+    keys = [
+        "un solo día de pierna", "solo un día de pierna", "pierna solo un día", "1 día de pierna",
+        "un solo dia de pierna", "solo un dia de pierna", "1 dia de pierna"
+    ]
+    return any(k in txt for k in keys)
+
+
+def _is_lower_exercise(name: str) -> bool:
+    n = str(name).lower()
+    lower_kw = [
+        "sentadilla", "squat", "prensa", "zancad", "extension cu", "extensión cu",
+        "peso muerto", "deadlift", "hip thrust", "glute", "femoral", "curl femoral", "rdl", "good morning",
+    ]
+    return any(k in n for k in lower_kw)
+
+def _upper_accessory_pool():
+    return [
+        "Face pulls", "Pájaros mancuernas", "Remo en polea", "Curl bíceps barra",
+        "Extensión tríceps polea", "Elevaciones laterales", "Press inclinado mancuernas",
+        "Remo mancuerna a banco", "Dominadas asistidas", "Plancha", "Crunch máquina",
+    ]
+
+def enforce_single_leg_day(plan: dict) -> dict:
+    if not isinstance(plan, dict): 
+        return plan
+    dias = plan.get("dias") or plan.get("semanal") or plan
+
+    def replace_lower_with_upper(e_list):
+        pool = _upper_accessory_pool()
+        new_list = []
+        for e in e_list:
+            name = e.get("nombre") if isinstance(e, dict) else str(e)
+            if _is_lower_exercise(name):
+                rep = {"nombre": pool[len(new_list) % len(pool)], "series": 3, "reps": "10-15", "descanso": "60-90s"}
+                new_list.append(rep)
+            else:
+                new_list.append(e)
+        while len(new_list) < 6:
+            new_list.append({"nombre": pool[len(new_list) % len(pool)], "series": 3, "reps": "12-15", "descanso": "60-90s"})
+        return new_list
+
+    if isinstance(dias, dict):
+        leg_days = []
+        for d, exs in dias.items():
+            ex_list = exs if isinstance(exs, list) else exs.get("ejercicios", [])
+            if any(_is_lower_exercise(e.get("nombre") if isinstance(e, dict) else e) for e in ex_list):
+                leg_days.append(d)
+        if len(leg_days) > 1:
+            for d in leg_days[1:]:
+                ex_list = dias[d] if isinstance(dias[d], list) else dias[d].get("ejercicios", [])
+                new_list = replace_lower_with_upper(ex_list)
+                if isinstance(dias[d], list):
+                    dias[d] = new_list
+                else:
+                    dias[d]["ejercicios"] = new_list
+    elif isinstance(dias, list):
+        leg_idx = []
+        for idx, day in enumerate(dias):
+            ex_list = day.get("ejercicios", [])
+            if any(_is_lower_exercise(e.get("nombre") if isinstance(e, dict) else e) for e in ex_list):
+                leg_idx.append(idx)
+        if len(leg_idx) > 1:
+            for idx in leg_idx[1:]:
+                ex_list = dias[idx].get("ejercicios", [])
+                new_list = replace_lower_with_upper(ex_list)
+                dias[idx]["ejercicios"] = new_list
+    return plan

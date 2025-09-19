@@ -488,6 +488,20 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
     reglas_estrictas = f"""
 REGLAS ESTRICTAS (debes cumplirlas sí o sí):
+    ia_detalles = (datos.get("ia_detalles") or "").strip()
+    comentarios = (datos.get("comentarios") or "").strip()
+    _txt = (ia_detalles + " " + comentarios).lower()
+    _single_leg = bool(re.search(r"(un\s*solo|solo\s*un|1)\s*d[ií]a\s*de\s*pierna", _txt))
+    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
+    if _single_leg and "un solo día de pierna" not in detalles_usuario:
+        detalles_usuario += "\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  un solo día de pierna\n"
+    if _single_leg:
+        bloques = _compute_primary_blocks(datos)
+        labels = datos.get("disponibilidad") or [f"Día {i+1}" for i in range(len(bloques))]
+        asignaciones = [f"- {lbl}: {bloques[i]}" for i, lbl in enumerate(labels[:len(bloques)])]
+        bloques_line = "\nBloques principales por día (OBLIGATORIO):\n" + "\n".join(asignaciones) + "\n"
+    else:
+        bloques_line = ""
 - Agrupación pedida: {agrup}
 - Si es "Un solo grupo principal por día":
   * EXACTAMENTE 1 grupo principal por día.
@@ -1196,3 +1210,27 @@ def _client():
                 pass
         return _openai
 
+
+
+def _compute_primary_blocks(datos: dict) -> list[str]:
+    dias_raw = datos.get("dias", 4)
+    disponibilidad = datos.get("disponibilidad") or []
+    if isinstance(dias_raw, (list, tuple)):
+        n = max(1, len(dias_raw))
+    elif isinstance(disponibilidad, (list, tuple)) and disponibilidad:
+        n = len(disponibilidad)
+    else:
+        try:
+            n = int(dias_raw)
+        except Exception:
+            n = 4
+    base = ["Pecho", "Espalda", "Pierna", "Hombros", "Empuje", "Tirón"]
+    plan = base[:n]
+    if "Pierna" not in plan and n >= 1:
+        insert_at = 2 if n >= 3 else n-1
+        insert_at = max(0, insert_at)
+        plan[min(insert_at, n-1)] = "Pierna"
+    for i in range(1, len(plan)):
+        if plan[i] == plan[i-1]:
+            plan[i] = "Hombros"
+    return plan
