@@ -390,6 +390,15 @@ def pagina_progreso():
 st.set_page_config(page_title="Gym App Web", page_icon="🏋️", layout="wide")
 ensure_base_dirs()
 
+# --- Seed DEMO (crea usuario admin con datos de prueba si no existe) ---
+try:
+    from app.demo_seed import maybe_seed_admin
+    maybe_seed_admin()
+except Exception:
+    # Si el seed falla, no bloqueamos el arranque de la app
+    pass
+
+
 def require_auth():
     if "user" not in st.session_state or not st.session_state["user"]:
         st.warning("Inicia sesión para continuar.")
