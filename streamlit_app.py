@@ -40,7 +40,7 @@ from app.training import (
     add_training_set, list_training, last_values_for_exercise,
 )
 from app.health import (
-    add_weight, list_weights, delete_weights,
+    add_weight, list_weights,
 )
 from app.routines import (
 
@@ -649,224 +649,187 @@ elif page == "🏋️ Añadir entrenamiento":
 
 elif page == "📚 Gestor de ejercicios":
     require_auth()
+    st.title("Gestor de ejercicios")
     user = st.session_state["user"]
 
-    tabs = st.tabs(['Listado', '📈 Progreso de ejercicios'])
+    tabs = st.tabs(["Listado", "📈 Progreso de ejercicios"])
 
     with tabs[0]:
-        st.subheader("📚 Listado de ejercicios")
+        st.subheader("Listado de ejercicios")
 
-        # --- Recopilar ejercicios (base + personalizados + detectados en rutinas/entrenos) ---
-        from pathlib import Path
-        data = load_user(user) or {}
+        # --- Carga de datos ---
+        ejercicios = list_all_exercises(user)
+        entrenos = list_training(user)
 
-        # Base (archivo)
-        base_exs = []
-        base_file = Path("data") / "base_exercises.txt"
-        if base_file.exists():
-            for line in base_file.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    base_exs.append(line)
+        # Stats por ejercicio
+        stats = {ex: {"sesiones": 0, "series": 0, "reps_totales": 0, "ultimo": None, "ultimo_peso": None, "ultimas_reps": None,
+                      "mejor_peso": 0.0, "mejor_1rm": 0.0} for ex in ejercicios}
 
-        # Personalizados
-        custom_exs = []
-        for c in (data.get("custom_exercises") or []):
-            if isinstance(c, str):
-                name = c.strip()
-            elif isinstance(c, dict):
-                name = str(c.get("name") or c.get("exercise") or c.get("ejercicio") or "").strip()
-            else:
-                name = ""
-            if name:
-                custom_exs.append(name)
+        # Para contar sesiones por fecha
+        fechas_por_ex = {ex: set() for ex in ejercicios}
 
-        # Detectados en rutinas
-        routine_exs = []
-        for r in (data.get("rutinas") or []):
-            for item in (r.get("items") or []):
-                ex = (item.get("exercise") or item.get("ejercicio") or "").strip()
-                if ex:
-                    routine_exs.append(ex)
+        for r in entrenos:
+            ex = r.get("exercise")
+            if ex not in stats:
+                # ejercicios detectados (por si aparecen en entrenos pero no están en base/custom)
+                ejercicios.append(ex)
+                stats[ex] = {"sesiones": 0, "series": 0, "reps_totales": 0, "ultimo": None, "ultimo_peso": None, "ultimas_reps": None,
+                             "mejor_peso": 0.0, "mejor_1rm": 0.0}
+                fechas_por_ex[ex] = set()
 
-        # Detectados en entrenamientos
-        training_rows = list_training(user)
-        df_train = pd.DataFrame(training_rows)
-        train_exs = []
-        if not df_train.empty:
-            # normalizar nombres de columnas
-            cols = {c.lower(): c for c in df_train.columns}
-            ex_col = cols.get("exercise") or cols.get("ejercicio")
-            if ex_col:
-                train_exs = [str(x).strip() for x in df_train[ex_col].dropna().tolist() if str(x).strip()]
+            d = str(r.get("date") or "")
+            reps = int(r.get("reps") or 0)
+            peso = float(r.get("weight") or 0.0)
 
-        all_exs = sorted(set(base_exs + custom_exs + routine_exs + train_exs), key=lambda s: s.lower())
+            fechas_por_ex[ex].add(d)
+            stats[ex]["series"] += 1
+            stats[ex]["reps_totales"] += reps
 
-        # Metadatos
-        meta_map = (data.get("exercise_meta") or {})
+            # último (por fecha ISO)
+            if d and (stats[ex]["ultimo"] is None or d > stats[ex]["ultimo"]):
+                stats[ex]["ultimo"] = d
+                stats[ex]["ultimo_peso"] = peso
+                stats[ex]["ultimas_reps"] = reps
 
-        # Stats de entrenamiento
-        stats = pd.DataFrame(columns=["Ejercicio","Sesiones","Series","Reps totales","Último","Último peso","Últimas reps","Mejor peso","Mejor 1RM"])
-        if not df_train.empty:
-            cols = {c.lower(): c for c in df_train.columns}
-            ex_col = cols.get("exercise") or cols.get("ejercicio")
-            dt_col = cols.get("date") or cols.get("fecha")
-            reps_col = cols.get("reps") or cols.get("rep") or cols.get("repeticiones")
-            w_col = cols.get("weight") or cols.get("peso")
+            # mejor peso
+            if peso > (stats[ex]["mejor_peso"] or 0.0):
+                stats[ex]["mejor_peso"] = peso
 
-            df = df_train.copy()
-            if ex_col and ex_col != "exercise":
-                df.rename(columns={ex_col:"exercise"}, inplace=True)
-            if dt_col and dt_col != "date":
-                df.rename(columns={dt_col:"date"}, inplace=True)
-            if reps_col and reps_col != "reps":
-                df.rename(columns={reps_col:"reps"}, inplace=True)
-            if w_col and w_col != "weight":
-                df.rename(columns={w_col:"weight"}, inplace=True)
+            # 1RM estimado (Epley)
+            if peso > 0 and reps > 0:
+                one_rm = peso * (1.0 + reps / 30.0)
+                if one_rm > (stats[ex]["mejor_1rm"] or 0.0):
+                    stats[ex]["mejor_1rm"] = one_rm
 
-            for c in ("reps","weight"):
-                if c in df.columns:
-                    df[c] = pd.to_numeric(df[c], errors="coerce")
-            if "date" in df.columns:
-                df["date_dt"] = pd.to_datetime(df["date"], errors="coerce")
-            else:
-                df["date_dt"] = pd.NaT
+        for ex in stats:
+            stats[ex]["sesiones"] = len(fechas_por_ex.get(ex, set()))
 
-            if "exercise" in df.columns:
-                g = df.dropna(subset=["exercise"]).groupby("exercise", dropna=False)
+        # Meta (grupo/imagen)
+        filas = []
+        for ex in ejercicios:
+            meta = get_exercise_meta(user, ex)
+            filas.append({
+                "Ejercicio": ex,
+                "Grupo": meta.get("grupo", "Otro"),
+                "Sesiones": stats.get(ex, {}).get("sesiones", 0),
+                "Series": stats.get(ex, {}).get("series", 0),
+                "Reps totales": stats.get(ex, {}).get("reps_totales", 0),
+                "Último": stats.get(ex, {}).get("ultimo", None),
+                "Último peso": stats.get(ex, {}).get("ultimo_peso", None),
+                "Últimas reps": stats.get(ex, {}).get("ultimas_reps", None),
+                "Mejor peso": stats.get(ex, {}).get("mejor_peso", 0.0),
+                "Mejor 1RM": round(stats.get(ex, {}).get("mejor_1rm", 0.0), 2),
+                "Tiene imagen": bool(meta.get("imagen")),
+            })
 
-                rows = []
-                for ex, gex in g:
-                    gex = gex.copy()
-                    # último
-                    gex = gex.sort_values(["date_dt","set"] if "set" in gex.columns else ["date_dt"])
-                    last = gex.iloc[-1]
-                    last_date = last.get("date")
-                    last_w = float(last.get("weight") or 0) if "weight" in gex.columns else 0.0
-                    last_r = int(last.get("reps") or 0) if "reps" in gex.columns else 0
+        df = pd.DataFrame(filas)
 
-                    # mejor peso
-                    best_w = float(gex["weight"].max()) if "weight" in gex.columns and gex["weight"].notna().any() else 0.0
-
-                    # e1rm (Epley): w * (1 + r/30)
-                    if "weight" in gex.columns and "reps" in gex.columns:
-                        e1rm = (gex["weight"] * (1 + (gex["reps"].fillna(0)/30.0))).replace([pd.NA, pd.NaT], 0)
-                        best_1rm = float(e1rm.max()) if e1rm.notna().any() else 0.0
-                    else:
-                        best_1rm = 0.0
-
-                    sesiones = int(gex["date_dt"].dt.date.nunique()) if gex["date_dt"].notna().any() else 0
-                    series = int(len(gex))
-                    reps_tot = int(gex["reps"].fillna(0).sum()) if "reps" in gex.columns else 0
-
-                    rows.append({
-                        "Ejercicio": str(ex),
-                        "Sesiones": sesiones,
-                        "Series": series,
-                        "Reps totales": reps_tot,
-                        "Último": str(last_date) if last_date is not None else "",
-                        "Último peso": round(last_w, 2),
-                        "Últimas reps": last_r,
-                        "Mejor peso": round(best_w, 2),
-                        "Mejor 1RM": round(best_1rm, 2),
-                    })
-
-                stats = pd.DataFrame(rows)
-
-        # Construir tabla final
-        rows = []
-        for ex in all_exs:
-            meta = meta_map.get(ex, {}) if isinstance(meta_map, dict) else {}
-            grupo = meta.get("grupo") or meta.get("group") or "Otro"
-            imagen = meta.get("imagen") or meta.get("image") or None
-            if ex in custom_exs:
-                fuente = "Personalizado"
-            elif ex in base_exs:
-                fuente = "Base"
-            else:
-                fuente = "Detectado"
-
-            rows.append({"Ejercicio": ex, "Grupo": grupo, "Fuente": fuente, "Imagen": imagen})
-
-        df_list = pd.DataFrame(rows)
-
-        # Merge con stats (si existen)
-        if not stats.empty:
-            df_list = df_list.merge(stats, on="Ejercicio", how="left")
-
-        # Filtros UI
-        c1, c2, c3 = st.columns([2,1,1])
+        # --- Filtros ---
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
-            q = st.text_input("Buscar", placeholder="Escribe parte del nombre…")
+            q = st.text_input("Buscar ejercicio", value="", placeholder="Ej: Press banca, Sentadilla...", key="ex_search")
         with c2:
-            grupos = sorted([g for g in df_list["Grupo"].dropna().unique().tolist() if str(g).strip()], key=lambda s: str(s).lower())
-            sel_grupos = st.multiselect("Grupo", options=grupos, default=[])
+            grupo_sel = st.selectbox("Grupo", ["Todos"] + GRUPOS, index=0, key="ex_group_filter")
         with c3:
-            solo_con_datos = st.checkbox("Solo con entrenos", value=False)
+            solo_con_entrenos = st.checkbox("Solo con entrenos", value=False, key="ex_only_with_trainings")
 
-        df_show = df_list.copy()
+        df_f = df.copy()
         if q:
-            df_show = df_show[df_show["Ejercicio"].str.contains(q, case=False, na=False)]
-        if sel_grupos:
-            df_show = df_show[df_show["Grupo"].isin(sel_grupos)]
-        if solo_con_datos and "Series" in df_show.columns:
-            df_show = df_show[df_show["Series"].fillna(0) > 0]
+            df_f = df_f[df_f["Ejercicio"].str.contains(q, case=False, na=False)]
+        if grupo_sel != "Todos":
+            df_f = df_f[df_f["Grupo"] == grupo_sel]
+        if solo_con_entrenos:
+            df_f = df_f[df_f["Series"] > 0]
 
-        # Orden razonable: primero los que tienen más series
-        if "Series" in df_show.columns:
-            df_show = df_show.sort_values(["Series","Ejercicio"], ascending=[False, True])
+        st.dataframe(df_f.sort_values(["Grupo", "Ejercicio"]), use_container_width=True, hide_index=True)
+
+        # --- Detalle editable ---
+        opciones = df_f["Ejercicio"].tolist()
+        if not opciones:
+            st.info("No hay ejercicios con esos filtros.")
         else:
-            df_show = df_show.sort_values(["Ejercicio"], ascending=[True])
+            # Mantener selección estable
+            default_idx = 0
+            prev = st.session_state.get("ex_selected")
+            if prev in opciones:
+                default_idx = opciones.index(prev)
 
-        # Mostrar tabla
-        st.dataframe(
-            df_show.drop(columns=["Imagen"]) if "Imagen" in df_show.columns else df_show,
-            use_container_width=True,
-            hide_index=True
-        )
+            seleccionado = st.selectbox("Ver detalle de ejercicio", opciones, index=default_idx, key="ex_detail_select")
+            st.session_state["ex_selected"] = seleccionado
 
-        # Detalle (imagen + meta)
-        st.divider()
-        ex_sel = st.selectbox("Ver detalle de un ejercicio", options=["—"] + df_show["Ejercicio"].tolist())
-        if ex_sel != "—":
-            row = df_list[df_list["Ejercicio"] == ex_sel].iloc[0].to_dict()
-            colA, colB = st.columns([1,2])
+            meta = get_exercise_meta(user, seleccionado)
+            grupo_actual = meta.get("grupo", "Otro")
+            if grupo_actual not in GRUPOS:
+                grupo_actual = "Otro"
+            imagen_rel = meta.get("imagen")
+
+            st.markdown("---")
+            st.markdown(f"## {seleccionado}")
+
+            colA, colB = st.columns([1, 1])
+
+            # ---- Columna A: editar grupo ----
             with colA:
-                st.markdown(f"**Grupo:** {row.get('Grupo','')}")
-                st.markdown(f"**Fuente:** {row.get('Fuente','')}")
-                if row.get("Último") is not None and str(row.get("Último","")).strip():
-                    st.markdown(f"**Último entrenamiento:** {row.get('Último','')}")
-                if pd.notna(row.get("Mejor peso", None)):
-                    st.markdown(f"**Mejor peso:** {row.get('Mejor peso','')} kg")
-                if pd.notna(row.get("Mejor 1RM", None)):
-                    st.markdown(f"**Mejor 1RM (estimado):** {row.get('Mejor 1RM','')} kg")
-            with colB:
-                img = row.get("Imagen")
-                if img:
-                    p = Path(str(img))
-                    if p.exists():
-                        st.image(str(p), use_container_width=True)
-                    else:
-                        # intentamos relativo al proyecto
-                        p2 = Path(".") / str(img)
-                        if p2.exists():
-                            st.image(str(p2), use_container_width=True)
-                        else:
-                            st.info("Este ejercicio tiene una imagen guardada, pero no se ha encontrado el archivo.")
-                else:
-                    st.info("Sin imagen asignada.")
+                st.markdown("### Datos")
+                key_safe = "".join(ch if ch.isalnum() else "_" for ch in seleccionado)
 
-        # Export rápido
-        st.download_button(
-            "Descargar listado (CSV)",
-            data=df_show.to_csv(index=False).encode("utf-8"),
-            file_name=f"ejercicios_{user}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+                grupo_nuevo = st.selectbox(
+                    "Grupo muscular",
+                    GRUPOS,
+                    index=GRUPOS.index(grupo_actual),
+                    key=f"ex_group_edit_{key_safe}",
+                )
+
+                if st.button("💾 Guardar grupo", key=f"ex_save_group_{key_safe}"):
+                    save_exercise_meta(user, seleccionado, grupo_nuevo, imagen_rel)
+                    st.success("Grupo actualizado.")
+                    st.rerun()
+
+                st.markdown("### Estadísticas")
+                st.write({
+                    "sesiones": stats.get(seleccionado, {}).get("sesiones", 0),
+                    "series": stats.get(seleccionado, {}).get("series", 0),
+                    "reps_totales": stats.get(seleccionado, {}).get("reps_totales", 0),
+                    "ultimo": stats.get(seleccionado, {}).get("ultimo", None),
+                    "ultimo_peso": stats.get(seleccionado, {}).get("ultimo_peso", None),
+                    "ultimas_reps": stats.get(seleccionado, {}).get("ultimas_reps", None),
+                    "mejor_peso": stats.get(seleccionado, {}).get("mejor_peso", 0.0),
+                    "mejor_1rm": round(stats.get(seleccionado, {}).get("mejor_1rm", 0.0), 2),
+                })
+
+            # ---- Columna B: imagen ----
+            with colB:
+                st.markdown("### Imagen")
+                img_path = None
+                if imagen_rel:
+                    # imagen_rel suele ser ruta relativa (ej: exercise_images/user/xxx.png)
+                    if os.path.exists(imagen_rel):
+                        img_path = imagen_rel
+
+                if img_path:
+                    st.image(img_path, use_container_width=True)
+                    if st.button("🧹 Quitar imagen", key=f"ex_remove_img_{key_safe}"):
+                        save_exercise_meta(user, seleccionado, grupo_actual, None)
+                        st.success("Imagen eliminada.")
+                        st.rerun()
+                else:
+                    st.info("Este ejercicio no tiene imagen todavía.")
+
+                up = st.file_uploader(
+                    "Subir/actualizar imagen (png/jpg/jpeg/webp)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    key=f"ex_img_upload_{key_safe}",
+                )
+                if up is not None:
+                    rel = store_exercise_image(user, up.name, up.getvalue())
+                    # Guardamos meta con el grupo que esté seleccionado ahora mismo
+                    save_exercise_meta(user, seleccionado, grupo_nuevo, rel)
+                    st.success("Imagen guardada.")
+                    st.rerun()
 
     with tabs[-1]:
         pagina_progreso()
+
 
 elif page == "📈 Tabla de entrenamientos":
     require_auth()
@@ -951,40 +914,8 @@ elif page == "🩺 Salud (Peso)":
         st.subheader("Tabla de pesos")
         rows = list_weights(user)
         if rows:
-            # Añadimos un ID interno (índice original en la lista) para poder borrar registros concretos
-            df_tab = pd.DataFrame([{"ID": i, **r} for i, r in enumerate(rows)]).sort_values("date", ascending=False)
-            df_tab["Borrar"] = False
-
-            # Tabla editable: solo la columna "Borrar" se puede modificar
-            try:
-                edited = st.data_editor(
-                    df_tab,
-                    hide_index=True,
-                    use_container_width=True,
-                    disabled=["ID", "date", "weight"],
-                    column_config={
-                        "ID": st.column_config.NumberColumn("ID", help="Identificador interno del registro", width="small"),
-                        "date": st.column_config.TextColumn("Fecha"),
-                        "weight": st.column_config.NumberColumn("Peso (kg)", format="%.1f"),
-                        "Borrar": st.column_config.CheckboxColumn("Borrar", help="Marca y pulsa el botón para eliminar"),
-                    },
-                )
-            except Exception:
-                # Fallback si la versión de Streamlit no soporta data_editor/column_config
-                st.dataframe(df_tab.drop(columns=["Borrar"]), use_container_width=True, hide_index=True)
-                edited = df_tab
-
-            to_delete = []
-            if "Borrar" in edited.columns:
-                to_delete = edited.loc[edited["Borrar"] == True, "ID"].tolist()
-
-            if st.button("🗑️ Borrar seleccionados", use_container_width=True, disabled=(len(to_delete) == 0)):
-                removed = delete_weights(user, to_delete)
-                if removed:
-                    st.success(f"Eliminados {removed} registro(s).")
-                    st.rerun()
-                else:
-                    st.info("No se eliminó ningún registro.")
+            df_tab = pd.DataFrame(rows).sort_values("date", ascending=False)
+            st.dataframe(df_tab, use_container_width=True, hide_index=True)
         else:
             st.info("Sin registros aún.")
     st.subheader("Gráfico de evolución")
