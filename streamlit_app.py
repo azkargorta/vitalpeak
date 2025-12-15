@@ -1,9 +1,37 @@
+
+def _asegurar_dias_minimos(datos_usuario: dict):
+    dias = datos_usuario.get("dias")
+    if not dias or not isinstance(dias, (list, tuple)) or len(dias) == 0:
+        # Si el usuario no seleccionó nada, por defecto 3 días
+        datos_usuario["dias"] = ["Lunes", "Miércoles", "Viernes"]
+
 import matplotlib.pyplot as plt
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+st.set_page_config(page_title="Vitalpeak", layout="wide")
+
+from dotenv import load_dotenv
+import os
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+st.markdown(
+    """
+<style>
+/* Usar el ancho completo de la página */
+.block-container { max-width: 100% !important; padding-left: 2rem; padding-right: 2rem; }
+/* Tabla más compacta para que quepan más columnas */
+div[data-testid="stDataFrame"] { font-size: 12px; }
+div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { white-space: normal; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+
 # Query params (Streamlit >= 1.30)
 params = st.query_params
 _u = params.get("user")
@@ -35,8 +63,198 @@ from app.routines import (
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
 
-st.set_page_config(page_title="Gym App Web", page_icon="🏋️", layout="wide")
-ensure_base_dirs()
+def pagina_progreso():
+    """Progreso de ejercicios basado en los entrenamientos guardados (usuarios_data/<user>.json).
+    Muestra evolución por sesión (día) y detalle por sets, con métricas y exportación.
+    """
+    import pandas as pd
+    import streamlit as st
+    from datetime import date as _date
+
+    st.subheader("📈 Progreso de ejercicios")
+
+    user = st.session_state.get("user")
+    if not user:
+        st.info("Inicia sesión para ver tu progreso.")
+        return
+
+    entrenos = list_training(user)
+    if not entrenos:
+        st.info("Aún no tienes entrenamientos guardados. Registra alguna serie para ver el progreso aquí.")
+        return
+
+    df = pd.DataFrame(entrenos)
+    # Normalizar columnas esperadas
+    for col in ["date", "exercise", "set", "reps", "weight"]:
+        if col not in df.columns:
+            df[col] = None
+
+    df["exercise"] = df["exercise"].astype(str).str.strip()
+    df["date_dt"] = pd.to_datetime(df["date"], errors="coerce")
+    df = df.dropna(subset=["date_dt"])
+    df["Fecha"] = df["date_dt"].dt.date
+    df["Set"] = pd.to_numeric(df["set"], errors="coerce").fillna(0).astype(int)
+    df["Reps"] = pd.to_numeric(df["reps"], errors="coerce").fillna(0).astype(int)
+    df["Peso"] = pd.to_numeric(df["weight"], errors="coerce").fillna(0.0).astype(float)
+
+    df = df[(df["exercise"] != "") & (df["exercise"].notna())].copy()
+    if df.empty:
+        st.info("No se encontraron registros válidos de entrenamientos.")
+        return
+
+    # Selector de ejercicio (prioriza los que tienen datos)
+    exercises_with_data = sorted(df["exercise"].unique().tolist())
+    all_exs = list_all_exercises(user)
+    # Mezclar: primero con datos, luego el resto (por si quieres ver un ejercicio sin datos)
+    merged = exercises_with_data + [e for e in all_exs if e not in set(exercises_with_data)]
+
+    left, right = st.columns([2, 1])
+    with left:
+        selected = st.selectbox("Ejercicio", merged, index=0, key="prog_exercise")
+    with right:
+        mode = st.radio("Vista", ["Por sesión (día)", "Por set"], horizontal=True, key="prog_mode")
+
+    # Meta + imagen
+    meta = get_exercise_meta(user, selected) if selected else {"grupo": "Otro", "imagen": None}
+    st.caption(f"**Grupo:** {meta.get('grupo','Otro')}")
+
+    if meta.get("imagen"):
+        try:
+            st.image(meta["imagen"], caption=selected, use_container_width=True)
+        except Exception:
+            pass
+
+    df_ex = df[df["exercise"] == selected].copy()
+    if df_ex.empty:
+        st.info("Este ejercicio aún no tiene series registradas.")
+        return
+
+    # Rango de fechas
+    min_d = df_ex["Fecha"].min()
+    max_d = df_ex["Fecha"].max()
+
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c1:
+        d_from = st.date_input("Desde", value=min_d, min_value=min_d, max_value=max_d, key="prog_from")
+    with c2:
+        d_to = st.date_input("Hasta", value=max_d, min_value=min_d, max_value=max_d, key="prog_to")
+    with c3:
+        smooth = st.checkbox("Suavizado (media móvil)", value=False, key="prog_smooth")
+
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
+
+    df_ex = df_ex[(df_ex["Fecha"] >= d_from) & (df_ex["Fecha"] <= d_to)].copy()
+    if df_ex.empty:
+        st.info("No hay registros en ese rango de fechas.")
+        return
+
+    # 1RM estimado (Epley)
+    df_ex["1RM"] = df_ex.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
+    df_ex["Volumen"] = df_ex["Peso"] * df_ex["Reps"]
+
+    # Métricas rápidas
+    pr_w_row = df_ex.loc[df_ex["Peso"].idxmax()] if not df_ex.empty else None
+    pr_1rm_row = df_ex.loc[df_ex["1RM"].idxmax()] if not df_ex.empty else None
+    last_day = df_ex["Fecha"].max()
+
+    total_sessions = df_ex["Fecha"].nunique()
+    total_sets = len(df_ex)
+    total_reps = int(df_ex["Reps"].sum())
+    total_volume = float(df_ex["Volumen"].sum())
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Sesiones", total_sessions)
+    m2.metric("Series", total_sets)
+    m3.metric("Reps totales", total_reps)
+    m4.metric("Volumen total", f"{total_volume:,.0f} kg·rep".replace(",", "."))
+
+    pr1, pr2, pr3 = st.columns(3)
+    if pr_w_row is not None:
+        pr1.metric("PR Peso", f"{float(pr_w_row['Peso']):g} kg", help=f"{int(pr_w_row['Reps'])} reps — {pr_w_row['Fecha']}")
+    if pr_1rm_row is not None:
+        pr2.metric("Mejor 1RM est.", f"{float(pr_1rm_row['1RM']):.1f} kg", help=f"{float(pr_1rm_row['Peso']):g} kg x {int(pr_1rm_row['Reps'])} — {pr_1rm_row['Fecha']}")
+    pr3.metric("Última sesión", str(last_day))
+
+    st.markdown("---")
+
+    if mode == "Por sesión (día)":
+        # Agregación por día
+        def _best_set(g):
+            # Devuelve set con mayor 1RM; si empate, mayor peso; si empate, mayor reps
+            gg = g.sort_values(["1RM", "Peso", "Reps"], ascending=[False, False, False])
+            return gg.iloc[0]
+
+        agg = df_ex.groupby("Fecha", as_index=False).apply(_best_set)
+        # groupby.apply crea índice compuesto; normalizar
+        if isinstance(agg.index, pd.MultiIndex):
+            agg = agg.reset_index(drop=True)
+
+        day = df_ex.groupby("Fecha", as_index=False).agg(
+            Series=("Peso", "count"),
+            Reps_tot=("Reps", "sum"),
+            Volumen=("Volumen", "sum"),
+        )
+        series = agg[["Fecha", "Peso", "Reps", "1RM"]].merge(day, on="Fecha", how="left").sort_values("Fecha")
+        series = series.rename(columns={"Peso": "Mejor peso", "Reps": "Reps en mejor set", "1RM": "Mejor 1RM est."})
+
+        # Suavizado
+        win = 3
+        if smooth and len(series) >= win:
+            for col in ["Mejor peso", "Mejor 1RM est.", "Volumen"]:
+                if col in series.columns:
+                    series[col + " (MM)"] = series[col].rolling(win, min_periods=1).mean()
+
+        # Gráficas
+        st.markdown("### Evolución")
+        g1, g2 = st.columns(2)
+        with g1:
+            st.write("**Mejor peso por sesión**")
+            plot_df = series.set_index("Fecha")
+            cols = ["Mejor peso"] + (["Mejor peso (MM)"] if "Mejor peso (MM)" in plot_df.columns else [])
+            st.line_chart(plot_df[cols])
+        with g2:
+            st.write("**Mejor 1RM estimado por sesión**")
+            plot_df = series.set_index("Fecha")
+            cols = ["Mejor 1RM est."] + (["Mejor 1RM est. (MM)"] if "Mejor 1RM est. (MM)" in plot_df.columns else [])
+            st.line_chart(plot_df[cols])
+
+        st.write("**Volumen por sesión**")
+        plot_df = series.set_index("Fecha")
+        cols = ["Volumen"] + (["Volumen (MM)"] if "Volumen (MM)" in plot_df.columns else [])
+        st.bar_chart(plot_df[cols])
+
+        st.markdown("### Sesiones (detalle)")
+        st.dataframe(
+            series[["Fecha", "Mejor peso", "Reps en mejor set", "Mejor 1RM est.", "Series", "Reps_tot", "Volumen"]],
+            use_container_width=True,
+            hide_index=True,
+            height=520,
+        )
+
+        # Export
+        csv1 = series.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Descargar progreso (CSV)", data=csv1, file_name=f"progreso_{selected}.csv", mime="text/csv")
+
+    else:
+        # Por set
+        st.markdown("### Sets (filtrados)")
+        show_cols = ["Fecha", "Set", "Reps", "Peso", "1RM", "Volumen"]
+        st.dataframe(df_ex[show_cols].sort_values(["Fecha", "Set"]), use_container_width=True, hide_index=True)
+
+        st.markdown("### Evolución por set")
+        # Preparar serie temporal: mejor peso por día (simple), y nube de sets por día (tabla + chart)
+        per_day = df_ex.groupby("Fecha", as_index=False).agg(Max_peso=("Peso","max"), Max_1RM=("1RM","max"), Volumen=("Volumen","sum")).sort_values("Fecha")
+        st.write("**Máximo peso por día (a partir de sets)**")
+        st.line_chart(per_day.set_index("Fecha")[["Max_peso"]])
+
+        st.write("**Máximo 1RM estimado por día (a partir de sets)**")
+        st.line_chart(per_day.set_index("Fecha")[["Max_1RM"]])
+
+        csv2 = df_ex[show_cols].sort_values(["Fecha","Set"]).to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Descargar sets (CSV)", data=csv2, file_name=f"sets_{selected}.csv", mime="text/csv")
+
+
 
 def require_auth():
     if "user" not in st.session_state or not st.session_state["user"]:
@@ -53,19 +271,24 @@ with st.sidebar:
         if st.button("Cerrar sesión", use_container_width=True):
             logout()
     st.markdown("---")
+    options = [
+        "🔐 Login / Registro",
+        "🏠 Inicio",
+        "🏋️ Añadir entrenamiento",
+        "📚 Gestor de ejercicios",
+        "📈 Tabla de entrenamientos",
+        "🩺 Salud (Peso)",
+        "📘 Rutinas",
+        "👤 Perfil",
+    ]
+    default_index = 0 if "user" not in st.session_state else 1
+    if st.session_state.get("nav_page") in options:
+        default_index = options.index(st.session_state["nav_page"])
     page = st.radio(
         "Secciones",
-        [
-            "🔐 Login / Registro",
-            "🏠 Inicio",
-            "🏋️ Añadir entrenamiento",
-            "📚 Gestor de ejercicios",
-            "📈 Tabla de entrenamientos",
-            "🩺 Salud (Peso)",
-            "📘 Rutinas",
-            "👤 Perfil",
-        ],
-        index=0 if "user" not in st.session_state else 1,
+        options,
+        index=default_index,
+        key="nav_page",
     )
 
 if page == "🔐 Login / Registro":
@@ -175,9 +398,223 @@ if page == "🔐 Login / Registro":
 
 elif page == "🏠 Inicio":
     require_auth()
-    st.title("Inicio")
-    st.write("Usa la barra lateral para navegar. Datos persistidos en `usuarios_data/<usuario>.json`.")
+    user = st.session_state["user"]
+    data = load_user(user) or {}
+    plan = dict(data.get("routine_plan", {}))
 
+    st.title("🏠 Inicio")
+
+    # -------------------------
+    # 🔥 HOY TOCA (arriba del todo)
+    # -------------------------
+    today = date.today()
+    today_iso = today.isoformat()
+    routines = list_routines(user)
+
+    st.subheader("🔥 Hoy toca")
+    rt_name = plan.get(today_iso)
+
+    colA, colB = st.columns([3, 2])
+    with colA:
+        if rt_name:
+            st.markdown(f"### **{rt_name}**")
+            r = next((rr for rr in routines if rr.get("name") == rt_name), None)
+            if r and r.get("items"):
+                st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
+            else:
+                st.info("La rutina asignada para hoy no existe o está vacía.")
+        else:
+            st.info("Hoy no tienes rutina asignada. Puedes planificar una o entrenar libre.")
+    with colB:
+        def _go(target: str):
+            st.session_state["nav_page"] = target
+            st.rerun()
+
+        if st.button("▶️ Iniciar entrenamiento", use_container_width=True):
+            _go("🏋️ Añadir entrenamiento")
+        if st.button("🗓️ Ir al planificador", use_container_width=True):
+            _go("📘 Rutinas")
+        if st.button("➕ Añadir peso", use_container_width=True):
+            _go("🩺 Salud (Peso)")
+
+    st.markdown("---")
+
+    # -------------------------
+    # 📊 Resumen rápido
+    # -------------------------
+    entrenos = list_training(user)
+    df_t = pd.DataFrame(entrenos) if entrenos else pd.DataFrame(columns=["date", "exercise", "set", "reps", "weight"])
+    if not df_t.empty:
+        df_t["date_dt"] = pd.to_datetime(df_t["date"], errors="coerce")
+        df_t = df_t.dropna(subset=["date_dt"])
+        df_t["Fecha"] = df_t["date_dt"].dt.date
+        df_t["Reps"] = pd.to_numeric(df_t.get("reps"), errors="coerce").fillna(0).astype(int)
+        df_t["Peso"] = pd.to_numeric(df_t.get("weight"), errors="coerce").fillna(0.0).astype(float)
+        df_t["Volumen"] = df_t["Reps"] * df_t["Peso"]
+
+    # Semana actual (Lun-Dom)
+    monday = today - timedelta(days=today.weekday())
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
+    week_isos = [d.isoformat() for d in week_dates]
+
+    entrenos_week = int(df_t[df_t["Fecha"].isin(week_dates)]["Fecha"].nunique()) if not df_t.empty else 0
+    plan_week = int(sum(1 for di in week_isos if plan.get(di))) if plan else 0
+
+    # Último entreno
+    last_train = None
+    if not df_t.empty and df_t["Fecha"].notna().any():
+        last_train = df_t["Fecha"].max()
+
+    # Peso actual y cambio 7d
+    weights = list_weights(user)
+    df_w = pd.DataFrame(weights) if weights else pd.DataFrame(columns=["date", "weight"])
+    current_weight = None
+    delta_7d = None
+    if not df_w.empty:
+        df_w["date_dt"] = pd.to_datetime(df_w["date"], errors="coerce")
+        df_w = df_w.dropna(subset=["date_dt"])
+        df_w = df_w.sort_values("date_dt")
+        df_w["Fecha"] = df_w["date_dt"].dt.date
+        df_w["Peso"] = pd.to_numeric(df_w.get("weight"), errors="coerce")
+        if df_w["Peso"].notna().any():
+            current_weight = float(df_w.dropna(subset=["Peso"]).iloc[-1]["Peso"])
+            target = today - timedelta(days=7)
+            past = df_w[df_w["Fecha"] <= target].dropna(subset=["Peso"])
+            if not past.empty:
+                w7 = float(past.iloc[-1]["Peso"])
+                delta_7d = current_weight - w7
+
+    # Racha (días entrenados consecutivos)
+    streak = 0
+    if not df_t.empty and df_t["Fecha"].notna().any():
+        days = sorted(set(df_t["Fecha"].tolist()))
+        cur = today
+        if cur not in days:
+            cur = today - timedelta(days=1)
+        while cur in days:
+            streak += 1
+            cur = cur - timedelta(days=1)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Entrenos semana", f"{entrenos_week}/{plan_week}" if plan_week else str(entrenos_week))
+    m2.metric("Último entreno", str(last_train) if last_train else "—")
+    if current_weight is not None:
+        m3.metric("Peso actual", f"{current_weight:.1f} kg", f"{delta_7d:+.1f} kg (7d)" if delta_7d is not None else None)
+    else:
+        m3.metric("Peso actual", "—")
+    m4.metric("Racha", f"{streak} días")
+
+    st.markdown("---")
+
+    # -------------------------
+    # 📈 Progreso rápido
+    # -------------------------
+    g1, g2, g3 = st.columns([2, 2, 2])
+
+    with g1:
+        st.subheader("📉 Peso (30 días)")
+        if not df_w.empty:
+            last_30 = today - timedelta(days=30)
+            df_w30 = df_w[df_w["Fecha"] >= last_30].dropna(subset=["Peso"])
+            if not df_w30.empty:
+                st.line_chart(df_w30.set_index("Fecha")[["Peso"]])
+            else:
+                st.info("Aún no hay pesos en los últimos 30 días.")
+        else:
+            st.info("Aún no has añadido peso.")
+
+    with g2:
+        st.subheader("🏋️ Volumen semanal")
+        if not df_t.empty:
+            df_t2 = df_t.copy()
+            df_t2["Semana"] = pd.to_datetime(df_t2["Fecha"]).dt.to_period("W").apply(lambda r: r.start_time.date())
+            wk = df_t2.groupby("Semana", as_index=False)["Volumen"].sum().sort_values("Semana").tail(8)
+            if not wk.empty:
+                st.bar_chart(wk.set_index("Semana")[["Volumen"]])
+            else:
+                st.info("Aún no hay volumen para mostrar.")
+        else:
+            st.info("Aún no tienes entrenamientos registrados.")
+
+    with g3:
+        st.subheader("📌 1RM estimado")
+        if not df_t.empty:
+            last_30 = today - timedelta(days=30)
+            df_last = df_t[df_t["Fecha"] >= last_30].copy()
+            if df_last.empty:
+                df_last = df_t.copy()
+            ex_counts = df_last["exercise"].astype(str).str.strip().value_counts()
+            default_ex = ex_counts.index[0] if len(ex_counts) else df_t["exercise"].astype(str).str.strip().iloc[0]
+            ex_options = sorted(set(df_t["exercise"].astype(str).str.strip().tolist()))
+            ex_sel = st.selectbox("Ejercicio", ex_options, index=ex_options.index(default_ex) if default_ex in ex_options else 0, key="home_1rm_ex")
+            dfx = df_t[df_t["exercise"].astype(str).str.strip() == ex_sel].copy()
+            dfx["1RM"] = dfx.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
+            per_day = dfx.groupby("Fecha", as_index=False)["1RM"].max().sort_values("Fecha").tail(20)
+            if not per_day.empty:
+                st.line_chart(per_day.set_index("Fecha")[["1RM"]])
+            else:
+                st.info("No hay datos para ese ejercicio todavía.")
+        else:
+            st.info("Aún no tienes entrenamientos registrados.")
+
+    st.markdown("---")
+
+    # -------------------------
+    # 🏅 Últimos PRs + Acciones rápidas
+    # -------------------------
+    left, right = st.columns([3, 2])
+
+    with left:
+        st.subheader("🏅 Últimos PRs")
+        if not df_t.empty:
+            dfp = df_t.copy()
+            dfp["Ejercicio"] = dfp["exercise"].astype(str).str.strip()
+            dfp["1RM"] = dfp.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
+            dfp = dfp.sort_values(["Fecha", "set"])
+            best_w = {}
+            best_1 = {}
+            prs = []
+            for _, r in dfp.iterrows():
+                ex = r["Ejercicio"]
+                w = float(r["Peso"])
+                one = float(r["1RM"])
+                is_pr = False
+                if ex not in best_w or w > best_w[ex]:
+                    best_w[ex] = w
+                    is_pr = True
+                if ex not in best_1 or one > best_1[ex]:
+                    best_1[ex] = one
+                    is_pr = True
+                if is_pr and w > 0:
+                    prs.append({
+                        "Fecha": r["Fecha"],
+                        "Ejercicio": ex,
+                        "Peso": w,
+                        "Reps": int(r["Reps"]),
+                        "1RM est.": round(one, 1),
+                    })
+            if prs:
+                prs_df = pd.DataFrame(prs).tail(12).iloc[::-1]
+                st.dataframe(prs_df, use_container_width=True, hide_index=True, height=380)
+            else:
+                st.info("Aún no hay PRs detectables (registra más series).")
+        else:
+            st.info("Aún no tienes entrenamientos registrados.")
+
+    with right:
+        st.subheader("⚡ Acciones rápidas")
+        def _go2(target: str):
+            st.session_state["nav_page"] = target
+            st.rerun()
+
+        if st.button("➕ Registrar entrenamiento", use_container_width=True):
+            _go2("🏋️ Añadir entrenamiento")
+        if st.button("📚 Gestor de ejercicios", use_container_width=True):
+            _go2("📚 Gestor de ejercicios")
+        if st.button("🗓️ Planificador de rutinas", use_container_width=True):
+            _go2("📘 Rutinas")
+        if st.button("🩺 Registrar peso", use_container_width=True):
+            _go2("🩺 Salud (Peso)")
 
 elif page == "🏋️ Añadir entrenamiento":
     require_auth()
@@ -290,51 +727,185 @@ elif page == "📚 Gestor de ejercicios":
     require_auth()
     st.title("Gestor de ejercicios")
     user = st.session_state["user"]
-    all_ex = list_all_exercises(user)
-    st.write(f"Total ejercicios: **{len(all_ex)}**")
 
-    st.subheader("Añadir ejercicio personalizado")
-    new_name = st.text_input("Nombre del ejercicio nuevo")
-    if st.button("Añadir") and new_name:
-        add_custom_exercise(user, new_name)
-        st.success(f"Añadido: {new_name}")
-        st.rerun()
+    tabs = st.tabs(["Listado", "📈 Progreso de ejercicios"])
 
-    st.subheader("Editar meta (grupo, imagen)")
-    ex = st.selectbox("Ejercicio", options=all_ex, key="meta_select")
-    meta = get_exercise_meta(user, ex)
-    grupo = st.selectbox("Grupo muscular", options=GRUPOS, index=GRUPOS.index(meta.get("grupo","Otro")) if meta.get("grupo") in GRUPOS else GRUPOS.index("Otro"))
-    img_up = st.file_uploader("Imagen del ejercicio (opcional)", type=["png","jpg","jpeg","webp"])
-    img_rel = meta.get("imagen")
-    if img_up is not None:
-        img_rel = store_exercise_image(user, img_up.name, img_up.getbuffer())
-    if st.button("Guardar meta"):
-        save_exercise_meta(user, ex, grupo, img_rel)
-        st.success("Meta guardada.")
-    if img_rel:
-        st.image(str(img_rel), caption=f"Imagen {ex}", width=240)
+    with tabs[0]:
+        st.subheader("Listado de ejercicios")
 
-    st.subheader("Renombrar / Eliminar")
-    col1, col2 = st.columns(2)
-    with col1:
-        to_rename = st.selectbox("Ejercicio a renombrar", options=all_ex, key="rename_select")
-        new_name2 = st.text_input("Nuevo nombre")
-        if st.button("Renombrar"):
-            if new_name2:
-                rename_custom_exercise(user, to_rename, new_name2)
-                st.success("Renombrado.")
-                st.rerun()
-            else:
-                st.warning("Escribe un nuevo nombre.")
-    with col2:
-        del_name = st.text_input("Nombre exacto a eliminar (personalizado)")
-        if st.button("Eliminar"):
-            if del_name and del_name not in set(list_all_exercises(user)[:len(list_all_exercises(user))]):
-                remove_custom_exercise(user, del_name)
-                st.success("Eliminado.")
-                st.rerun()
-            else:
-                st.warning("Solo se pueden eliminar personalizados.")
+        # --- Carga de datos ---
+        ejercicios = list_all_exercises(user)
+        entrenos = list_training(user)
+
+        # Stats por ejercicio
+        stats = {ex: {"sesiones": 0, "series": 0, "reps_totales": 0, "ultimo": None, "ultimo_peso": None, "ultimas_reps": None,
+                      "mejor_peso": 0.0, "mejor_1rm": 0.0} for ex in ejercicios}
+
+        # Para contar sesiones por fecha
+        fechas_por_ex = {ex: set() for ex in ejercicios}
+
+        for r in entrenos:
+            ex = r.get("exercise")
+            if ex not in stats:
+                # ejercicios detectados (por si aparecen en entrenos pero no están en base/custom)
+                ejercicios.append(ex)
+                stats[ex] = {"sesiones": 0, "series": 0, "reps_totales": 0, "ultimo": None, "ultimo_peso": None, "ultimas_reps": None,
+                             "mejor_peso": 0.0, "mejor_1rm": 0.0}
+                fechas_por_ex[ex] = set()
+
+            d = str(r.get("date") or "")
+            reps = int(r.get("reps") or 0)
+            peso = float(r.get("weight") or 0.0)
+
+            fechas_por_ex[ex].add(d)
+            stats[ex]["series"] += 1
+            stats[ex]["reps_totales"] += reps
+
+            # último (por fecha ISO)
+            if d and (stats[ex]["ultimo"] is None or d > stats[ex]["ultimo"]):
+                stats[ex]["ultimo"] = d
+                stats[ex]["ultimo_peso"] = peso
+                stats[ex]["ultimas_reps"] = reps
+
+            # mejor peso
+            if peso > (stats[ex]["mejor_peso"] or 0.0):
+                stats[ex]["mejor_peso"] = peso
+
+            # 1RM estimado (Epley)
+            if peso > 0 and reps > 0:
+                one_rm = peso * (1.0 + reps / 30.0)
+                if one_rm > (stats[ex]["mejor_1rm"] or 0.0):
+                    stats[ex]["mejor_1rm"] = one_rm
+
+        for ex in stats:
+            stats[ex]["sesiones"] = len(fechas_por_ex.get(ex, set()))
+
+        # Meta (grupo/imagen)
+        filas = []
+        for ex in ejercicios:
+            meta = get_exercise_meta(user, ex)
+            filas.append({
+                "Ejercicio": ex,
+                "Grupo": meta.get("grupo", "Otro"),
+                "Sesiones": stats.get(ex, {}).get("sesiones", 0),
+                "Series": stats.get(ex, {}).get("series", 0),
+                "Reps totales": stats.get(ex, {}).get("reps_totales", 0),
+                "Último": stats.get(ex, {}).get("ultimo", None),
+                "Último peso": stats.get(ex, {}).get("ultimo_peso", None),
+                "Últimas reps": stats.get(ex, {}).get("ultimas_reps", None),
+                "Mejor peso": stats.get(ex, {}).get("mejor_peso", 0.0),
+                "Mejor 1RM": round(stats.get(ex, {}).get("mejor_1rm", 0.0), 2),
+                "Tiene imagen": bool(meta.get("imagen")),
+            })
+
+        df = pd.DataFrame(filas)
+
+        # --- Filtros ---
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1:
+            q = st.text_input("Buscar ejercicio", value="", placeholder="Ej: Press banca, Sentadilla...", key="ex_search")
+        with c2:
+            grupo_sel = st.selectbox("Grupo", ["Todos"] + GRUPOS, index=0, key="ex_group_filter")
+        with c3:
+            solo_con_entrenos = st.checkbox("Solo con entrenos", value=False, key="ex_only_with_trainings")
+
+        df_f = df.copy()
+        if q:
+            df_f = df_f[df_f["Ejercicio"].str.contains(q, case=False, na=False)]
+        if grupo_sel != "Todos":
+            df_f = df_f[df_f["Grupo"] == grupo_sel]
+        if solo_con_entrenos:
+            df_f = df_f[df_f["Series"] > 0]
+
+        st.dataframe(df_f.sort_values(["Grupo", "Ejercicio"]), use_container_width=True, hide_index=True)
+
+        # --- Detalle editable ---
+        opciones = df_f["Ejercicio"].tolist()
+        if not opciones:
+            st.info("No hay ejercicios con esos filtros.")
+        else:
+            # Mantener selección estable
+            default_idx = 0
+            prev = st.session_state.get("ex_selected")
+            if prev in opciones:
+                default_idx = opciones.index(prev)
+
+            seleccionado = st.selectbox("Ver detalle de ejercicio", opciones, index=default_idx, key="ex_detail_select")
+            st.session_state["ex_selected"] = seleccionado
+
+            meta = get_exercise_meta(user, seleccionado)
+            grupo_actual = meta.get("grupo", "Otro")
+            if grupo_actual not in GRUPOS:
+                grupo_actual = "Otro"
+            imagen_rel = meta.get("imagen")
+
+            st.markdown("---")
+            st.markdown(f"## {seleccionado}")
+
+            colA, colB = st.columns([1, 1])
+
+            # ---- Columna A: editar grupo ----
+            with colA:
+                st.markdown("### Datos")
+                key_safe = "".join(ch if ch.isalnum() else "_" for ch in seleccionado)
+
+                grupo_nuevo = st.selectbox(
+                    "Grupo muscular",
+                    GRUPOS,
+                    index=GRUPOS.index(grupo_actual),
+                    key=f"ex_group_edit_{key_safe}",
+                )
+
+                if st.button("💾 Guardar grupo", key=f"ex_save_group_{key_safe}"):
+                    save_exercise_meta(user, seleccionado, grupo_nuevo, imagen_rel)
+                    st.success("Grupo actualizado.")
+                    st.rerun()
+
+                st.markdown("### Estadísticas")
+                st.write({
+                    "sesiones": stats.get(seleccionado, {}).get("sesiones", 0),
+                    "series": stats.get(seleccionado, {}).get("series", 0),
+                    "reps_totales": stats.get(seleccionado, {}).get("reps_totales", 0),
+                    "ultimo": stats.get(seleccionado, {}).get("ultimo", None),
+                    "ultimo_peso": stats.get(seleccionado, {}).get("ultimo_peso", None),
+                    "ultimas_reps": stats.get(seleccionado, {}).get("ultimas_reps", None),
+                    "mejor_peso": stats.get(seleccionado, {}).get("mejor_peso", 0.0),
+                    "mejor_1rm": round(stats.get(seleccionado, {}).get("mejor_1rm", 0.0), 2),
+                })
+
+            # ---- Columna B: imagen ----
+            with colB:
+                st.markdown("### Imagen")
+                img_path = None
+                if imagen_rel:
+                    # imagen_rel suele ser ruta relativa (ej: exercise_images/user/xxx.png)
+                    if os.path.exists(imagen_rel):
+                        img_path = imagen_rel
+
+                if img_path:
+                    st.image(img_path, use_container_width=True)
+                    if st.button("🧹 Quitar imagen", key=f"ex_remove_img_{key_safe}"):
+                        save_exercise_meta(user, seleccionado, grupo_actual, None)
+                        st.success("Imagen eliminada.")
+                        st.rerun()
+                else:
+                    st.info("Este ejercicio no tiene imagen todavía.")
+
+                up = st.file_uploader(
+                    "Subir/actualizar imagen (png/jpg/jpeg/webp)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    key=f"ex_img_upload_{key_safe}",
+                )
+                if up is not None:
+                    rel = store_exercise_image(user, up.name, up.getvalue())
+                    # Guardamos meta con el grupo que esté seleccionado ahora mismo
+                    save_exercise_meta(user, seleccionado, grupo_nuevo, rel)
+                    st.success("Imagen guardada.")
+                    st.rerun()
+
+    with tabs[-1]:
+        pagina_progreso()
+
 
 elif page == "📈 Tabla de entrenamientos":
     require_auth()
@@ -474,7 +1045,7 @@ elif page == "🩺 Salud (Peso)":
             st.pyplot(fig, clear_figure=True)
         else:
             st.info("No hay datos de peso para mostrar.")
-        
+
 elif page == "📘 Rutinas":
     require_auth()
     st.title("Planificador de rutinas")
@@ -732,408 +1303,267 @@ elif page == "📘 Rutinas":
 
     # ---------- Auto-configurador de rutinas (chat) ----------
     with st.expander("Auto-configurador de rutinas (chat)", expanded=False):
-        import re as _re
+
+        import os, json
         import datetime as _dt
-        if "autoplan_msgs" not in st.session_state: st.session_state["autoplan_msgs"] = []
-        if "autoplan_step" not in st.session_state: st.session_state["autoplan_step"] = 0
-        if "autoplan_data" not in st.session_state: st.session_state["autoplan_data"] = {"goal": None, "days": None, "level": None, "equipment": None, "session": None}
-        def _say(role, text): st.session_state["autoplan_msgs"].append({"role": role, "text": text})
-        if not st.session_state["autoplan_msgs"]:
-            _say("assistant", "¡Hola! Soy tu asistente para crear un plan. Empecemos 🤖💪")
-            _say("assistant", "1) ¿Cuál es tu objetivo principal? (fuerza / hipertrofia / pérdida de grasa)")
-        for m in st.session_state["autoplan_msgs"]:
-            with st.chat_message("assistant" if m["role"] == "assistant" else "user"): st.write(m["text"])
+        import pandas as pd
+        import streamlit as st
+        from app.ai_generator import call_gpt, build_prompt
+        from app.rules_fallback import generate_fallback
+        from app.pdf_export import rutina_a_pdf_bytes
+        from app.routines import add_routine, list_routines
 
-        def _parse_goal(text):
-            t = text.lower()
-            if "fuerza" in t: return "fuerza"
-            if "hiper" in t or "masa" in t or "musculo" in t: return "hipertrofia"
-            if "defin" in t or "grasa" in t or "peso" in t: return "perdida_grasa"
-            return None
+        user = st.session_state.get("user", "default")
+        st.info("Genera tu plan con IA, se guarda en memoria y se muestra como tablas por día (tipo PDF).")
 
-        def _parse_days(text):
-            # robusto: acepta "4", "4 dias", "cuatro", etc.
-            t = str(text).strip().lower()
-            palabras = {"uno":1,"dos":2,"tres":3,"cuatro":4,"cinco":5,"seis":6,"siete":7}
-            for k,v in palabras.items():
-                if k in t: return v
-            m = _re.search(r"(\d+)", t)
-            if m:
-                try:
-                    n = int(m.group(1))
-                    if 1 <= n <= 7: return n
-                except Exception: pass
-            return None
+        # ---------- Formulario de entrada ----------
+        with st.form("ia_form"):
 
-        def _parse_level(text):
-            t = text.lower()
-            if "princi" in t: return "principiante"
-            if "inter" in t: return "intermedio"
-            if "avan" in t: return "avanzado"
-            return None
+            col1, col2 = st.columns(2)
 
-        def _parse_equip(text):
-            t = text.lower()
-            if "gim" in t or "gimnasio" in t: return ["gimnasio"]
-            opts = []
-            if "manc" in t or "pesas" in t or "barra" in t: opts.append("pesas")
-            if "maqui" in t: opts.append("maquinas")
-            if "casa" in t or "sin" in t: opts.append("casa")
-            return opts or None
-
-        def _parse_session(text):
-            t = str(text).strip().lower()
-            m = _re.search(r"(\d+)", t)
-            if m:
-                try:
-                    n = int(m.group(1))
-                    if 20 <= n <= 120: return n
-                except Exception: pass
-            return None
-
-        user_in = st.chat_input("Escribe tu respuesta...")
-        if user_in:
-            _say("user", user_in.strip())
-            step = st.session_state["autoplan_step"]
-            data = st.session_state["autoplan_data"]
-            if step == 0:
-                g = _parse_goal(user_in)
-                if g:
-                    data["goal"] = g
-                    st.session_state["autoplan_step"] = 1
-                    _say("assistant", "2) ¿Cuántos días por semana quieres entrenar? (1-7)")
-                else:
-                    _say("assistant", "No te entendí del todo. Dime fuerza / hipertrofia / pérdida de grasa.")
-            elif step == 1:
-                d = _parse_days(user_in)
-                if d:
-                    data["days"] = d; _say("assistant", f"Perfecto: {d} días/semana.")
-                    st.session_state["autoplan_step"] = 2
-                    _say("assistant", "3) ¿Tu nivel? (principiante / intermedio / avanzado)")
-                else:
-                    _say("assistant", "Dime un número entre 1 y 7 😉")
-            elif step == 2:
-                lv = _parse_level(user_in)
-                if lv:
-                    data["level"] = lv
-                    st.session_state["autoplan_step"] = 3
-                    _say("assistant", "4) ¿Qué equipamiento tienes? (gimnasio, pesas, máquinas, casa)")
-                else:
-                    _say("assistant", "Responde: principiante / intermedio / avanzado.")
-            elif step == 3:
-                eq = _parse_equip(user_in)
-                if eq:
-                    data["equipment"] = eq
-                    st.session_state["autoplan_step"] = 4
-                    _say("assistant", "5) ¿Cuántos minutos quieres entrenar por sesión? (20-120)")
-                else:
-                    _say("assistant", "Indica algo como: gimnasio / pesas / máquinas / casa (puede ser varias).")
-            elif step == 4:
-                mins = _parse_session(user_in)
-                if mins:
-                    data["session"] = mins; _say("assistant", f"Perfecto: {mins} minutos por sesión.")
-                    st.session_state["autoplan_step"] = 5
-                    _say("assistant", "¡Perfecto! Con esto puedo proponerte un programa. Pulsa **Generar plan** abajo 👇")
-                else:
-                    _say("assistant", "Pon un número entre 20 y 120.")
-            else:
-                _say("assistant", "Si quieres cambiar algo, pulsa **Reiniciar chat**.")
-            st.rerun()
-
-        with st.expander("Ajustes manuales (opcional)", expanded=False):
-            data = st.session_state["autoplan_data"]
-            data["goal"] = st.selectbox("Objetivo", ["fuerza", "hipertrofia", "perdida_grasa"], index=(["fuerza","hipertrofia","perdida_grasa"].index(data["goal"]) if data["goal"] else 1))
-            data["days"] = st.slider("Días/semana", 1, 7, value=data["days"] or 3)
-            data["level"] = st.selectbox("Nivel", ["principiante","intermedio","avanzado"], index=(["principiante","intermedio","avanzado"].index(data["level"]) if data["level"] else 0))
-            data["equipment"] = st.multiselect("Equipamiento", ["gimnasio","pesas","maquinas","casa"], default=data["equipment"] or ["gimnasio"])
-            data["session"] = st.slider("Minutos por sesión", 20, 120, value=data["session"] or 60)
-
-        colg1, colg2, colg3 = st.columns(3)
-        with colg1:
-            if st.button("Generar plan", use_container_width=True):
-                st.session_state["autoplan_step"] = 5
-        with colg2:
-            if st.button("Reiniciar chat", use_container_width=True):
-                st.session_state["autoplan_msgs"] = []
-                st.session_state["autoplan_step"] = 0
-                st.session_state["autoplan_data"] = {"goal": None, "days": None, "level": None, "equipment": None, "session": None}
-                st.rerun()
-        with colg3:
-            st.caption("Ajusta valores arriba si el chat no te entendió.")
-
-        # ===== Generación + REFINO interactivo =====
-        if st.session_state["autoplan_step"] >= 5:
-            all_ex = list_all_exercises(user)
-            if not all_ex:
-                st.warning("No tienes ejercicios en tu catálogo. Ve a **📚 Ejercicios** y añade tu lista primero."); st.stop()
-
-            days = st.session_state["autoplan_data"]["days"] or 3
-            if days == 1: split = ["Full Body A"]
-            elif days == 2: split = ["Upper", "Lower"]
-            elif days == 3: split = ["Full Body A", "Full Body B", "Full Body C"]
-            elif days == 4: split = ["Upper A", "Lower A", "Upper B", "Lower B"]
-            elif days == 5: split = ["Push", "Pull", "Legs", "Upper", "Lower"]
-            else: split = ["Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B"]
-
-            def _rep_range(goal):
-                if goal == "fuerza": return (3,5)
-                if goal == "perdida_grasa": return (12,15)
-                return (8,12)
-
-            def _routine_template(name, picks):
-                lo, hi = _rep_range(st.session_state["autoplan_data"]["goal"] or "hipertrofia")
-                items = [{"exercise": ex, "sets": 3, "reps": (lo+hi)//2, "weight": 0.0} for ex in picks]
-                return {"name": name, "items": items}
-
-            def _pick_exercises(pool, keywords):
-                pool_lower = {p.lower(): p for p in pool}
-                selected = []
-                for kw in keywords:
-                    cand = next((pool_lower[k] for k in pool_lower if kw.lower() in k), None)
-                    if cand and cand not in selected: selected.append(cand)
-                for ex in pool:
-                    if len(selected) >= 8: break
-                    if ex not in selected: selected.append(ex)
-                return selected[:8]
-
-            GROUPS = {
-                "pecho": ["pecho","banca","press banca","aperturas","inclinado"],
-                "espalda": ["espalda","remo","jalón","dominada","pull"],
-                "piernas": ["pierna","piernas","sentadilla","zancada","prensa","gemelo","femoral","cuad","peso muerto"],
-                "hombros": ["hombro","hombros","militar","elevaciones laterales","arnold"],
-                "brazos": ["bíceps","biceps","tríceps","triceps","curl","extensión"],
-                "core": ["core","abdominal","abdomen","plancha","lumbar"],
-            }
-            def _classify_groups(name: str):
-                n = name.lower(); gset=set()
-                for g,kws in GROUPS.items():
-                    if any(kw in n for kw in kws): gset.add(g)
-                return gset
-            def _alt_from_pool(orig_ex: str, pool: list[str]):
-                target = _classify_groups(orig_ex)
-                for ex in pool:
-                    if ex == orig_ex: continue
-                    if _classify_groups(ex) & target: return ex
-                for ex in pool:
-                    if ex != orig_ex: return ex
-                return orig_ex
-
-            if "autoplan_program" not in st.session_state or not st.session_state["autoplan_program"]:
-                routines_built = []
-                for name in split:
-                    if "Upper" in name or name in ["Push","Pull"]:
-                        kws = ["press banca","remo","press militar","domin","jalón","curl","tríceps"]
-                    elif "Lower" in name or "Legs" in name:
-                        kws = ["sentadilla","peso muerto","zancada","prensa","gemelo","hip thrust"]
-                    else:
-                        kws = ["sentadilla","press banca","remo","peso muerto","press militar","domin"]
-                    picks = _pick_exercises(all_ex, kws)
-                    routines_built.append(_routine_template(name, picks))
-                st.session_state["autoplan_program"] = routines_built
-
-            program = st.session_state["autoplan_program"]
-            st.success("Programa actual:")
-            for r in program:
-                st.markdown(f"**{r['name']}**"); st.table(pd.DataFrame(r["items"]))
-
-            st.markdown("""**Dime cosas como:**  
-• *no quiero sentadilla* → alternativa  
-• *sustituye jalón por dominadas*  
-• *más piernas* / *menos pecho*""")
-            def _apply_feedback(text: str, program: list[dict]):
-                t = text.strip().lower()
-                changed = False
-
-                # ---------- SCOPE: 'solo en <rutina>' o 'en <rutina>' ----------
-                scope = None
-                import re as _sre
-                scope_match = _sre.search(r"(?:solo\s+en|en)\s+(?:el\s+d[ií]a\s+)?(.+)$", t)
-                if scope_match:
-                    scope_name = scope_match.group(1).strip()
-                    # elegir rutina cuyo nombre contenga scope_name (case-insensitive)
-                    names = [r["name"] for r in program]
-                    scope = next((nm for nm in names if scope_name in nm.lower()), None)
-                    # quita la clausula '... en <rutina>' del texto para facilitar el resto de parseos
-                    t = t[:scope_match.start()].strip()
-
-                def _target_routines():
-                    if scope:
-                        return [r for r in program if r["name"].lower() == scope]
-                    return program
-
-                # ---------- 1) Sustitución explícita: "sustituye X por Y" ----------
-                m = _sre.search(r"sustit(uir|uye|uya)\s+(.+?)\s+por\s+(.+)", t)
-                if m:
-                    old = m.group(2).strip()
-                    new = m.group(3).strip()
-                    new_real = next((e for e in all_ex if new in e.lower()), None) or _alt_from_pool(old, all_ex)
-                    for r in _target_routines():
-                        for it in r["items"]:
-                            if old in it["exercise"].lower():
-                                it["exercise"] = new_real
-                                changed = True
-                    msg_scope = f" en **{scope}**" if scope else ""
-                    return changed, f"Sustituido **{old}** por **{new_real}**{msg_scope}."
-
-                # ---------- 2) 'no quiero X' / 'quitar X' ----------
-                m = _sre.search(r"(no quiero|quitar|quita|elimina|eliminar)\s+(.+)", t)
-                if m:
-                    bad = m.group(2).strip()
-                    alt = _alt_from_pool(bad, all_ex)
-                    for r in _target_routines():
-                        for it in r["items"]:
-                            if bad in it["exercise"].lower():
-                                it["exercise"] = alt
-                                changed = True
-                    msg_scope = f" en **{scope}**" if scope else ""
-                    return changed, f"Reemplazado **{bad}** por **{alt}**{msg_scope}."
-
-                # ---------- 3) Más/Menos grupo ----------
-                m = _sre.search(r"(más|mas|menos)\s+(pecho|espalda|piernas|hombros|brazos|core)", t)
-                if m:
-                    op = m.group(1); grp = m.group(2)
-                    cand = [e for e in all_ex if grp in _classify_groups(e)]
-                    if not cand:
-                        return False, f"No encontré ejercicios de **{grp}** en tu lista."
-                    # cuenta por rutina restringida por scope
-                    counts = []
-                    targets = _target_routines()
-                    for r in targets:
-                        c = sum(1 for it in r["items"] if grp in _classify_groups(it["exercise"]))
-                        counts.append(c)
-                    import pandas as _pd
-                    if op.startswith("mas") or op.startswith("más"):
-                        idx_rel = int(_pd.Series(counts).idxmin())
-                        r = targets[idx_rel]
-                        ex = next((e for e in cand if e not in [it["exercise"] for it in r["items"]]), cand[0])
-                        r["items"].append({"exercise": ex, "sets": 3, "reps": 10, "weight": 0.0})
-                        changed = True
-                        return changed, f"Añadido **{ex}** (énfasis **{grp}**) en **{r['name']}**."
-                    else:
-                        idx_rel = int(_pd.Series(counts).idxmax())
-                        r = targets[idx_rel]
-                        pos = None
-                        for i, it in enumerate(r["items"]):
-                            if grp in _classify_groups(it["exercise"]):
-                                pos = i; break
-                        if pos is not None:
-                            removed = r["items"].pop(pos)
-                            changed = True
-                            return changed, f"Quitado **{removed['exercise']}** (menos **{grp}**) de **{r['name']}**."
-                        else:
-                            return False, f"No había ejercicios de **{grp}** para quitar."
-
-                # ---------- 4) Ajuste de SERIES / REPS en grupo o ejercicio ----------
-                # Ejemplos: "sube a 4 series en pecho", "pon a 6 reps en sentadilla"
-                m = _sre.search(r"(sube|baja|pon|ajusta|cambia)\s+a\s+(\d+)\s+(series|reps?|repeticiones)\s+en\s+(pecho|espalda|piernas|hombros|brazos|core)", t)
-                if m:
-                    val = int(m.group(2))
-                    field = m.group(3)
-                    grp = m.group(4)
-                    # normaliza campo
-                    field_key = "sets" if "series" in field else "reps"
-                    count_mod = 0
-                    for r in _target_routines():
-                        for it in r["items"]:
-                            if grp in _classify_groups(it["exercise"]):
-                                it[field_key] = val
-                                count_mod += 1
-                    if count_mod == 0:
-                        return False, f"No hay ejercicios de **{grp}** para ajustar."
-                    msg_scope = f" en **{scope}**" if scope else ""
-                    return True, f"Ajustadas **{count_mod}** entradas ({field_key}={val}) para **{grp}**{msg_scope}."
-
-                # Ajuste por ejercicio concreto
-                m = _sre.search(r"(sube|baja|pon|ajusta|cambia)\s+a\s+(\d+)\s+(series|reps?|repeticiones)\s+en\s+(.+)", t)
-                if m:
-                    val = int(m.group(2))
-                    field = m.group(3)
-                    ex_kw = m.group(4).strip()
-                    field_key = "sets" if "series" in field else "reps"
-                    count_mod = 0
-                    for r in _target_routines():
-                        for it in r["items"]:
-                            if ex_kw in it["exercise"].lower():
-                                it[field_key] = val
-                                count_mod += 1
-                    if count_mod == 0:
-                        return False, f"No encontré **{ex_kw}** para ajustar."
-                    msg_scope = f" en **{scope}**" if scope else ""
-                    return True, f"Ajustadas **{count_mod}** entradas ({field_key}={val}) para **{ex_kw}**{msg_scope}."
-
-                return False, (
-                    "No entendí el ajuste. Prueba con *'no quiero sentadilla'*, "
-                    "*'sustituye jalón por dominadas'*, *'más piernas'*, "
-                    "o *'sube a 4 series en pecho'* (puedes añadir *'solo en Lower A'*)."
+            with col1:
+                nivel = st.selectbox("Nivel", ["principiante","intermedio","avanzado"], index=1)
+                dias = st.number_input("Días/semana", min_value=1, max_value=6, value=4, step=1)
+                duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=60, step=5)
+                disponibilidad = st.multiselect(
+                    "Disponibilidad (elige días)",
+                    ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"],
+                    default=["Lunes","Martes","Jueves","Viernes"]
                 )
-                
-            fb = st.chat_input("Dime qué quieres cambiar…")
-            if fb:
-                changed,msg = _apply_feedback(fb, program)
-                if changed:
-                    st.session_state["autoplan_program"] = program; st.success(msg); st.rerun()
-                else:
-                    st.info(msg)
+                progresion_pref = st.selectbox("Progresión preferida", ["doble_progresion","lineal","RPE_autorregulada"], index=0)
+                volumen_tol = st.select_slider("Tolerancia a volumen", options=["baja","media","alta"], value="media")
+                semanas_ciclo = st.number_input("Semanas del ciclo", min_value=4, max_value=12, value=6)
 
-            # Exportar / Guardar / Asignar del programa actual
-            from io import BytesIO
-            try:
-                from reportlab.lib.pagesizes import A4
-                from reportlab.lib import colors
-                from reportlab.lib.styles import getSampleStyleSheet
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-            except Exception as _e:
-                st.error("Falta 'reportlab'. Instálala con: pip install reportlab"); A4=None
+            with col2:
+                objetivo = st.selectbox("Objetivo", ["fuerza","hipertrofia","resistencia","mixto"], index=0)
 
-            def _build_program_pdf(title: str, routines_list: list) -> bytes:
-                buf = BytesIO()
-                doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-                styles = getSampleStyleSheet(); story=[Paragraph(title, styles["Title"]), Spacer(1,12)]
-                for idx, r in enumerate(routines_list):
-                    story.append(Paragraph(r["name"], styles["Heading2"]))
-                    data = [["Ejercicio","Series","Reps","Peso (kg)"]]
-                    for it in r["items"]:
-                        data.append([it["exercise"], str(it["sets"]), str(it["reps"]), str(it["weight"])])
-                    table = Table(data, repeatRows=1)
-                    table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("ALIGN",(1,1),(-1,-1),"CENTER"),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("FONTSIZE",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,0),6),("TOPPADDING",(0,0),(-1,0),6)]))
-                    story.append(table)
-                    if idx < len(routines_list)-1: story.append(PageBreak())
-                doc.build(story); pdf=buf.getvalue(); buf.close(); return pdf
+                # --- Material (con preset) ---
+                material_preset = st.radio("Material (preset)", ["Todo", "Personalizado"], index=0, horizontal=True)
+                material_personalizado = []
+                if material_preset == "Personalizado":
+                    material_personalizado = st.multiselect(
+                        "Material disponible",
+                        ["barra","mancuernas","poleas","máquinas","banco","rack","prensa","dominadas","anillas","gomas","kettlebells","discos"]
+                    )
+                material = (["todo"] if material_preset == "Todo" else material_personalizado)
 
-            colp1, colp2, colp3 = st.columns([1,1,2])
-            with colp1:
-                pdf_bytes = _build_program_pdf("Programa de entrenamiento", program) if A4 else None
-                if pdf_bytes:
-                    st.download_button("Descargar programa PDF", data=pdf_bytes, file_name="programa_entrenamiento.pdf", mime="application/pdf", use_container_width=True)
-            with colp2:
-                if st.button("Guardar rutinas en registro", use_container_width=True):
-                    existing = [r["name"] for r in list_routines(user)]
-                    saved=0
-                    for r in program:
-                        name=r["name"]; base=name; k=1
-                        while name in existing:
-                            k+=1; name=f"{base} ({k})"
+                limitaciones = st.text_input("Lesiones/limitaciones (opcional)", placeholder="Hombro, rodilla, ...")
+                superseries_ok = st.checkbox("Permitir superseries", value=True)
+                deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
+                unidades = st.selectbox("Unidades", ["kg","lb"], index=0)
+                idioma = st.selectbox("Idioma", ["es","en"], index=0)
+
+            # ---------- Experiencia y PR ----------
+            st.markdown("#### Experiencia y PR recientes")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                exp_banca = st.text_input("Banca (experiencia)", value="2 años")
+                pr_banca = st.number_input("Banca 1x3 (kg)", value=80, step=2)
+            with c2:
+                exp_sentadilla = st.text_input("Sentadilla (experiencia)", value="1 año")
+                pr_senta = st.number_input("Sentadilla 1x3 (kg)", value=110, step=2)
+            with c3:
+                exp_muerto = st.text_input("Peso muerto (experiencia)", value="1 año")
+                pr_muerto = st.number_input("Muerto 1x3 (kg)", value=130, step=2)
+
+            enfasis = st.multiselect("Énfasis accesorios", ["espalda alta","gluteo","triceps","biceps","core"], default=["espalda alta","core"])
+            evitar_txt = st.text_input("Evitar movimientos (separar por comas)", value="press militar de pie pesado")
+            calentamiento = st.selectbox("Calentamiento", ["breve","medio","largo"], index=0)
+
+            agrupacion = st.selectbox(
+                "Estructura de grupos por día",
+                ["Varios grupos principales por día", "Un solo grupo principal por día"],
+                index=0
+            )
+
+            detalles_ia = st.text_area(
+                "Detalles adicionales para la IA (opcional)",
+                placeholder="Ej.: evitar press militar por hombro • añadir 1 día de cardio + core • priorizar glúteo...",
+                height=120
+            )
+
+            submitted = st.form_submit_button("Generar rutina")
+        # ---------- Función de render tipo PDF ----------
+        def render_rutina_tabular(rutina: dict):
+            st.subheader("Plan (vista tipo PDF)")
+            dias = rutina.get("dias", [])
+            if not dias:
+                st.info("No hay días en la rutina.")
+                return
+            # Construcción de tabs segura
+            tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias)]
+            tab_labels.append("📈 Progreso de ejercicios")
+            tabs = st.tabs(tab_labels)
+
+            for i, dia in enumerate(dias):
+                with tabs[i]:
+                    rows = [{
+                        "Ejercicio": ej.get("nombre",""),
+                        "Series": ej.get("series",""),
+                        "Reps": ej.get("reps",""),
+                        "Descanso": ej.get("descanso",""),
+                        "Intensidad": ej.get("intensidad","") or ""
+                    } for ej in dia.get("ejercicios", [])]
+                    import pandas as _pd
+                    st.table(_pd.DataFrame(rows, columns=["Ejercicio","Series","Reps","Descanso","Intensidad"]))
+                    if dia.get("notas"):
+                        st.caption("Notas: " + dia["notas"])
+
+    # Pestaña adicional: Progreso de ejercicios
+            prog = rutina.get("progresion", {})
+            st.markdown("### Progresión")
+            st.write(
+                f"- **Principales:** {prog.get('principales','')}\n"
+                f"- **Accesorios:** {prog.get('accesorios','')}\n"
+                f"- **Deload (semana):** {prog.get('deload_semana','')}"
+            )
+
+        # ---------- Llamada a IA / Fallback ----------
+        if submitted:
+            if "datos_usuario" not in st.session_state:
+                st.session_state["datos_usuario"] = {}
+            ia_detalles_value = " " + (ia_notas if "ia_notas" in locals() else st.session_state.get("ia_notas", ""))
+            datos_usuario = {
+                "ia_detalles": ia_detalles_value,
+
+                "nivel": nivel,
+                "dias": int(dias),
+                "duracion": int(duracion),
+                "objetivo": objetivo,
+                "material": material,
+                "lesiones": limitaciones.strip(),
+                "disponibilidad": disponibilidad,
+                "progresion_preferida": progresion_pref,
+                "volumen_tolerancia": volumen_tol,
+                "semanas_ciclo": int(semanas_ciclo),
+                "superseries_ok": bool(superseries_ok),
+                "deload_preferido_semana": int(deload_semana_pref),
+                "unidades": unidades,
+                "idioma": idioma,
+                "experiencia": {"banca": exp_banca, "sentadilla": exp_sentadilla, "peso_muerto": exp_muerto,
+        "agrupacion": agrupacion
+    ,
+        "comentarios": (detalles_ia or "").strip()
+    },
+                "pr_recientes": {"banca_1x3": pr_banca, "sentadilla_1x3": pr_senta, "muerto_1x3": pr_muerto, "unidad": unidades},
+                "enfasis_accesorios": enfasis,
+                "evitar": [s.strip() for s in evitar_txt.split(",") if s.strip()],
+                "calentamiento": calentamiento
+            }
+            api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+            if api_key_ok:
+                with st.spinner("Generando con IA..."):
+                    result = call_gpt(datos_usuario)
+                    if result.get("ok"):
+                        st.session_state["rutina_ia"] = result["data"]
+                        # Guardar prompt/system para depurar
                         try:
-                            add_routine(user, name, r["items"]); existing.append(name); saved+=1
-                        except Exception as e:
-                            st.warning(f"No se pudo guardar {name}: {e}")
-                    st.success(f"Guardadas {saved} rutinas."); st.rerun()
-            with colp3:
-                st.subheader("Asignar al calendario")
-                start = st.date_input("Fecha de inicio", value=date.today(), key="autoplan_start")
-                weeks = st.number_input("Semanas", min_value=1, max_value=12, value=4, step=1, key="autoplan_weeks")
-                weekdays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-                chosen = st.multiselect("Días de entrenamiento", options=list(range(7)), default=list(range(min(len(program), 6))), format_func=lambda i: weekdays[i], key="autoplan_weekdays")
-                if st.button("Aplicar al calendario", use_container_width=True, disabled=len(chosen)==0):
-                    order=list(range(len(program))); idx=0; count=0
-                    for w in range(int(weeks)):
-                        for wd in sorted(chosen):
-                            d = start + _dt.timedelta(days=(wd - start.weekday()) % 7) + _dt.timedelta(weeks=w)
-                            routine = program[order[idx % len(order)]]["name"]
-                            _set_plan(user, d.isoformat(), routine); idx+=1; count+=1
-                    st.success(f"Asignadas {count} sesiones al calendario."); st.rerun()
+                            st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
+                        except Exception:
+                            st.session_state["ia_prompt"] = None
+                        st.session_state["ia_system"] = result.get("system")
+                    else:
+                        _asegurar_dias_minimos(datos_usuario)
+                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                        # Guardar prompt/system aunque haya fallo
+                        try:
+                            st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
+                        except Exception:
+                            st.session_state["ia_prompt"] = build_prompt(datos_usuario)
+                        st.session_state["ia_system"] = result.get("system")
+                        err = result.get("error","Error desconocido")
+                        if not os.getenv("OPENAI_API_KEY"):
+                            st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
+                        else:
+                            st.warning("Se usó el plan de respaldo por fallo al generar con OpenAI.")
+                        st.error(f"Fallo al generar con OpenAI: {err}")
+            else:
+                st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
+                try:
+                    st.session_state["ia_prompt"] = build_prompt(datos_usuario)
+                except Exception:
+                    st.session_state["ia_prompt"] = None
+                st.session_state["ia_system"] = None
+                st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
+                st.error(f"Fallo al generar con OpenAI: {st.session_state.get('ia_error', 'error desconocido')}")
+                st.session_state["rutina_meta"] = {"nivel": nivel, "objetivo": objetivo, "duracion": int(duracion)}
 
-    # ---------- Exportar rutina (PDF) ----------
+        # ---------- Mostrar desde sesión ----------
+        rutina_view = st.session_state.get("rutina_ia")
+        if rutina_view:
+            render_rutina_tabular(rutina_view)
+
+            pdf_bytes = rutina_a_pdf_bytes(rutina_view)
+            st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
+            st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
+                               file_name="rutina.json", mime="application/json")
+
+            st.markdown("---")
+            st.subheader("📅 Nombra, asigna días y programa semanas")
+
+            dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+            with st.form("planificacion_form", clear_on_submit=False):
+                schedule = []
+                for i, dia in enumerate(rutina_view.get("dias", [])):
+                    st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
+                    c1, c2 = st.columns(2)
+                    weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
+                    custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
+                    schedule.append({
+                        "day_index": i,
+                        "weekday": dias_semana.index(weekday),
+                        "name": custom_name
+                    })
+                cA, cB, cC = st.columns(3)
+                start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
+                weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
+                guardar = cC.form_submit_button("💾 Guardar y programar")
+
+            if guardar:
+                existing = [r["name"] for r in list_routines(user)]
+                def _ensure_unique(name, existing_names):
+                    base, n, cand = name, 1, name
+                    while cand in existing_names:
+                        n += 1
+                        cand = f"{base} ({n})"
+                    existing_names.append(cand)
+                    return cand
+
+                created = []
+                for s in schedule:
+                    d = rutina_view["dias"][s["day_index"]]
+                    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
+                    items = []
+                    for ej in d.get("ejercicios", []):
+                        reps = ej.get("reps","10")
+                        try:
+                            reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
+                        except:
+                            reps_val = 10
+                        items.append({"exercise": ej.get("nombre",""), "sets": int(ej.get("series",3)), "reps": reps_val, "weight": 0.0})
+                    add_routine(user, rname, items)
+                    created.append((s["weekday"], rname))
+
+                try:
+                    base_mon = start_date - _dt.timedelta(days=start_date.weekday())
+                    for w in range(int(weeks)):
+                        for wd, rname in created:
+                            d = base_mon + _dt.timedelta(weeks=w, days=int(wd))
+                            _set_plan(user, d.isoformat(), rname)
+                    st.success("Rutinas guardadas y programadas ✅")
+                except NameError:
+                    st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
+                except Exception as e:
+                    st.error(f"Error al programar: {e}")
+
+            # 🧠 Mostrar prompt utilizado para la IA
+            if st.session_state.get("ia_prompt"):
+                with st.expander("🧠 Ver prompt construido con tus parámetros", expanded=False):
+                    st.code(st.session_state.get("ia_prompt"))
+
+            with st.expander("Ver JSON (avanzado)", expanded=False):
+                st.json(rutina_view)
+
     with st.expander("Exportar rutina (PDF)", expanded=False):
         from io import BytesIO
         try:
@@ -1227,3 +1657,256 @@ elif page == "👤 Perfil":
         if new_acc: set_account_email(user, new_acc)
         if new_rec: set_recovery_email(user, new_rec)
         st.success("Emails actualizados.")
+
+# === Nueva sección integrada: Progreso de ejercicios ===
+
+
+    st.subheader("📈 Progreso de ejercicios")
+    st.caption("Visualiza la evolución de peso y repeticiones por ejercicio.")
+
+    @st.cache_data(show_spinner=False)
+    def discover_data_sources(base_dir: str):
+        dbs, csvs = [], []
+        for root, _, files in os.walk(base_dir):
+            for f in files:
+                low = f.lower()
+                if low.endswith((".db", ".sqlite", ".sqlite3")):
+                    dbs.append(os.path.join(root, f))
+                if low.endswith(".csv"):
+                    csvs.append(os.path.join(root, f))
+        return dbs, csvs
+
+    def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
+        try:
+            con = sqlite3.connect(db_path)
+            cur = con.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [r[0] for r in cur.fetchall()]
+            candidates = [t for t in tables if any(k in t.lower() for k in ["serie","series","sets","entren","workout","training","registro"])]
+            exercises = set()
+            for t in (candidates or tables):
+                cur.execute(f"PRAGMA table_info('{t}')")
+                cols = [c[1].lower() for c in cur.fetchall()]
+                has_ex = any(c in cols for c in ["ejercicio","exercise","nombre_ejercicio"])
+                has_weight = any(c in cols for c in ["peso","weight","kg"])
+                has_reps = any(c in cols for c in ["reps","repeticiones","rep"])
+                if has_ex and (has_weight or has_reps):
+                    ex_col = "ejercicio" if "ejercicio" in cols else ("exercise" if "exercise" in cols else "nombre_ejercicio")
+                    cur.execute(f"SELECT DISTINCT {ex_col} FROM '{t}' WHERE {ex_col} IS NOT NULL AND TRIM({ex_col})<>'' LIMIT 5000")
+                    exercises.update([r[0] for r in cur.fetchall()])
+            con.close()
+            return sorted(e for e in exercises if e)
+        except Exception:
+            return None
+
+    def _fetch_progress_from_sqlite(db_path: str, exercise: str) -> Optional[pd.DataFrame]:
+        try:
+            con = sqlite3.connect(db_path)
+            cur = con.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [r[0] for r in cur.fetchall()]
+            frames = []
+            for t in tables:
+                cur.execute(f"PRAGMA table_info('{t}')")
+                cols_info = cur.fetchall()
+                cols = [c[1] for c in cols_info]
+                lcols = [c.lower() for c in cols]
+                def pick(*opts):
+                    for o in opts:
+                        if o in lcols:
+                            return cols[lcols.index(o)]
+                    return None
+                col_ex = pick("ejercicio","exercise","nombre_ejercicio")
+                col_date = pick("fecha","date","created_at","day","session_date")
+                col_weight = pick("peso","weight","kg")
+                col_reps = pick("reps","repeticiones","rep","repetition")
+                if not col_ex or not (col_weight or col_reps):
+                    continue
+                select_cols = [col_ex]
+                if col_date: select_cols.append(col_date)
+                if col_weight: select_cols.append(col_weight)
+                if col_reps: select_cols.append(col_reps)
+                try:
+                    df = pd.read_sql_query(f"SELECT {', '.join(select_cols)} FROM '{t}' WHERE {col_ex} = ?", con, params=[exercise])
+                except Exception:
+                    continue
+                if df.empty:
+                    continue
+                df.rename(columns={
+                    col_ex: "Ejercicio",
+                    col_date: "Fecha" if col_date else None,
+                    col_weight: "Peso",
+                    col_reps: "Reps",
+                }, inplace=True)
+                if "Fecha" in df.columns:
+                    for fmt in ("%Y-%m-%d","%Y/%m/%d","%d/%m/%Y","%d-%m-%Y","%Y-%m-%d %H:%M:%S","%Y/%m/%d %H:%M:%S"):
+                        try:
+                            df["Fecha"] = pd.to_datetime(df["Fecha"], format=fmt, errors="ignore")
+                        except Exception:
+                            pass
+                    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+                else:
+                    df["Fecha"] = pd.NaT
+                if "Peso" in df.columns:
+                    df["Peso"] = pd.to_numeric(df["Peso"], errors="coerce")
+                else:
+                    df["Peso"] = pd.NA
+                if "Reps" in df.columns:
+                    df["Reps"] = pd.to_numeric(df["Reps"], errors="coerce")
+                else:
+                    df["Reps"] = pd.NA
+                frames.append(df[["Fecha","Peso","Reps"]])
+            con.close()
+            if not frames:
+                return None
+            out = pd.concat(frames, ignore_index=True)
+            out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
+            if out["Fecha"].notna().any():
+                out = out.sort_values("Fecha")
+            else:
+                out = out.reset_index(drop=True)
+            return out
+        except Exception:
+            return None
+
+    def _fetch_from_csvs(csv_paths: List[str]) -> List[str]:
+        exs = set()
+        for p in csv_paths:
+            try:
+                df = pd.read_csv(p)
+            except Exception:
+                try:
+                    df = pd.read_csv(p, sep=";")
+                except Exception:
+                    continue
+            lcols = [c.lower() for c in df.columns]
+            def pick(*opts):
+                for o in opts:
+                    if o in lcols:
+                        return df.columns[lcols.index(o)]
+                return None
+            col_ex = pick("ejercicio","exercise","nombre_ejercicio")
+            if col_ex is not None:
+                exs.update(df[col_ex].dropna().astype(str).str.strip().unique().tolist())
+        return sorted(e for e in exs if e)
+
+    def _progress_from_csvs(csv_paths: List[str], exercise: str) -> Optional[pd.DataFrame]:
+        frames = []
+        for p in csv_paths:
+            try:
+                df = pd.read_csv(p)
+            except Exception:
+                try:
+                    df = pd.read_csv(p, sep=";")
+                except Exception:
+                    continue
+            lcols = [c.lower() for c in df.columns]
+            def pick(*opts):
+                for o in opts:
+                    if o in lcols:
+                        return df.columns[lcols.index(o)]
+                return None
+            col_ex = pick("ejercicio","exercise","nombre_ejercicio")
+            if col_ex is None:
+                continue
+            sub = df[df[col_ex].astype(str).str.strip() == exercise].copy()
+            if sub.empty:
+                continue
+            col_date = pick("fecha","date","created_at","day","session_date")
+            col_weight = pick("peso","weight","kg")
+            col_reps = pick("reps","repeticiones","rep","repetition")
+            sub.rename(columns={
+                col_date: "Fecha" if col_date else None,
+                col_weight: "Peso",
+                col_reps: "Reps",
+            }, inplace=True)
+            if "Fecha" in sub.columns:
+                for fmt in ("%Y-%m-%d","%Y/%m/%d","%d/%m/%Y","%d-%m-%Y","%Y-%m-%d %H:%M:%S","%Y/%m/%d %H:%M:%S"):
+                    try:
+                        sub["Fecha"] = pd.to_datetime(sub["Fecha"], format=fmt, errors="ignore")
+                    except Exception:
+                        pass
+                sub["Fecha"] = pd.to_datetime(sub["Fecha"], errors="coerce")
+            else:
+                sub["Fecha"] = pd.NaT
+            if "Peso" in sub.columns:
+                sub["Peso"] = pd.to_numeric(sub["Peso"], errors="coerce")
+            else:
+                sub["Peso"] = pd.NA
+            if "Reps" in sub.columns:
+                sub["Reps"] = pd.to_numeric(sub["Reps"], errors="coerce")
+            else:
+                sub["Reps"] = pd.NA
+            frames.append(sub[["Fecha","Peso","Reps"]])
+        if not frames:
+            return None
+        out = pd.concat(frames, ignore_index=True)
+        out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
+        if out["Fecha"].notna().any():
+            out = out.sort_values("Fecha")
+        else:
+            out = out.reset_index(drop=True)
+        return out
+
+    base_dir = os.path.dirname(__file__)
+    dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, "..")))
+
+    detected_exercises = set()
+    for db in dbs:
+        exs = _fetch_exercises_from_sqlite(db)
+        if exs:
+            detected_exercises.update(exs)
+    if not detected_exercises:
+        detected_exercises.update(_fetch_from_csvs(csvs))
+
+    if detected_exercises:
+        ejercicio = st.selectbox("Elige un ejercicio", sorted(detected_exercises))
+    else:
+        st.info("No se detectaron ejercicios automáticamente. Puedes escribir uno manualmente.")
+        ejercicio = st.text_input("Nombre del ejercicio")
+
+    if ejercicio:
+        df = None
+        src = ""
+        for db in dbs:
+            df = _fetch_progress_from_sqlite(db, ejercicio)
+            if df is not None and not df.empty:
+                src = f"SQLite: {os.path.basename(db)}"
+                break
+        if (df is None or df.empty) and csvs:
+            df = _progress_from_csvs(csvs, ejercicio)
+            src = "CSV"
+        if df is not None and not df.empty:
+            st.success(f"Datos encontrados desde {src}.")
+            col1, col2, col3, col4 = st.columns(4)
+            if df["Peso"].notna().any() and df["Reps"].notna().any():
+                df["1RM"] = df.apply(lambda r: r["Peso"] * (1 + (r["Reps"]/30)) if pd.notna(r["Peso"]) and pd.notna(r["Reps"]) else pd.NA, axis=1)
+                best_1rm = df["1RM"].max(skipna=True)
+                col1.metric("Mejor 1RM estimada", f"{best_1rm:.1f} kg" if isinstance(best_1rm, (int,float)) else "—")
+            else:
+                col1.metric("Mejor 1RM estimada", "—")
+            max_peso = df["Peso"].max(skipna=True) if "Peso" in df.columns else None
+            col2.metric("Máx. peso", f"{max_peso:.1f} kg" if isinstance(max_peso, (int,float)) else "—")
+            if df["Fecha"].notna().any():
+                first = df["Fecha"].min(); last = df["Fecha"].max()
+                col3.metric("Rango de fechas", f"{first.date()} → {last.date()}")
+            else:
+                col3.metric("Rango de fechas", "—")
+            col4.metric("Registros", f"{df.shape[0]}")
+
+            st.subheader("Tendencia de Peso")
+            if df["Fecha"].notna().any():
+                st.line_chart(df.set_index("Fecha")[["Peso"]])
+            else:
+                st.line_chart(df[["Peso"]])
+
+            st.subheader("Tendencia de Reps")
+            if df["Fecha"].notna().any():
+                st.line_chart(df.set_index("Fecha")[["Reps"]])
+            else:
+                st.line_chart(df[["Reps"]])
+
+            with st.expander("Ver tabla de datos"):
+                st.dataframe(df)
+        else:
+            st.warning("No se encontraron datos de progresión. Agrega registros con columnas de ejercicio, peso, repeticiones y opcionalmente fecha.")
