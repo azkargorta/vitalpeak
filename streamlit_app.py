@@ -43,360 +43,199 @@ from app.health import (
     add_weight, list_weights,
 )
 from app.routines import (
-
-# === Progreso de ejercicios: función ===
-
-
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
 
-
-# === Progreso de ejercicios: función ===
-
 def pagina_progreso():
-    import os, sqlite3
-    from typing import List, Optional
+    """Progreso de ejercicios basado en los entrenamientos guardados (usuarios_data/<user>.json).
+    Muestra evolución por sesión (día) y detalle por sets, con métricas y exportación.
+    """
     import pandas as pd
     import streamlit as st
+    from datetime import date as _date
 
     st.subheader("📈 Progreso de ejercicios")
 
-    @st.cache_data(show_spinner=False)
-    def discover_data_sources(base_dir: str):
-        dbs, csvs = [], []
-        for root, _, files in os.walk(base_dir):
-            for f in files:
-                low = f.lower()
-                if low.endswith(('.db','.sqlite','.sqlite3')):
-                    dbs.append(os.path.join(root, f))
-                if low.endswith('.csv'):
-                    csvs.append(os.path.join(root, f))
-        return dbs, csvs
-
-    def _pick(cols, *opts):
-        l = [c.lower() for c in cols]
-        for o in opts:
-            if o in l:
-                return cols[l.index(o)]
-        return None
-
-    def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
-        try:
-            con = sqlite3.connect(db_path); cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            exercises = set()
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols = [c[1] for c in cur.fetchall()]
-                col_ex = _pick(cols, 'ejercicio','exercise','nombre_ejercicio')
-                col_w  = _pick(cols, 'peso','weight','kg')
-                col_r  = _pick(cols, 'reps','repeticiones','rep')
-                if col_ex and (col_w or col_r):
-                    cur.execute(f"SELECT DISTINCT {col_ex} FROM '{t}' WHERE {col_ex} IS NOT NULL AND TRIM({col_ex})<>'' LIMIT 5000")
-                    exercises.update([r[0] for r in cur.fetchall()])
-            con.close()
-            return sorted(e for e in exercises if e)
-        except Exception:
-            return None
-
-    def _fetch_progress_from_sqlite(db_path: str, exercise: str) -> Optional[pd.DataFrame]:
-        try:
-            con = sqlite3.connect(db_path); cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            frames = []
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols = [c[1] for c in cur.fetchall()]
-                col_ex = _pick(cols, 'ejercicio','exercise','nombre_ejercicio')
-                col_dt = _pick(cols, 'fecha','date','created_at','day','session_date')
-                col_w  = _pick(cols, 'peso','weight','kg')
-                col_r  = _pick(cols, 'reps','repeticiones','rep','repetition')
-                if not col_ex or not (col_w or col_r): continue
-                sel = [col_ex] + ([col_dt] if col_dt else []) + ([col_w] if col_w else []) + ([col_r] if col_r else [])
-                df = pd.read_sql_query(f"SELECT {', '.join(sel)} FROM '{t}' WHERE {col_ex} = ?", con, params=[exercise])
-                if df.empty: continue
-                df.rename(columns={col_ex:'Ejercicio', col_dt:'Fecha' if col_dt else None, col_w:'Peso', col_r:'Reps'}, inplace=True)
-                if 'Fecha' in df.columns: df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-                if 'Peso' in df.columns: df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce')
-                if 'Reps' in df.columns: df['Reps'] = pd.to_numeric(df['Reps'], errors='coerce')
-                frames.append(df[['Fecha','Peso','Reps']])
-            con.close()
-            if not frames: return None
-            out = pd.concat(frames, ignore_index=True)
-            out = out.dropna(how='all', subset=['Fecha','Peso','Reps'])
-            if out['Fecha'].notna().any():
-                out = out.sort_values('Fecha')
-            else:
-                out = out.reset_index(drop=True)
-            return out
-        except Exception:
-            return None
-
-    def _from_csvs_all(csv_paths: list) -> list:
-        exs = set()
-        for p in csv_paths:
-            try: df = pd.read_csv(p)
-            except Exception:
-                try: df = pd.read_csv(p, sep=';')
-                except Exception: continue
-            lcols = [c.lower() for c in df.columns]
-            if 'ejercicio' in lcols:
-                col = df.columns[lcols.index('ejercicio')]
-            elif 'exercise' in lcols:
-                col = df.columns[lcols.index('exercise')]
-            elif 'nombre_ejercicio' in lcols:
-                col = df.columns[lcols.index('nombre_ejercicio')]
-            else:
-                continue
-            exs.update(df[col].dropna().astype(str).str.strip().unique())
-        return sorted([e for e in exs if e])
-
-    def _from_csvs_progress(csv_paths: list, exercise: str) -> Optional[pd.DataFrame]:
-        frames = []
-        for p in csv_paths:
-            try: df = pd.read_csv(p)
-            except Exception:
-                try: df = pd.read_csv(p, sep=';')
-                except Exception: continue
-            lcols = [c.lower() for c in df.columns]
-            def pick_df(*opts):
-                for o in opts:
-                    if o in lcols: return df.columns[lcols.index(o)]
-                return None
-            col_ex = pick_df('ejercicio','exercise','nombre_ejercicio')
-            if col_ex is None: continue
-            sub = df[df[col_ex].astype(str).str.strip() == exercise].copy()
-            if sub.empty: continue
-            col_dt = pick_df('fecha','date','created_at','day','session_date')
-            col_w  = pick_df('peso','weight','kg')
-            col_r  = pick_df('reps','repeticiones','rep','repetition')
-            sub.rename(columns={col_dt:'Fecha' if col_dt else None, col_w:'Peso', col_r:'Reps'}, inplace=True)
-            if 'Fecha' in sub.columns: sub['Fecha'] = pd.to_datetime(sub['Fecha'], errors='coerce')
-            if 'Peso' in sub.columns: sub['Peso'] = pd.to_numeric(sub['Peso'], errors='coerce')
-            if 'Reps' in sub.columns: sub['Reps'] = pd.to_numeric(sub['Reps'], errors='coerce')
-            frames.append(sub[['Fecha','Peso','Reps']])
-        if not frames: return None
-        out = pd.concat(frames, ignore_index=True)
-        out = out.dropna(how='all', subset=['Fecha','Peso','Reps'])
-        if out['Fecha'].notna().any():
-            out = out.sort_values('Fecha')
-        else:
-            out = out.reset_index(drop=True)
-        return out
-
-    base_dir = os.path.dirname(__file__)
-    dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, '..')))
-
-    ejercicios = set()
-    for db in dbs:
-        try:
-            exs = _fetch_exercises_from_sqlite(db)
-            if exs: ejercicios.update(exs)
-        except Exception: pass
-    ejercicios.update(_from_csvs_all(csvs))
-    ejercicios = sorted([e for e in ejercicios if e])
-
-    if not ejercicios:
-        st.warning('No se detectaron ejercicios en tus datos (SQLite/CSV).')
+    user = st.session_state.get("user")
+    if not user:
+        st.info("Inicia sesión para ver tu progreso.")
         return
 
-    ejercicio = st.selectbox('Ejercicio', ejercicios, index=0)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        fecha_ini = st.date_input('Fecha desde', value=None)
-    with col2:
-        fecha_fin = st.date_input('Fecha hasta', value=None)
-
-    df = None
-    for db in dbs:
-        try:
-            df = _fetch_progress_from_sqlite(db, ejercicio)
-        except Exception:
-            df = None
-        if df is not None and not df.empty: break
-    if (df is None or df.empty) and csvs:
-        df = _from_csvs_progress(csvs, ejercicio)
-
-    if df is None or df.empty:
-        st.info('No hay registros de progresión para el ejercicio seleccionado.')
+    entrenos = list_training(user)
+    if not entrenos:
+        st.info("Aún no tienes entrenamientos guardados. Registra alguna serie para ver el progreso aquí.")
         return
 
-    if 'Fecha' in df.columns:
-        if fecha_ini:
-            df = df[df['Fecha'] >= pd.to_datetime(fecha_ini)]
-        if fecha_fin:
-            df = df[df['Fecha'] <= pd.to_datetime(fecha_fin)]
-        if df['Fecha'].notna().any():
-            df = df.sort_values('Fecha')
+    df = pd.DataFrame(entrenos)
+    # Normalizar columnas esperadas
+    for col in ["date", "exercise", "set", "reps", "weight"]:
+        if col not in df.columns:
+            df[col] = None
 
-    st.dataframe(df, use_container_width=True)
+    df["exercise"] = df["exercise"].astype(str).str.strip()
+    df["date_dt"] = pd.to_datetime(df["date"], errors="coerce")
+    df = df.dropna(subset=["date_dt"])
+    df["Fecha"] = df["date_dt"].dt.date
+    df["Set"] = pd.to_numeric(df["set"], errors="coerce").fillna(0).astype(int)
+    df["Reps"] = pd.to_numeric(df["reps"], errors="coerce").fillna(0).astype(int)
+    df["Peso"] = pd.to_numeric(df["weight"], errors="coerce").fillna(0.0).astype(float)
 
-    plot_df = df.copy()
-    if 'Fecha' in plot_df.columns and plot_df['Fecha'].notna().any():
-        plot_df = plot_df.set_index('Fecha')
-    st.line_chart(plot_df[['Peso','Reps']].dropna(how='all'), use_container_width=True)
+    df = df[(df["exercise"] != "") & (df["exercise"].notna())].copy()
+    if df.empty:
+        st.info("No se encontraron registros válidos de entrenamientos.")
+        return
 
+    # Selector de ejercicio (prioriza los que tienen datos)
+    exercises_with_data = sorted(df["exercise"].unique().tolist())
+    all_exs = list_all_exercises(user)
+    # Mezclar: primero con datos, luego el resto (por si quieres ver un ejercicio sin datos)
+    merged = exercises_with_data + [e for e in all_exs if e not in set(exercises_with_data)]
 
-    st.subheader("📈 Progreso de ejercicios")
+    left, right = st.columns([2, 1])
+    with left:
+        selected = st.selectbox("Ejercicio", merged, index=0, key="prog_exercise")
+    with right:
+        mode = st.radio("Vista", ["Por sesión (día)", "Por set"], horizontal=True, key="prog_mode")
 
-    @st.cache_data(show_spinner=False)
-    def discover_data_sources(base_dir: str):
-        dbs, csvs = [], []
-        for root, _, files in os.walk(base_dir):
-            for f in files:
-                low = f.lower()
-                if low.endswith((".db", ".sqlite", ".sqlite3")):
-                    dbs.append(os.path.join(root, f))
-                if low.endswith(".csv"):
-                    csvs.append(os.path.join(root, f))
-        return dbs, csvs
+    # Meta + imagen
+    meta = get_exercise_meta(user, selected) if selected else {"grupo": "Otro", "imagen": None}
+    st.caption(f"**Grupo:** {meta.get('grupo','Otro')}")
 
-    def _pick(cols, *opts):
-        l = [c.lower() for c in cols]
-        for o in opts:
-            if o in l: return cols[l.index(o)]
-        return None
-
-    def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
+    if meta.get("imagen"):
         try:
-            con = sqlite3.connect(db_path); cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            exercises = set()
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols = [c[1] for c in cur.fetchall()]
-                col_ex = _pick(cols, "ejercicio","exercise","nombre_ejercicio")
-                col_w  = _pick(cols, "peso","weight","kg")
-                col_r  = _pick(cols, "reps","repeticiones","rep")
-                if col_ex and (col_w or col_r):
-                    cur.execute(f"SELECT DISTINCT {col_ex} FROM '{t}' WHERE {col_ex} IS NOT NULL AND TRIM({col_ex})<>'' LIMIT 2000")
-                    exercises.update([r[0] for r in cur.fetchall()])
-            con.close()
-            return sorted(e for e in exercises if e)
-        except Exception:
-            return None
-
-    def _fetch_progress_from_sqlite(db_path: str, exercise: str) -> Optional[pd.DataFrame]:
-        try:
-            con = sqlite3.connect(db_path); cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            frames = []
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols = [c[1] for c in cur.fetchall()]
-                col_ex = _pick(cols, "ejercicio","exercise","nombre_ejercicio")
-                col_dt = _pick(cols, "fecha","date","created_at","day","session_date")
-                col_w  = _pick(cols, "peso","weight","kg")
-                col_r  = _pick(cols, "reps","repeticiones","rep","repetition")
-                if not col_ex or not (col_w or col_r): continue
-                sel = [col_ex] + ([col_dt] if col_dt else []) + ([col_w] if col_w else []) + ([col_r] if col_r else [])
-                df = pd.read_sql_query(f"SELECT {', '.join(sel)} FROM '{t}' WHERE {col_ex} = ?", con, params=[exercise])
-                if df.empty: continue
-                df.rename(columns={col_ex:"Ejercicio", col_dt:"Fecha" if col_dt else None, col_w:"Peso", col_r:"Reps"}, inplace=True)
-                if "Fecha" in df.columns: df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-                if "Peso" in df.columns: df["Peso"] = pd.to_numeric(df["Peso"], errors="coerce")
-                if "Reps" in df.columns: df["Reps"] = pd.to_numeric(df["Reps"], errors="coerce")
-                frames.append(df[["Fecha","Peso","Reps"]])
-            con.close()
-            if not frames: return None
-            out = pd.concat(frames, ignore_index=True)
-            out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
-            out = out.sort_values("Fecha") if out["Fecha"].notna().any() else out.reset_index(drop=True)
-            return out
-        except Exception:
-            return None
-
-    def _from_csvs(csv_paths: list, exercise: str) -> Optional[pd.DataFrame]:
-        frames = []
-        for p in csv_paths:
-            try: df = pd.read_csv(p)
-            except Exception:
-                try: df = pd.read_csv(p, sep=";")
-                except Exception: continue
-            cols = list(df.columns)
-            col_ex = _pick(cols, "ejercicio","exercise","nombre_ejercicio")
-            if col_ex is None: continue
-            sub = df[df[col_ex].astype(str).str.strip() == exercise].copy()
-            if sub.empty: continue
-            col_dt = _pick(cols, "fecha","date","created_at","day","session_date")
-            col_w  = _pick(cols, "peso","weight","kg")
-            col_r  = _pick(cols, "reps","repeticiones","rep","repetition")
-            sub.rename(columns={col_dt:"Fecha" if col_dt else None, col_w:"Peso", col_r:"Reps"}, inplace=True)
-            if "Fecha" in sub.columns: sub["Fecha"] = pd.to_datetime(sub["Fecha"], errors="coerce")
-            if "Peso" in sub.columns: sub["Peso"] = pd.to_numeric(sub["Peso"], errors="coerce")
-            if "Reps" in sub.columns: sub["Reps"] = pd.to_numeric(sub["Reps"], errors="coerce")
-            frames.append(sub[["Fecha","Peso","Reps"]])
-        if not frames: return None
-        out = pd.concat(frames, ignore_index=True)
-        out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
-        out = out.sort_values("Fecha") if out["Fecha"].notna().any() else out.reset_index(drop=True)
-        return out
-
-    base_dir = os.path.dirname(__file__)
-    dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, "..")))
-
-    detected = set()
-    for db in dbs:
-        try:
-            exs = _fetch_exercises_from_sqlite(db)
-            if exs: detected.update(exs)
+            st.image(meta["imagen"], caption=selected, use_container_width=True)
         except Exception:
             pass
 
-    st.write("Selecciona un ejercicio para ver su progresión (Peso / Reps).")
-    ejercicio = st.selectbox("Ejercicio", sorted(detected)) if detected else st.text_input("Ejercicio (escríbelo)")
+    df_ex = df[df["exercise"] == selected].copy()
+    if df_ex.empty:
+        st.info("Este ejercicio aún no tiene series registradas.")
+        return
 
-    # Date filters
-    colf1, colf2 = st.columns(2)
-    with colf1:
-        fecha_ini = st.date_input("Fecha desde", value=None)
-    with colf2:
-        fecha_fin = st.date_input("Fecha hasta", value=None)
+    # Rango de fechas
+    min_d = df_ex["Fecha"].min()
+    max_d = df_ex["Fecha"].max()
 
-    if ejercicio:
-        df = None
-        for db in dbs:
-            try:
-                df = _fetch_progress_from_sqlite(db, ejercicio)
-            except Exception:
-                df = None
-            if df is not None and not df.empty: break
-        if (df is None or df.empty) and csvs:
-            df = _from_csvs(csvs, ejercicio)
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c1:
+        d_from = st.date_input("Desde", value=min_d, min_value=min_d, max_value=max_d, key="prog_from")
+    with c2:
+        d_to = st.date_input("Hasta", value=max_d, min_value=min_d, max_value=max_d, key="prog_to")
+    with c3:
+        smooth = st.checkbox("Suavizado (media móvil)", value=False, key="prog_smooth")
 
-        if df is not None and not df.empty:
-            # Apply date filter if dates present
-            if "Fecha" in df.columns:
-                if fecha_ini:
-                    df = df[df["Fecha"] >= pd.to_datetime(fecha_ini)]
-                if fecha_fin:
-                    df = df[df["Fecha"] <= pd.to_datetime(fecha_fin)]
-                if df["Fecha"].notna().any():
-                    df = df.sort_values("Fecha")
-            st.dataframe(df, use_container_width=True)
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
 
-            # Export button
-            csv_bytes = df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Descargar CSV", data=csv_bytes, file_name=f"progreso_{ejercicio}.csv", mime="text/csv")
-        else:
-            st.warning("No hay registros de progresión para este ejercicio.")
+    df_ex = df_ex[(df_ex["Fecha"] >= d_from) & (df_ex["Fecha"] <= d_to)].copy()
+    if df_ex.empty:
+        st.info("No hay registros en ese rango de fechas.")
+        return
 
+    # 1RM estimado (Epley)
+    df_ex["1RM"] = df_ex.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
+    df_ex["Volumen"] = df_ex["Peso"] * df_ex["Reps"]
 
-st.set_page_config(page_title="Gym App Web", page_icon="🏋️", layout="wide")
-ensure_base_dirs()
+    # Métricas rápidas
+    pr_w_row = df_ex.loc[df_ex["Peso"].idxmax()] if not df_ex.empty else None
+    pr_1rm_row = df_ex.loc[df_ex["1RM"].idxmax()] if not df_ex.empty else None
+    last_day = df_ex["Fecha"].max()
 
-# --- Seed DEMO (crea usuario admin con datos de prueba si no existe) ---
-try:
-    from app.demo_seed import maybe_seed_admin
-    maybe_seed_admin()
-except Exception:
-    # Si el seed falla, no bloqueamos el arranque de la app
-    pass
+    total_sessions = df_ex["Fecha"].nunique()
+    total_sets = len(df_ex)
+    total_reps = int(df_ex["Reps"].sum())
+    total_volume = float(df_ex["Volumen"].sum())
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Sesiones", total_sessions)
+    m2.metric("Series", total_sets)
+    m3.metric("Reps totales", total_reps)
+    m4.metric("Volumen total", f"{total_volume:,.0f} kg·rep".replace(",", "."))
+
+    pr1, pr2, pr3 = st.columns(3)
+    if pr_w_row is not None:
+        pr1.metric("PR Peso", f"{float(pr_w_row['Peso']):g} kg", help=f"{int(pr_w_row['Reps'])} reps — {pr_w_row['Fecha']}")
+    if pr_1rm_row is not None:
+        pr2.metric("Mejor 1RM est.", f"{float(pr_1rm_row['1RM']):.1f} kg", help=f"{float(pr_1rm_row['Peso']):g} kg x {int(pr_1rm_row['Reps'])} — {pr_1rm_row['Fecha']}")
+    pr3.metric("Última sesión", str(last_day))
+
+    st.markdown("---")
+
+    if mode == "Por sesión (día)":
+        # Agregación por día
+        def _best_set(g):
+            # Devuelve set con mayor 1RM; si empate, mayor peso; si empate, mayor reps
+            gg = g.sort_values(["1RM", "Peso", "Reps"], ascending=[False, False, False])
+            return gg.iloc[0]
+
+        agg = df_ex.groupby("Fecha", as_index=False).apply(_best_set)
+        # groupby.apply crea índice compuesto; normalizar
+        if isinstance(agg.index, pd.MultiIndex):
+            agg = agg.reset_index(drop=True)
+
+        day = df_ex.groupby("Fecha", as_index=False).agg(
+            Series=("Peso", "count"),
+            Reps_tot=("Reps", "sum"),
+            Volumen=("Volumen", "sum"),
+        )
+        series = agg[["Fecha", "Peso", "Reps", "1RM"]].merge(day, on="Fecha", how="left").sort_values("Fecha")
+        series = series.rename(columns={"Peso": "Mejor peso", "Reps": "Reps en mejor set", "1RM": "Mejor 1RM est."})
+
+        # Suavizado
+        win = 3
+        if smooth and len(series) >= win:
+            for col in ["Mejor peso", "Mejor 1RM est.", "Volumen"]:
+                if col in series.columns:
+                    series[col + " (MM)"] = series[col].rolling(win, min_periods=1).mean()
+
+        # Gráficas
+        st.markdown("### Evolución")
+        g1, g2 = st.columns(2)
+        with g1:
+            st.write("**Mejor peso por sesión**")
+            plot_df = series.set_index("Fecha")
+            cols = ["Mejor peso"] + (["Mejor peso (MM)"] if "Mejor peso (MM)" in plot_df.columns else [])
+            st.line_chart(plot_df[cols])
+        with g2:
+            st.write("**Mejor 1RM estimado por sesión**")
+            plot_df = series.set_index("Fecha")
+            cols = ["Mejor 1RM est."] + (["Mejor 1RM est. (MM)"] if "Mejor 1RM est. (MM)" in plot_df.columns else [])
+            st.line_chart(plot_df[cols])
+
+        st.write("**Volumen por sesión**")
+        plot_df = series.set_index("Fecha")
+        cols = ["Volumen"] + (["Volumen (MM)"] if "Volumen (MM)" in plot_df.columns else [])
+        st.bar_chart(plot_df[cols])
+
+        st.markdown("### Sesiones (detalle)")
+        st.dataframe(
+            series[["Fecha", "Mejor peso", "Reps en mejor set", "Mejor 1RM est.", "Series", "Reps_tot", "Volumen"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        # Export
+        csv1 = series.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Descargar progreso (CSV)", data=csv1, file_name=f"progreso_{selected}.csv", mime="text/csv")
+
+    else:
+        # Por set
+        st.markdown("### Sets (filtrados)")
+        show_cols = ["Fecha", "Set", "Reps", "Peso", "1RM", "Volumen"]
+        st.dataframe(df_ex[show_cols].sort_values(["Fecha", "Set"]), use_container_width=True, hide_index=True)
+
+        st.markdown("### Evolución por set")
+        # Preparar serie temporal: mejor peso por día (simple), y nube de sets por día (tabla + chart)
+        per_day = df_ex.groupby("Fecha", as_index=False).agg(Max_peso=("Peso","max"), Max_1RM=("1RM","max"), Volumen=("Volumen","sum")).sort_values("Fecha")
+        st.write("**Máximo peso por día (a partir de sets)**")
+        st.line_chart(per_day.set_index("Fecha")[["Max_peso"]])
+
+        st.write("**Máximo 1RM estimado por día (a partir de sets)**")
+        st.line_chart(per_day.set_index("Fecha")[["Max_1RM"]])
+
+        csv2 = df_ex[show_cols].sort_values(["Fecha","Set"]).to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Descargar sets (CSV)", data=csv2, file_name=f"sets_{selected}.csv", mime="text/csv")
+
 
 
 def require_auth():
