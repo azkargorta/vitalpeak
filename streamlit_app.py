@@ -13,17 +13,12 @@ import pandas as pd
 import streamlit as st
 st.set_page_config(page_title="Vitalpeak", layout="wide")
 
-from dotenv import load_dotenv
-import os
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 st.markdown(
     """
 <style>
 /* Usar el ancho completo de la página */
 .block-container { max-width: 100% !important; padding-left: 2rem; padding-right: 2rem; }
-/* Tabla más compacta para que quepan más columnas */
+/* Tablas más compactas para que quepan más columnas */
 div[data-testid="stDataFrame"] { font-size: 12px; }
 div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { white-space: normal; }
 </style>
@@ -32,6 +27,10 @@ div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { white-spa
 )
 
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Query params (Streamlit >= 1.30)
 params = st.query_params
 _u = params.get("user")
@@ -229,7 +228,6 @@ def pagina_progreso():
             series[["Fecha", "Mejor peso", "Reps en mejor set", "Mejor 1RM est.", "Series", "Reps_tot", "Volumen"]],
             use_container_width=True,
             hide_index=True,
-            height=520,
         )
 
         # Export
@@ -272,25 +270,24 @@ with st.sidebar:
             logout()
     st.markdown("---")
     options = [
-        "🔐 Login / Registro",
-        "🏠 Inicio",
-        "🏋️ Añadir entrenamiento",
-        "📚 Gestor de ejercicios",
-        "📈 Tabla de entrenamientos",
-        "🩺 Salud (Peso)",
-        "📘 Rutinas",
-        "👤 Perfil",
-    ]
-    default_index = 0 if "user" not in st.session_state else 1
-    if st.session_state.get("nav_page") in options:
-        default_index = options.index(st.session_state["nav_page"])
-    page = st.radio(
-        "Secciones",
-        options,
-        index=default_index,
-        key="nav_page",
-    )
-
+    "🔐 Login / Registro",
+    "🏠 Inicio",
+    "🏋️ Añadir entrenamiento",
+    "📚 Gestor de ejercicios",
+    "📈 Tabla de entrenamientos",
+    "🩺 Salud (Peso)",
+    "📘 Rutinas",
+    "👤 Perfil",
+]
+default_index = 0 if "user" not in st.session_state else 1
+if st.session_state.get("nav_page") in options:
+    default_index = options.index(st.session_state["nav_page"])
+page = st.radio(
+    "Secciones",
+    options,
+    index=default_index,
+    key="nav_page",
+)
 if page == "🔐 Login / Registro":
     st.title("Acceso")
 
