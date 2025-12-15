@@ -40,7 +40,7 @@ from app.training import (
     add_training_set, list_training, last_values_for_exercise,
 )
 from app.health import (
-    add_weight, list_weights,
+    add_weight, list_weights, delete_weights,
 )
 from app.routines import (
 
@@ -744,8 +744,40 @@ elif page == "🩺 Salud (Peso)":
         st.subheader("Tabla de pesos")
         rows = list_weights(user)
         if rows:
-            df_tab = pd.DataFrame(rows).sort_values("date", ascending=False)
-            st.dataframe(df_tab, use_container_width=True, hide_index=True)
+            # Añadimos un ID interno (índice original en la lista) para poder borrar registros concretos
+            df_tab = pd.DataFrame([{"ID": i, **r} for i, r in enumerate(rows)]).sort_values("date", ascending=False)
+            df_tab["Borrar"] = False
+
+            # Tabla editable: solo la columna "Borrar" se puede modificar
+            try:
+                edited = st.data_editor(
+                    df_tab,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ID", "date", "weight"],
+                    column_config={
+                        "ID": st.column_config.NumberColumn("ID", help="Identificador interno del registro", width="small"),
+                        "date": st.column_config.TextColumn("Fecha"),
+                        "weight": st.column_config.NumberColumn("Peso (kg)", format="%.1f"),
+                        "Borrar": st.column_config.CheckboxColumn("Borrar", help="Marca y pulsa el botón para eliminar"),
+                    },
+                )
+            except Exception:
+                # Fallback si la versión de Streamlit no soporta data_editor/column_config
+                st.dataframe(df_tab.drop(columns=["Borrar"]), use_container_width=True, hide_index=True)
+                edited = df_tab
+
+            to_delete = []
+            if "Borrar" in edited.columns:
+                to_delete = edited.loc[edited["Borrar"] == True, "ID"].tolist()
+
+            if st.button("🗑️ Borrar seleccionados", use_container_width=True, disabled=(len(to_delete) == 0)):
+                removed = delete_weights(user, to_delete)
+                if removed:
+                    st.success(f"Eliminados {removed} registro(s).")
+                    st.rerun()
+                else:
+                    st.info("No se eliminó ningún registro.")
         else:
             st.info("Sin registros aún.")
     st.subheader("Gráfico de evolución")
