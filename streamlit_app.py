@@ -19,6 +19,12 @@ st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Crear un usuario DEMO para pruebas (admin/admin) con datos realistas de ~2 meses.
+# Se puede desactivar con: VITALPEAK_SEED=0
+from app.demo_seed import maybe_seed_admin
+maybe_seed_admin()
+
 # Query params (Streamlit >= 1.30)
 params = st.query_params
 _u = params.get("user")

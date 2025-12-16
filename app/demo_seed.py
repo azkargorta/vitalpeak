@@ -2,10 +2,18 @@
 from __future__ import annotations
 
 import os
+import random
 import datetime as _dt
 from typing import Dict, List, Any
 
-from .datastore import register_user, load_user, save_user
+from .datastore import (
+    register_user,
+    load_user,
+    save_user,
+    set_password,
+    set_account_email,
+    set_recovery_email,
+)
 
 
 def _iso(d: _dt.date) -> str:
@@ -40,15 +48,23 @@ def maybe_seed_admin() -> None:
     if _conf("VITALPEAK_SEED", "1").strip() in ("0", "false", "False", "no", "NO"):
         return
 
-    username = _conf("VITALPEAK_ADMIN_USER", "admin")
-    email = _conf("VITALPEAK_ADMIN_EMAIL", "admin@admin.com")
+    # Credenciales por defecto (DEMO). Se pueden sobreescribir por Secrets/ENV.
+    username = _conf("VITALPEAK_ADMIN_USER", "admin").strip() or "admin"
+    email = _conf("VITALPEAK_ADMIN_EMAIL", "gg@gg.com").strip() or "gg@gg.com"
     password = _conf("VITALPEAK_ADMIN_PASSWORD", "admin")
 
     # 1) Crear usuario si no existe
-    created = register_user(username, password, email=email)
+    register_user(username, password, email=email)
+
+    # 2) Forzar credenciales/Emails del usuario demo (lo pidió el proyecto)
+    #    Nota: si lo quieres desactivar, pon VITALPEAK_SEED=0.
+    set_password(username, password)
+    set_account_email(username, email)
+    set_recovery_email(username, email)
+
     data = load_user(username) or {}
 
-    # 2) Completar datos básicos sin pisar si ya existen
+    # 3) Completar datos básicos sin pisar si ya existen (pero ya hemos forzado emails arriba)
     data.setdefault("email", email)
     data.setdefault("recovery_email", email)
 
@@ -63,19 +79,22 @@ def maybe_seed_admin() -> None:
         }
     data["profile"] = profile
 
-    # 3) Peso (últimos 30 días)
+    # 4) Peso (últimos ~60 días)
     weights = data.get("weights") or []
     if not weights:
         today = _dt.date.today()
+        days = 60
         base = 82.0
-        # ligera bajada para que la gráfica tenga sentido
-        for i in range(30):
-            d = today - _dt.timedelta(days=(29 - i))
-            w = base - (i * 0.06)
+        # tendencia suave + pequeñas variaciones (para que la gráfica se vea real)
+        for i in range(days):
+            d = today - _dt.timedelta(days=(days - 1 - i))
+            trend = -0.04 * i  # -2.4 kg en 60 días aprox
+            noise = random.uniform(-0.2, 0.2)
+            w = base + trend + noise
             weights.append({"date": _iso(d), "weight": round(w, 1)})
         data["weights"] = weights
 
-    # 4) Ejercicios custom + meta (para probar gestor)
+    # 5) Ejercicios custom + meta (para probar gestor)
     customs = data.get("custom_exercises") or []
     meta = data.get("exercise_meta") or {}
 
@@ -91,7 +110,7 @@ def maybe_seed_admin() -> None:
     data["custom_exercises"] = customs
     data["exercise_meta"] = meta
 
-    # 5) Rutinas DEMO
+    # 6) Rutinas DEMO (4 bloques típicos)
     rutinas = data.get("rutinas") or []
     if not rutinas:
         _maybe_add_routine(
@@ -136,37 +155,107 @@ def maybe_seed_admin() -> None:
         )
         data["rutinas"] = rutinas
 
-    # 6) Planificador de rutinas (últimos 7 días + próximos 7)
+    # 7) Planificador de rutinas (últimos 60 días + próximos 14)
     plan = dict(data.get("routine_plan", {}) or {})
     if not plan and data.get("rutinas"):
-        # asignación alterna
         routine_names = [r["name"] for r in data["rutinas"]]
+        name_map = {
+            "Push (DEMO)": "Push (DEMO)",
+            "Pull (DEMO)": "Pull (DEMO)",
+            "Legs (DEMO)": "Legs (DEMO)",
+            "Full Body (DEMO)": "Full Body (DEMO)",
+        }
         today = _dt.date.today()
-        window = list(range(-7, 8))
-        for idx, offset in enumerate(window):
+        # patrón: L Push, M Pull, X descanso, J Legs, V Full Body, S descanso/extra, D descanso
+        for offset in range(-60, 15):
             d = today + _dt.timedelta(days=offset)
-            plan[_iso(d)] = routine_names[idx % len(routine_names)]
+            wd = d.weekday()  # 0=L
+            if wd == 0:
+                plan[_iso(d)] = name_map["Push (DEMO)"]
+            elif wd == 1:
+                plan[_iso(d)] = name_map["Pull (DEMO)"]
+            elif wd == 3:
+                plan[_iso(d)] = name_map["Legs (DEMO)"]
+            elif wd == 4:
+                plan[_iso(d)] = name_map["Full Body (DEMO)"]
+            elif wd == 5:
+                # sábado: si quieres probar un 5º día, alterna Push/Pull
+                plan[_iso(d)] = routine_names[(offset % len(routine_names))]
+            # miércoles (2) y domingo (6): libre por defecto
         data["routine_plan"] = plan
 
-    # 7) Entrenamientos (si no hay, crear un histórico breve)
+    # 8) Entrenamientos (últimos ~60 días) con sobrecarga progresiva suave
     entrenos = data.get("entrenamientos") or []
     if not entrenos:
         today = _dt.date.today()
-        # 10 sesiones (cada 2 días), 3 ejercicios x 3 series = 90 filas aprox
-        session_days = [today - _dt.timedelta(days=i) for i in range(0, 20, 2)]
-        exercises = [
-            ("Press con barra en banco horizontal", [50, 52.5, 55]),
-            ("Sentadilla de Hack con postura amplia", [60, 65, 70]),
-            ("Remo con polea de agarre cerrado", [45, 47.5, 50]),
+
+        # ejercicios por rutina (coherente con lo que hay en rutinas)
+        push_ex = [
+            ("Press con barra en banco inclinado", 45.0),
+            ("Apertura de pecho sentado", 35.0),
+            ("Press de hombro en máquina", 30.0),
+            ("Jalón de triceps en polea alta con cuerda", 25.0),
         ]
-        for s_idx, d in enumerate(reversed(session_days)):
+        pull_ex = [
+            ("Remo inclinado con barra T agarre ancho", 40.0),
+            ("Remo con polea de agarre cerrado", 45.0),
+            ("Curl martillo con mancuernas", 12.5),
+        ]
+        legs_ex = [
+            ("Prensa de piernas en posición ancha", 120.0),
+            ("Extensiones de piernas sentado", 40.0),
+            ("Curls de pierna sentado", 30.0),
+            ("Hip thrust con barra", 70.0),
+        ]
+        full_ex = [
+            ("Sentadilla de Hack con postura amplia", 60.0),
+            ("Press con barra en banco horizontal", 50.0),
+            ("Remo de un brazo con mancuerna", 22.5),
+            ("Peso muerto con barra", 70.0),
+            ("Plancha (isométrico)", 0.0),
+        ]
+
+        def _session_rows(d: _dt.date, ex_list: list[tuple[str, float]], *, reps_base: int, inc: float, session_idx: int):
             d_iso = _iso(d)
-            for ex, weights_seq in exercises:
-                w = weights_seq[min(s_idx, len(weights_seq)-1)]
-                for setn in (1, 2, 3):
-                    entrenos.append(
-                        {"date": d_iso, "exercise": ex, "set": setn, "reps": 10 - (setn - 1), "weight": float(w)}
-                    )
+            rows = []
+            for ex, base_w in ex_list:
+                # progresión: +inc cada 2 sesiones aprox
+                prog = (session_idx // 2) * inc
+                w = max(0.0, base_w + prog)
+                sets = 3 if ex != "Plancha (isométrico)" else 2
+                for setn in range(1, sets + 1):
+                    reps = reps_base - (setn - 1)
+                    if ex == "Plancha (isométrico)":
+                        reps = 45 + (session_idx % 3) * 5
+                    rows.append({"date": d_iso, "exercise": ex, "set": setn, "reps": int(reps), "weight": float(round(w, 1))})
+            return rows
+
+        # Generar sesiones solo en días con plan asignado (L/M/J/V y algunos S)
+        session_idx = 0
+        for offset in range(60, -1, -1):
+            d = today - _dt.timedelta(days=offset)
+            rt = (data.get("routine_plan") or {}).get(_iso(d))
+            if not rt:
+                continue
+            if "Push" in rt:
+                entrenos.extend(_session_rows(d, push_ex, reps_base=12, inc=1.0, session_idx=session_idx))
+            elif "Pull" in rt:
+                entrenos.extend(_session_rows(d, pull_ex, reps_base=12, inc=1.0, session_idx=session_idx))
+            elif "Legs" in rt:
+                entrenos.extend(_session_rows(d, legs_ex, reps_base=12, inc=2.5, session_idx=session_idx))
+            else:
+                entrenos.extend(_session_rows(d, full_ex, reps_base=10, inc=2.5, session_idx=session_idx))
+            session_idx += 1
         data["entrenamientos"] = entrenos
+
+    # 9) Campos extra que usa la app (si no existen)
+    data.setdefault("routine_plan", data.get("routine_plan", {}))
+    data.setdefault("custom_exercises", data.get("custom_exercises", []))
+    data.setdefault("exercise_meta", data.get("exercise_meta", {}))
+    data.setdefault("rutinas", data.get("rutinas", []))
+    data.setdefault("entrenamientos", data.get("entrenamientos", []))
+    data.setdefault("weights", data.get("weights", []))
+    data.setdefault("profile", data.get("profile", {}))
+    data.setdefault("role", "admin")
 
     save_user(username, data)
