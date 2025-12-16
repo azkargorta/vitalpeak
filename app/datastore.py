@@ -51,6 +51,7 @@ def ensure_user(username: str) -> Dict[str, Any]:
             "custom_exercises": [],
             "exercise_meta": {},
             "weights": [],
+            "objetivos": {"dias_semana": 3, "peso_objetivo": None, "ejercicios": {}},
         }
         save_user(username, data)
         return data
@@ -124,6 +125,7 @@ def register_user(username: str, password: str, email: Optional[str]=None) -> bo
         "custom_exercises": [],
         "exercise_meta": {},
         "weights": [],
+        "objetivos": {"dias_semana": 3, "peso_objetivo": None, "ejercicios": {}},
     }
     save_user(username, data)
     return True

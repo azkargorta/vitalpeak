@@ -60,6 +60,12 @@ def remove_custom_exercise(username: str, name: str) -> None:
     if name in meta:
         del meta[name]
         data["exercise_meta"] = meta
+    # También eliminar objetivo asociado (si existe)
+    try:
+        from .goals import delete_exercise_goal
+        delete_exercise_goal(username, name)
+    except Exception:
+        pass
     save_user(username, data)
 
 
@@ -76,6 +82,12 @@ def rename_custom_exercise(username: str, old: str, new: str) -> None:
     for e in data.get("entrenamientos", []):
         if e.get("exercise") == old:
             e["exercise"] = new
+    # Renombrar objetivo asociado (si existe)
+    try:
+        from .goals import rename_exercise_goal
+        rename_exercise_goal(username, old, new)
+    except Exception:
+        pass
     save_user(username, data)
 
 

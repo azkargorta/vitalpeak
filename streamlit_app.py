@@ -52,6 +52,12 @@ from app.training import (
 from app.health import (
     add_weight, list_weights,
 )
+from app.goals import (
+    get_goals, save_goals,
+    set_weekly_days_goal, set_target_body_weight,
+    set_exercise_goal, remove_exercise_goal,
+    weekly_workout_counts, week_range,
+)
 from app.routines import (
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
@@ -271,6 +277,7 @@ with st.sidebar:
             "🏋️ Añadir entrenamiento",
             "📚 Gestor de ejercicios",
             "📈 Tabla de entrenamientos",
+            "🎯 Objetivos",
             "🩺 Salud (Peso)",
             "📘 Rutinas",
             "👤 Perfil",
@@ -809,6 +816,187 @@ elif page == "📈 Tabla de entrenamientos":
                 st.download_button("Descargar Excel", data=xbytes, file_name=f"entrenamientos_{modo}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             except Exception as e:
                 st.error(str(e))
+
+
+elif page == "🎯 Objetivos":
+    require_auth()
+    st.title("🎯 Objetivos")
+    user = st.session_state["user"]
+
+    goals = get_goals(user)
+
+    st.subheader("✅ Objetivo semanal")
+    ws, we = week_range(date.today())
+    this_week_done = weekly_workout_counts(user, weeks_back=1, anchor=date.today())[0]["workouts"]
+    goal_days = int(goals.get("dias_semana", 0) or 0)
+
+    c1, c2, c3 = st.columns([1.2, 1.2, 2.6])
+    with c1:
+        new_goal_days = st.number_input(
+            "Días de entreno/semana",
+            min_value=0,
+            max_value=7,
+            value=goal_days,
+            step=1,
+            key="obj_week_days",
+        )
+    with c2:
+        if st.button("Guardar", key="obj_week_save", use_container_width=True):
+            set_weekly_days_goal(user, int(new_goal_days))
+            st.success("Objetivo semanal actualizado.")
+            st.rerun()
+    with c3:
+        st.metric(
+            "Esta semana",
+            f"{this_week_done}/{goal_days} días" if goal_days > 0 else f"{this_week_done} días",
+            help=f"Semana: {ws.isoformat()} → {we.isoformat()} (Lunes–Domingo)",
+        )
+        if goal_days > 0:
+            st.progress(min(1.0, this_week_done / goal_days))
+        else:
+            st.progress(0.0)
+
+    hist = weekly_workout_counts(user, weeks_back=8, anchor=date.today())
+    if hist:
+        df_hist = pd.DataFrame(hist)
+        df_hist["Semana"] = df_hist["week_start"].apply(lambda d: d.strftime("%d/%m"))
+        df_hist = df_hist[["Semana", "workouts"]].set_index("Semana")
+        st.caption("Histórico de días entrenados (últimas 8 semanas)")
+        st.bar_chart(df_hist)
+
+    st.markdown("---")
+
+    st.subheader("⚖️ Peso objetivo")
+    weights = list_weights(user)
+    current_w = None
+    current_w_date = None
+    if weights:
+        try:
+            # último por fecha
+            w_sorted = sorted(weights, key=lambda x: str(x.get("date", "")))
+            last = w_sorted[-1]
+            current_w = float(last.get("weight"))
+            current_w_date = str(last.get("date"))
+        except Exception:
+            current_w = None
+
+    with st.form("obj_weight_form"):
+        use_weight_goal = st.checkbox(
+            "Quiero establecer un peso objetivo",
+            value=(goals.get("peso_objetivo") is not None),
+            key="obj_use_weight_goal",
+        )
+        default_w_goal = goals.get("peso_objetivo")
+        if default_w_goal is None:
+            default_w_goal = 70.0
+        w_goal = st.number_input(
+            "Peso objetivo (kg)",
+            min_value=0.0,
+            step=0.1,
+            value=float(default_w_goal),
+            disabled=not use_weight_goal,
+            key="obj_weight_goal",
+        )
+        save_w = st.form_submit_button("Guardar peso objetivo")
+    if save_w:
+        set_target_body_weight(user, float(w_goal) if use_weight_goal else None)
+        st.success("Peso objetivo actualizado.")
+        st.rerun()
+
+    peso_obj = goals.get("peso_objetivo")
+    if current_w is not None:
+        if peso_obj is not None:
+            diff = current_w - float(peso_obj)
+            st.metric(
+                "Peso actual vs objetivo",
+                f"{current_w:.1f} kg",
+                delta=f"{diff:+.1f} kg",
+                help=f"Último registro: {current_w_date}",
+            )
+        else:
+            st.metric("Peso actual", f"{current_w:.1f} kg", help=f"Último registro: {current_w_date}")
+    else:
+        st.info("Aún no hay registros de peso. Ve a **Salud (Peso)** para añadirlos.")
+
+    st.markdown("---")
+
+    st.subheader("🏋️ Objetivos por ejercicio")
+
+    all_exs = list_all_exercises(user)
+    ex_goals = (goals.get("ejercicios") or {})
+    ex_goal_names = sorted(ex_goals.keys())
+
+    with st.expander("➕ Añadir / editar objetivo", expanded=True):
+        # Si ya hay objetivos, por defecto selecciona el primero; si no, el primero del listado
+        default_ex = ex_goal_names[0] if ex_goal_names else (all_exs[0] if all_exs else "")
+        selected_ex = st.selectbox("Ejercicio", all_exs, index=(all_exs.index(default_ex) if default_ex in all_exs else 0), key="obj_ex_sel")
+        current_meta = ex_goals.get(selected_ex, {}) if selected_ex else {}
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            t_w = st.number_input(
+                "Peso objetivo (kg)",
+                min_value=0.0,
+                step=0.5,
+                value=float(current_meta.get("peso") or 0.0),
+                key="obj_ex_weight",
+            )
+        with c2:
+            t_r = st.number_input(
+                "Reps objetivo",
+                min_value=1,
+                max_value=100,
+                step=1,
+                value=int(current_meta.get("reps") or 8),
+                key="obj_ex_reps",
+            )
+        with c3:
+            if st.button("Guardar objetivo", key="obj_ex_save", use_container_width=True):
+                set_exercise_goal(user, selected_ex, peso_objetivo=float(t_w), reps_objetivo=int(t_r))
+                st.success("Objetivo guardado.")
+                st.rerun()
+
+    # Tabla de comparación objetivo vs último valor
+    if not ex_goals:
+        st.info("Aún no tienes objetivos por ejercicio. Añade alguno arriba.")
+    else:
+        rows = []
+        for ex_name, meta in sorted(ex_goals.items(), key=lambda x: x[0].lower()):
+            t_w = meta.get("peso")
+            t_r = meta.get("reps")
+            last = last_values_for_exercise(user, ex_name)
+            last_r, last_w = (None, None)
+            if last:
+                last_r, last_w = last
+
+            # Estado: si hay datos
+            status = "—"
+            if last is not None:
+                ok_w = True if t_w is None else (float(last_w) >= float(t_w))
+                ok_r = True if t_r is None else (int(last_r) >= int(t_r))
+                status = "✅" if (ok_w and ok_r) else "⏳"
+
+            rows.append(
+                {
+                    "Ejercicio": ex_name,
+                    "Objetivo (kg)": ("" if t_w is None else float(t_w)),
+                    "Objetivo (reps)": ("" if t_r is None else int(t_r)),
+                    "Último (kg)": ("" if last_w is None else float(last_w)),
+                    "Último (reps)": ("" if last_r is None else int(last_r)),
+                    "Estado": status,
+                }
+            )
+
+        df_obj = pd.DataFrame(rows)
+        st.dataframe(df_obj, use_container_width=True, hide_index=True)
+
+        st.caption("*El ‘Último’ valor es la última serie guardada para ese ejercicio (por fecha y set).* ")
+
+        st.markdown("#### 🗑️ Eliminar objetivo")
+        del_ex = st.selectbox("Selecciona un objetivo para borrar", ex_goal_names, key="obj_ex_del_sel")
+        if st.button("Eliminar", key="obj_ex_del_btn"):
+            remove_exercise_goal(user, del_ex)
+            st.success("Objetivo eliminado.")
+            st.rerun()
 
 
 elif page == "🩺 Salud (Peso)":

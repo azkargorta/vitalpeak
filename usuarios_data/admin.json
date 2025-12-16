@@ -4065,5 +4065,23 @@
     "2025-12-29": "Push (DEMO)",
     "2025-12-30": "Pull (DEMO)"
   },
-  "role": "admin"
+  "role": "admin",
+  "objetivos": {
+    "dias_semana": 4,
+    "peso_objetivo": 78.0,
+    "ejercicios": {
+      "Press con barra en banco horizontal": {
+        "peso": 70.0,
+        "reps": 8
+      },
+      "Prensa de piernas en posición ancha": {
+        "peso": 160.0,
+        "reps": 12
+      },
+      "Peso muerto con barra": {
+        "peso": 100.0,
+        "reps": 5
+      }
+    }
+  }
 }

@@ -258,4 +258,18 @@ def maybe_seed_admin() -> None:
     data.setdefault("profile", data.get("profile", {}))
     data.setdefault("role", "admin")
 
+    # 10) Objetivos DEMO (para probar la pantalla de Objetivos)
+    data.setdefault(
+        "objetivos",
+        {
+            "dias_semana": 4,
+            "peso_objetivo": 78.0,
+            "ejercicios": {
+                "Press con barra en banco horizontal": {"peso": 70.0, "reps": 8},
+                "Prensa de piernas en posición ancha": {"peso": 160.0, "reps": 12},
+                "Peso muerto con barra": {"peso": 100.0, "reps": 5},
+            },
+        },
+    )
+
     save_user(username, data)
