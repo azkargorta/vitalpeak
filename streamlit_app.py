@@ -13,6 +13,10 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 import os
+
+# Config (debe ir antes de usar componentes de Streamlit)
+st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
+
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Query params (Streamlit >= 1.30)
@@ -376,7 +380,73 @@ if page == "🔐 Login / Registro":
 elif page == "🏠 Inicio":
     require_auth()
     st.title("Inicio")
-    st.write("Usa la barra lateral para navegar. Datos persistidos en `usuarios_data/<usuario>.json`.")
+
+    user = st.session_state["user"]
+    data_u = load_user(user)
+    plan = dict(data_u.get("routine_plan", {}))
+    routines = list_routines(user)
+    routines_by_name = {r.get("name"): r for r in (routines or [])}
+
+    # ---------------- HOY TOCA ----------------
+    st.subheader("🔥 HOY TOCA")
+    today = date.today()
+    today_iso = today.isoformat()
+    rt_name = plan.get(today_iso)
+
+    topA, topB = st.columns([2, 1])
+    with topA:
+        if rt_name:
+            st.markdown(f"### {rt_name}")
+            r = routines_by_name.get(rt_name)
+            if r and r.get("items"):
+                st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
+            else:
+                st.info("La rutina asignada no existe (o está vacía). Ve a **📘 Rutinas** para revisarla.")
+        else:
+            st.markdown("### Día libre 🎉")
+            st.caption("No hay rutina asignada para hoy en el planificador.")
+    with topB:
+        st.metric("Fecha", today.strftime("%d/%m/%Y"))
+        st.metric("Semana", today.isocalendar().week)
+
+    st.markdown("---")
+
+    # ---------------- ESTA SEMANA (IMAGEN) ----------------
+    st.subheader("🗓️ Esta semana")
+    st.caption("Vista rápida (lunes a domingo) de lo que toca entrenar.")
+
+    import datetime as _dt
+    from io import BytesIO as _BytesIO
+
+    monday = today - _dt.timedelta(days=today.weekday())  # lunes
+    week_dates = [monday + _dt.timedelta(days=i) for i in range(7)]
+    dias_abrev = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    dias_full = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    labels = [f"{dias_abrev[i]}\n{week_dates[i].strftime('%d/%m')}" for i in range(7)]
+    values = [plan.get(d.isoformat(), "") or "—" for d in week_dates]
+
+    # Generar una imagen tipo calendario (tabla) con matplotlib
+    fig, ax = plt.subplots(figsize=(12, 2.6))
+    ax.axis("off")
+    tbl = ax.table(
+        cellText=[values],
+        colLabels=labels,
+        cellLoc="center",
+        loc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 2.0)
+    fig.tight_layout()
+
+    buf = _BytesIO()
+    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    st.image(buf.getvalue(), use_container_width=True)
+
+    # Extra: tabla (útil para copiar/leer en móvil)
+    df_week = pd.DataFrame({"Día": dias_full, "Fecha": [d.isoformat() for d in week_dates], "Rutina": values})
+    st.dataframe(df_week, use_container_width=True, hide_index=True)
 
 
 elif page == "🏋️ Añadir entrenamiento":
