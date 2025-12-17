@@ -17,16 +17,23 @@ import os
 # Config (debe ir antes de usar componentes de Streamlit)
 st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
 
-load_dotenv()
-
-# Streamlit Cloud: leer Secrets y volcarlos a variables de entorno (para que el resto del código use os.getenv)
+# --- Carga de credenciales (local .env y Streamlit Cloud Secrets) ---
+# 1) Streamlit Cloud: st.secrets (recomendado)
 try:
     if hasattr(st, "secrets"):
         if "OPENAI_API_KEY" in st.secrets and st.secrets["OPENAI_API_KEY"]:
-            os.environ["OPENAI_API_KEY"] = str(st.secrets["OPENAI_API_KEY"]).strip()
+            os.environ["OPENAI_API_KEY"] = str(st.secrets["OPENAI_API_KEY"])
         if "OPENAI_MODEL" in st.secrets and st.secrets["OPENAI_MODEL"]:
-            os.environ["OPENAI_MODEL"] = str(st.secrets["OPENAI_MODEL"]).strip()
+            os.environ["OPENAI_MODEL"] = str(st.secrets["OPENAI_MODEL"])
 except Exception:
+    pass
+
+# 2) Local: .env en la raíz del proyecto (si existe)
+try:
+    _ROOT = Path(__file__).resolve().parent
+    load_dotenv(dotenv_path=_ROOT / ".env", override=False)
+except Exception:
+    # Si dotenv no está o falla, seguimos (en Cloud no hace falta)
     pass
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
