@@ -17,25 +17,18 @@ import os
 # Config (debe ir antes de usar componentes de Streamlit)
 st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
 
-# --- Carga de credenciales (local .env y Streamlit Cloud Secrets) ---
-# 1) Streamlit Cloud: st.secrets (recomendado)
+load_dotenv()
+
+# En Streamlit Cloud, la API key se configura en Settings → Secrets.
+# Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
 try:
-    if hasattr(st, "secrets"):
-        if "OPENAI_API_KEY" in st.secrets and st.secrets["OPENAI_API_KEY"]:
-            os.environ["OPENAI_API_KEY"] = str(st.secrets["OPENAI_API_KEY"])
-        if "OPENAI_MODEL" in st.secrets and st.secrets["OPENAI_MODEL"]:
-            os.environ["OPENAI_MODEL"] = str(st.secrets["OPENAI_MODEL"])
+    if hasattr(st, 'secrets'):
+        if 'OPENAI_API_KEY' in st.secrets and not os.getenv('OPENAI_API_KEY'):
+            os.environ['OPENAI_API_KEY'] = str(st.secrets['OPENAI_API_KEY']).strip()
+        if 'OPENAI_MODEL' in st.secrets and str(st.secrets['OPENAI_MODEL']).strip():
+            os.environ['OPENAI_MODEL'] = str(st.secrets['OPENAI_MODEL']).strip()
 except Exception:
     pass
-
-# 2) Local: .env en la raíz del proyecto (si existe)
-try:
-    _ROOT = Path(__file__).resolve().parent
-    load_dotenv(dotenv_path=_ROOT / ".env", override=False)
-except Exception:
-    # Si dotenv no está o falla, seguimos (en Cloud no hace falta)
-    pass
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Crear un usuario DEMO para pruebas (admin/admin) con datos realistas de ~2 meses.
@@ -1404,7 +1397,7 @@ elif page == "🤖 Creador de rutinas":
     import os, json
     import datetime as _dt
     import streamlit as st
-    from app.ai_generator import call_gpt, build_prompt
+    from app.ai_generator import call_gpt, build_prompt, analyze_user_data
     from app.rules_fallback import generate_fallback
     from app.pdf_export import rutina_a_pdf_bytes
     from app.routines import add_routine, list_routines
@@ -1939,6 +1932,18 @@ AFINADO:
                 "comentarios": (notas_extra or "").strip(),
             }
 
+
+
+            # --- Análisis previo: interpretamos consignas y restricciones antes de generar ---
+            try:
+                analysis = analyze_user_data(datos_usuario)
+                with st.expander("🧠 Análisis de consignas (antes de generar)", expanded=False):
+                    st.markdown("**Interpretación automática (lo que la IA debe cumplir):**")
+                    st.markdown(chr(10).join(analysis.get('restricciones', [])) or "(Sin restricciones adicionales)")
+                    st.markdown("---")
+                    st.caption("Si algo no te cuadra, ajusta la disponibilidad/material/notas y vuelve a generar.")
+            except Exception:
+                pass
             api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
             if api_key_ok:
                 with st.spinner("Generando con IA..."):
