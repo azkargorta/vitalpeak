@@ -10,7 +10,7 @@ import os
 import re
 import json
 from typing import Any, Dict, List, Optional
-from openai import OpenAI
+# Nota: NO re-importamos OpenAI aquí. Ya se resolvió arriba con try/except.
 
 JSON_MD_RE = re.compile(r"```json\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
 JSON_BLOCK_RE = re.compile(r"\{[\s\S]*\}", re.MULTILINE)
@@ -476,78 +476,112 @@ def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
 def build_prompt(datos: Dict[str, Any]) -> str:
-    ia_detalles = (datos.get('ia_detalles') or '').strip()
-    """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
+    """Construye el prompt para la IA respetando reglas y preferencias del usuario.
+
+    IMPORTANTE: esta función NO debe contener f-strings anidados dentro de textos
+    (por ejemplo `f"Día {i+1}"` dentro de un f-string mayor), porque eso rompe
+    la ejecución con NameError. Toda la lógica se calcula fuera y se inserta como
+    texto plano.
+    """
+    ia_detalles = (datos.get("ia_detalles") or "").strip()
+    comentarios = (datos.get("comentarios") or "").strip()
     agrup = datos.get("agrupacion", "Varios grupos principales por día")
     material = datos.get("material", [])
-    notas = datos.get("comentarios", "")
     objetivo = datos.get("objetivo", "mixto")
     nivel = datos.get("nivel", "intermedio")
 
-    extra_notas = f"\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  {notas}" if notas else ""
-    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
-    reglas_estrictas = f"""
-REGLAS ESTRICTAS (debes cumplirlas sí o sí):
-    ia_detalles = (datos.get("ia_detalles") or "").strip()
-    comentarios = (datos.get("comentarios") or "").strip()
-    _txt = (ia_detalles + " " + comentarios).lower()
-    _single_leg = bool(re.search(r"(un\s*solo|solo\s*un|1)\s*d[ií]a\s*de\s*pierna", _txt))
-    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
-    if _single_leg and "un solo día de pierna" not in detalles_usuario:
-        detalles_usuario += "\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  un solo día de pierna\n"
-    if _single_leg:
+    # --- Texto libre del usuario (si existe) ---
+    extra_notas = ""
+    if comentarios:
+        extra_notas = "\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  " + comentarios
+
+    detalles_usuario = ""
+    if ia_detalles:
+        detalles_usuario = "\nDETALLES_USUARIO (usar tal cual):\n<<<\n" + ia_detalles + "\n>>>\n"
+
+    # --- Reglas derivadas de texto: "un solo día de pierna" ---
+    txt = (ia_detalles + " " + comentarios).lower()
+    single_leg = bool(re.search(r"(un\s*solo|solo\s*un|1)\s*d[ií]a\s*de\s*pierna", txt)) or ("un solo día de pierna" in txt)
+
+    bloques_line = ""
+    if single_leg:
         bloques = _compute_primary_blocks(datos)
-        labels = datos.get("disponibilidad") or [f"Día {i+1}" for i in range(len(bloques))]
-        asignaciones = [f"- {lbl}: {bloques[i]}" for i, lbl in enumerate(labels[:len(bloques)])]
-        bloques_line = "\nBloques principales por día (OBLIGATORIO):\n" + "\n".join(asignaciones) + "\n"
-    else:
-        bloques_line = ""
-- Agrupación pedida: {agrup}
-- Si es "Un solo grupo principal por día":
-  * EXACTAMENTE 1 grupo principal por día.
-  * No mezclar dos grupos principales (p. ej., pecho y espalda) el mismo día.
-  * Accesorios subordinados al principal (bíceps con espalda, tríceps con pecho) permitidos.
-- Si es "Varios grupos principales por día":
-  * Máximo 2 principales salvo que el usuario pida 3 explícitamente.
-  * Evitar solapar el mismo grupo en días consecutivos si el volumen es alto.
-- Material:
-  * Si la lista incluye "todo": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).
-  * Si es personalizado, usa SOLO el material listado.
-- Respeta lesiones/limitaciones y el objetivo indicado.
-- Ajusta volumen y selección de ejercicios al objetivo ({objetivo}) y nivel ({nivel}).
-{extra_notas}
-    """.strip("\n")
 
-    prompt = f"""
-Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
+        # Etiquetas de días (preferimos disponibilidad; si no, intentamos 'dias'; si no, Día 1..N)
+        labels = datos.get("disponibilidad") or datos.get("dias")
+        if isinstance(labels, (list, tuple)) and labels:
+            labels = [str(x) for x in labels]
+        else:
+            labels = ["Día {}".format(i + 1) for i in range(len(bloques))]
 
-Genera una rutina semanal siguiendo estas reglas base:
-{RULES_TEXT.format(dur=datos.get('duracion', 60))}
+        asignaciones = []
+        for i, bloque in enumerate(bloques):
+            lbl = labels[i] if i < len(labels) else "Día {}".format(i + 1)
+            asignaciones.append("- {}: {}".format(lbl, bloque))
 
-{reglas_estrictas}
+        bloques_line = "\nBLOQUES PRINCIPALES POR DÍA (OBLIGATORIO):\n" + "\n".join(asignaciones) + "\n"
 
-ENTRADA DEL USUARIO (estructura):
-- Nivel: {nivel}
-- Días/semana: {datos.get('dias')}
-- Duración (min): {datos.get('duracion')}
-- Objetivo: {objetivo}
-- Material: {material}
-- Lesiones/limitaciones: {(datos.get('limitaciones') or datos.get('lesiones') or '')}
-- Disponibilidad: {datos.get('disponibilidad',[])}
-- Progresión preferida: {datos.get('progresion_preferida','')}
-- Tolerancia a volumen: {datos.get('volumen_tolerancia','')}
-- Semanas del ciclo: {datos.get('semanas_ciclo','')}
-- Superseries: {datos.get('superseries_ok')}
-- Unidades: {datos.get('unidades','kg')}
-- Idioma: {datos.get('idioma','es')}
-- PR recientes: {datos.get('pr_recientes',{})}
-- Énfasis accesorios: {datos.get('enfasis_accesorios',[])}
-- Evitar: {datos.get('evitar',[])}
-- Calentamiento: {datos.get('calentamiento','')}
-- Agrupación: {agrup}\n" + detalles_usuario + f"\n
-SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
-"""
-    return prompt
+        # Si el usuario lo pidió en comentarios pero no quedó reflejado en detalles, lo reforzamos.
+        if "un solo día de pierna" not in (ia_detalles + " " + comentarios).lower():
+            extra_notas += "\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  un solo día de pierna"
+
+    reglas_estrictas = "\n".join(
+        [
+            "REGLAS ESTRICTAS (debes cumplirlas sí o sí):",
+            "- Agrupación pedida: {}".format(agrup),
+            "- Si es \"Un solo grupo principal por día\":",
+            "  * EXACTAMENTE 1 grupo principal por día.",
+            "  * No mezclar dos grupos principales (p. ej., pecho y espalda) el mismo día.",
+            "  * Accesorios subordinados al principal (bíceps con espalda, tríceps con pecho) permitidos.",
+            "- Si es \"Varios grupos principales por día\":",
+            "  * Máximo 2 principales salvo que el usuario pida 3 explícitamente.",
+            "  * Evitar solapar el mismo grupo en días consecutivos si el volumen es alto.",
+            "- Material:",
+            "  * Si la lista incluye \"todo\": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).",
+            "  * Si es personalizado, usa SOLO el material listado.",
+            "- Respeta lesiones/limitaciones y el objetivo indicado.",
+            "- Ajusta volumen y selección de ejercicios al objetivo ({}) y nivel ({}).".format(objetivo, nivel),
+        ]
+    ).strip()
+
+    # Prompt final (sin f-strings con llaves problemáticas)
+    parts = []
+    parts.append("Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.")
+    parts.append("")
+    parts.append("Genera una rutina semanal siguiendo estas reglas base:")
+    parts.append(RULES_TEXT.format(dur=datos.get("duracion", 60)))
+    parts.append("")
+    parts.append(reglas_estrictas)
+    if bloques_line:
+        parts.append(bloques_line.strip("\n"))
+    if extra_notas:
+        parts.append(extra_notas.strip("\n"))
+    if detalles_usuario:
+        parts.append(detalles_usuario.strip("\n"))
+    parts.append("")
+    parts.append("ENTRADA DEL USUARIO (estructura):")
+    parts.append("- Nivel: {}".format(nivel))
+    parts.append("- Días/semana: {}".format(datos.get("dias")))
+    parts.append("- Duración (min): {}".format(datos.get("duracion")))
+    parts.append("- Objetivo: {}".format(objetivo))
+    parts.append("- Material: {}".format(material))
+    parts.append("- Lesiones/limitaciones: {}".format(datos.get("limitaciones") or datos.get("lesiones") or ""))
+    parts.append("- Disponibilidad: {}".format(datos.get("disponibilidad", [])))
+    parts.append("- Progresión preferida: {}".format(datos.get("progresion_preferida", "")))
+    parts.append("- Tolerancia a volumen: {}".format(datos.get("volumen_tolerancia", "")))
+    parts.append("- Semanas del ciclo: {}".format(datos.get("semanas_ciclo", "")))
+    parts.append("- Superseries: {}".format(datos.get("superseries_ok")))
+    parts.append("- Unidades: {}".format(datos.get("unidades", "kg")))
+    parts.append("- Idioma: {}".format(datos.get("idioma", "es")))
+    parts.append("- PR recientes: {}".format(datos.get("pr_recientes", {})))
+    parts.append("- Énfasis accesorios: {}".format(datos.get("enfasis_accesorios", [])))
+    parts.append("- Evitar: {}".format(datos.get("evitar", [])))
+    parts.append("- Calentamiento: {}".format(datos.get("calentamiento", "")))
+    parts.append("- Agrupación: {}".format(agrup))
+    parts.append("")
+    parts.append("SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.")
+
+    return "\n".join(parts)
 
 def _client() -> OpenAI:
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -1192,6 +1226,14 @@ def _client():
 
     If the modern class is not available, fall back to the legacy 'openai' module.
     """
+    # Asegura que `.env` (local) o `st.secrets` (Streamlit Cloud) estén cargados.
+    try:
+        from app.config import load_env
+
+        load_env()
+    except Exception:
+        pass
+
     api_key = os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
     if OpenAI is not None:

@@ -11,13 +11,14 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
 import os
+from app.config import load_env
 
 # Config (debe ir antes de usar componentes de Streamlit)
 st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
 
-load_dotenv()
+# Carga `.env` (local) y `st.secrets` (Streamlit Cloud) en os.environ
+load_env()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Crear un usuario DEMO para pruebas (admin/admin) con datos realistas de ~2 meses.
