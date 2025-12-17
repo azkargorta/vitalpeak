@@ -532,7 +532,7 @@ ENTRADA DEL USUARIO (estructura):
 - Duración (min): {datos.get('duracion')}
 - Objetivo: {objetivo}
 - Material: {material}
-- Lesiones/limitaciones: {datos.get('limitaciones','')}
+- Lesiones/limitaciones: {(datos.get('limitaciones') or datos.get('lesiones') or '')}
 - Disponibilidad: {datos.get('disponibilidad',[])}
 - Progresión preferida: {datos.get('progresion_preferida','')}
 - Tolerancia a volumen: {datos.get('volumen_tolerancia','')}
