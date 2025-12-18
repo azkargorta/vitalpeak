@@ -230,25 +230,22 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
 
+    # Preferencia deload: si el usuario define semanas de ciclo, el deload por defecto se coloca al final del ciclo.
+    try:
+        semanas_ciclo = int(datos.get("semanas_ciclo") or 0)
+        if semanas_ciclo < 1:
+            semanas_ciclo = 0
+    except Exception:
+        semanas_ciclo = 0
+
     # --- META ---
     if "meta" not in data or not isinstance(data.get("meta"), dict):
         data["meta"] = {
             "nivel": datos.get("nivel", "intermedio"),
-            "dias": int(datos.get("dias", 4) or 4),  # días/semana del usuario
+            "dias": int(datos.get("dias", 4) or 4),
             "duracion_min": int(datos.get("duracion", 60) or 60),
             "objetivo": datos.get("objetivo", "mixto"),
-            "split": datos.get("split_pref", "") or datos.get("split", ""),
-            "cycle_sessions": int(datos.get("cycle_sessions", datos.get("dias", 4) or 4) or 0),
         }
-
-    # Completar meta con campos de ciclo/rotación si faltan
-    try:
-        if isinstance(data.get("meta"), dict):
-            data["meta"].setdefault("split", datos.get("split_pref", "") or datos.get("split", ""))
-            data["meta"].setdefault("cycle_sessions", int(datos.get("cycle_sessions", datos.get("dias", 4) or 4) or 0))
-    except Exception:
-        pass
-
 
     # --- PROGRESION ---
     pref_in = data.get("progresion")
@@ -260,19 +257,19 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
             data["progresion"] = {
                 "principales": "doble progresión en carga o repeticiones",
                 "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
-                "deload_semana": 5
+                "deload_semana": (semanas_ciclo or 6)
             }
         elif "lineal" in pref:
             data["progresion"] = {
                 "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
                 "accesorios": "mantén técnica y suma reps gradualmente",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
         else:
             data["progresion"] = {
                 "principales": "progresión simple: subir reps o carga cada semana si es posible",
                 "accesorios": "reps adicionales o pausas más cortas",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
 
     
@@ -284,19 +281,19 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
             data["progresion"] = {
                 "principales": "doble progresión en carga o repeticiones",
                 "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
-                "deload_semana": 5
+                "deload_semana": (semanas_ciclo or 6)
             }
         elif "lineal" in pref:
             data["progresion"] = {
                 "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
                 "accesorios": "mantén técnica y suma reps gradualmente",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
         else:
             data["progresion"] = {
                 "principales": "progresión simple: subir reps o carga cada semana si es posible",
                 "accesorios": "reps adicionales o pausas más cortas",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
 
 
@@ -586,6 +583,19 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     no_bar = bool(re.search(r"(?:no\s+barra|sin\s+barra)", txt))
     no_db = bool(re.search(r"(?:no\s+mancuernas|sin\s+mancuernas)", txt))
 
+    # --- Split preferido (normalización) ---
+    split_pref = str(datos.get("split_pref") or "").strip()
+    split_low = split_pref.lower()
+    split_template: List[str] | None = None
+    if "ppl" in split_low:
+        # Para 4 días: PPL + 1 extra de tren superior (Push B por defecto)
+        if dias == 4:
+            split_template = ["Push A", "Pull A", "Legs", "Push B"]
+        elif dias == 3:
+            split_template = ["Push", "Pull", "Legs"]
+        elif dias == 6:
+            split_template = ["Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B"]
+
     # Evitar
     evitar = datos.get("evitar") or []
     if isinstance(evitar, str):
@@ -625,35 +635,9 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
 - Ajusta volumen/descansos para cumplir {dur} min.
 """.format(dur=duracion)
 
-
-    # --- Split / ciclo de sesiones ---
-    split_pref = str(datos.get("split_pref") or "").strip()
-    if not split_pref:
-        # fallback: intentar extraer de ia_detalles si viene en texto
-        txt_det = str(datos.get("ia_detalles") or "")
-        m = re.search(r"split\s+preferido\s*:\s*(.+)", txt_det, flags=re.IGNORECASE)
-        if m:
-            split_pref = m.group(1).strip()
-
-    split_l = split_pref.lower()
-    if "ppl" in split_l:
-        # Por defecto, PPL "completo" = 6 sesiones (A/B). Si el usuario pide explícitamente 3, usamos 3.
-        if "ciclo 3" in split_l or "3 sesiones" in split_l or ("3" in split_l and "ciclo" in split_l):
-            cycle_sessions = 3
-        else:
-            cycle_sessions = 6
-    else:
-        cycle_sessions = dias
-
     # --- Restricciones (checklist) ---
     restricciones: List[str] = []
-    restricciones.append(f"- NO INVENTAR: días de gimnasio del usuario: {disp} ({dias} días/semana).")
-    if cycle_sessions != dias:
-        restricciones.append(f"- IMPORTANTE: el plan debe ser un CICLO de {cycle_sessions} sesiones (no semanas). La app lo asignará en ROTACIÓN sobre esos {dias} días/semana.")
-        restricciones.append("- NO fijes sesiones a Lunes/Martes dentro del JSON; nómbralas como 'Sesión 1', 'Sesión 2', etc.")
-        restricciones.append(f"- El JSON debe incluir EXACTAMENTE {cycle_sessions} sesiones en 'dias'.")
-    if split_pref:
-        restricciones.append(f"- Split preferido: {split_pref}.")
+    restricciones.append(f"- NO INVENTAR: usa exactamente estos días: {disp} (y solo {dias} días).")
     restricciones.append(f"- Duración por sesión: {duracion} min (ajusta descansos/series para cumplir).")
     restricciones.append(f"- Nivel: {nivel}.")
     restricciones.append(f"- Objetivo: {objetivo}.")
@@ -673,8 +657,10 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     if no_db:
         restricciones.append("- Restricción: SIN mancuernas.")
 
-    if datos.get("split_pref"):
-        restricciones.append(f"- Split preferido: {datos.get('split_pref')}. Si no encaja con la disponibilidad, adapta manteniendo la lógica.")
+    if split_pref:
+        restricciones.append(f"- Split preferido: {split_pref}. Respétalo y hazlo explícito en el nombre de cada día.")
+        if split_template:
+            restricciones.append(f"- Orden del split (obligatorio): {split_template}.")
     if datos.get("enfasis_accesorios"):
         restricciones.append(f"- Prioridades musculares: {datos.get('enfasis_accesorios')}. Aumenta volumen ahí sin romper el tiempo.")
     if datos.get("basicos_objetivo"):
@@ -685,14 +671,14 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
         "nivel": nivel,
         "dias": dias,
         "duracion": duracion,
-        "split_pref": split_pref,
-        "cycle_sessions": int(cycle_sessions),
         "disponibilidad": disp,
         "material": material,
         "full_gym": full_gym,
         "limitaciones": limitaciones,
         "evitar": evitar,
         "rir_obj": rir_obj,
+        "split_pref": split_pref,
+        "split_template": split_template,
         "reglas_objetivo": reglas_obj,
         "restricciones": restricciones,
     }
@@ -715,13 +701,26 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     reglas_generales = (
         "REGLAS GENERALES (siempre):" + nl +
         "- Devuelve EXCLUSIVAMENTE JSON válido (sin markdown, sin explicación)." + nl +
-        "- NO asignes días de la semana dentro del JSON; trata cada elemento de 'dias' como una SESIÓN del ciclo (p. ej. 'Sesión 1', 'Sesión 2', ...)." + nl +
         "- Cada día debe tener 5-8 ejercicios (ideal 6-7)." + nl +
+        "- Estructura por día: 1 principal (3-6 o 4-6), 1 secundario (6-10), 3-4 accesorios (10-15/12-20), 1 core o finisher." + nl +
+        "- Incluye 'descanso' en TODOS los ejercicios." + nl +
+        "- El último ejercicio de cada día DEBE ser el core/finisher y su nombre debe empezar por 'Core:' o 'Finisher:' (para verificación)." + nl +
         "- Upper (si aparece): balancea empuje y tirón." + nl +
         "- Lower (si aparece): evita meter tríceps como parte principal." + nl +
         "- Evita duplicar exactamente el mismo ejercicio en la misma semana." + nl +
         "- Ajusta volumen/descansos para que la sesión quepa en el tiempo por sesión." + nl
     )
+
+    split_rules = ""
+    if A.get("split_pref"):
+        split_rules += "REGLAS DE SPLIT (OBLIGATORIO):" + nl
+        if A.get("split_template"):
+            # Se exige el orden, y que se refleje en el nombre del día para que la app lo valide.
+            split_rules += f"- Usa este orden exacto de sesiones: {A['split_template']}." + nl
+            split_rules += "- El campo 'nombre' de cada día debe ser: '<DíaSemana> - <Sesión>' (ej: 'Lunes - Push A')." + nl
+        else:
+            split_rules += f"- Split preferido: {A['split_pref']}. Respétalo." + nl
+        split_rules += nl
 
     restricciones_txt = nl.join(A["restricciones"])
 
@@ -741,22 +740,11 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     schema_hint = '''
 ESQUEMA JSON (obligatorio):
 {
-  "meta": {
-    "nivel": "principiante|intermedio|avanzado",
-    "dias": N,                  // días/semana del usuario
-    "duracion_min": N,
-    "objetivo": "fuerza|hipertrofia|resistencia|mixto",
-    "split": "texto",
-    "cycle_sessions": N         // nº de sesiones del ciclo (p.ej., PPL completo = 6)
-  },
+  "meta": {"nivel": "principiante|intermedio|avanzado", "dias": N, "duracion_min": N, "objetivo": "fuerza|hipertrofia|resistencia|mixto"},
   "dias": [
-    {
-      "nombre": "Sesión 1",
-      "ejercicios": [
-        {"nombre": "...", "series": 3, "reps": "8-12", "descanso": "60-90s", "rir": "2", "notas": ""}
-      ],
-      "notas": ""
-    }
+    {"nombre": "Lunes", "ejercicios": [
+      {"nombre": "...", "series": 3, "reps": "8-12", "intensidad": "RIR 1-2", "descanso": "60-90s"}
+    ], "notas": "..."}
   ],
   "progresion": {"principales": "...", "accesorios": "...", "deload_semana": N}
 }
@@ -768,12 +756,11 @@ ESQUEMA JSON (obligatorio):
         "DATOS NORMALIZADOS:" + nl +
         f"- Objetivo: {A['objetivo']}" + nl +
         f"- Nivel: {A['nivel']}" + nl +
-        f"- Días/semana (usuario): {A['dias']}" + nl +
-        f"- Split preferido: {A.get('split_pref', '')}" + nl +
-        f"- Sesiones del ciclo: {A.get('cycle_sessions', A['dias'])}" + nl +
+        f"- Días/semana: {A['dias']}" + nl +
         f"- Duración: {A['duracion']} min" + nl +
         f"- Días exactos: {A['disponibilidad']}" + nl + nl +
         reglas_generales + nl +
+        split_rules +
         "REGLAS POR OBJETIVO:" + nl + A['reglas_objetivo'] + nl +
         "RESTRICCIONES Y CHECKLIST (OBLIGATORIO):" + nl + restricciones_txt + nl +
         detalles_usuario + nl +
@@ -785,10 +772,10 @@ ESQUEMA JSON (obligatorio):
 def _client() -> OpenAI:
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def _chat(client: OpenAI, prompt: str) -> str:
+def _chat(client: OpenAI, prompt: str, *, temperature: float = 0.1) -> str:
     resp = client.chat.completions.create(
         model=MODEL,
-        temperature=0.2,
+        temperature=temperature,
         messages=[
             {"role":"system","content": build_system()},
             {"role":"user","content": prompt}
@@ -940,7 +927,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         seen=set(); dup=set()
         for d in plan.get("dias", []):
             for ej in d.get("ejercicios", []):
-                n=_norm(e.get("nombre",""))
+                n=_norm(ej.get("nombre",""))
                 if not n: continue
                 if n in seen: dup.add(n)
                 seen.add(n)
@@ -952,7 +939,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         for i,d in enumerate(plan.get("dias", []), start=1):
             found=False
             for ej in d.get("ejercicios", []):
-                if "calentamiento" in _norm(e.get("nombre","")):
+                if "calentamiento" in _norm(ej.get("nombre","")):
                     mins=_exercise_minutes(ej)
                     if mins is None or mins<need: errs.append(f"Calentamiento de {need} min requerido en día {i}.")
                     found=True; break
@@ -1016,7 +1003,9 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         total_bi=0; bi_terms=("curl","predicador","martillo","hammer curl","inclinado con mancuernas")
         for d in plan.get("dias", []):
             for e in d.get("ejercicios", []):
-                name=_norm(ej.get("nombre","")); gp=_norm(ej.get("musculo_principal","")) or _norm(ej.get("grupo","")); sp=_norm(ej.get("musculo_secundario",""))
+                name=_norm(e.get("nombre",""))
+                gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+                sp=_norm(e.get("musculo_secundario",""))
                 if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name: total_bi+=1
                 elif any(t in name for t in bi_terms): total_bi+=1
                 elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp: total_bi+=1
@@ -1032,37 +1021,6 @@ def validar_objetivo(plan: Dict[str, Any], A: Dict[str, Any]) -> List[str]:
         return ['Plan inválido (no es dict).']
 
     objetivo = (A.get('objetivo') or '').lower()
-    cycle_sessions = int(A.get('cycle_sessions') or (A.get('dias') or 0) or 0)
-    split_pref = (A.get('split_pref') or '').lower().strip()
-
-    # Validación de nº de sesiones del ciclo (cuando aplica)
-    try:
-        dias_plan_list = plan.get('dias') or []
-        if cycle_sessions and isinstance(dias_plan_list, list) and len(dias_plan_list) != cycle_sessions:
-            errs.append(f"Se pidió un ciclo de {cycle_sessions} sesiones y el JSON tiene {len(dias_plan_list)}.")
-    except Exception:
-        pass
-
-    # Split PPL completo: debe incluir Push/Pull/Legs A y B (6 sesiones)
-    if 'ppl' in split_pref and cycle_sessions == 6:
-        try:
-            labels = []
-            for d in (plan.get('dias') or []):
-                if isinstance(d, dict):
-                    labels.append((d.get('nombre') or '').lower())
-            def _cat(s: str) -> str:
-                if any(k in s for k in ('push','empuje')):
-                    return 'push'
-                if any(k in s for k in ('pull','tiron','tirón')):
-                    return 'pull'
-                if any(k in s for k in ('leg','pierna')):
-                    return 'legs'
-                return ''
-            cats = [_cat(x) for x in labels]
-            if cats.count('push') < 2 or cats.count('pull') < 2 or cats.count('legs') < 2:
-                errs.append("PPL (6 sesiones): nombra y estructura las sesiones como Push A/B, Pull A/B y Pierna A/B (mínimo 2 de cada).")
-        except Exception:
-            pass
     dias_user = A.get('disponibilidad') or []
     # Días exactos
     try:
@@ -1072,8 +1030,9 @@ def validar_objetivo(plan: Dict[str, Any], A: Dict[str, Any]) -> List[str]:
             # si al menos 2 coinciden, exigimos que coincidan todos
             if any(n in dias_user for n in nombres):
                 for i,(n_exp, n_got) in enumerate(zip(dias_user, nombres), start=1):
-                    if n_got and n_got != n_exp:
-                        errs.append(f"Día {i}: el nombre debe ser '{n_exp}' (según disponibilidad), pero llegó '{n_got}'.")
+                    # Permitimos sufijos tipo "Lunes - Push A" siempre que incluya el día.
+                    if n_got and (n_exp.lower() not in n_got.lower()):
+                        errs.append(f"Día {i}: el nombre debe incluir '{n_exp}' (según disponibilidad), pero llegó '{n_got}'.")
     except Exception:
         pass
 
@@ -1119,6 +1078,203 @@ def validar_objetivo(plan: Dict[str, Any], A: Dict[str, Any]) -> List[str]:
                 errs.append(f"Fuerza: Día {i} debería incluir al menos 1 principal en 3-6 reps.")
 
     return errs
+
+
+# --- Validaciones extra para evitar desvíos del prompt ---
+_CORE_PREFIX = ("core:", "finisher:")
+_CORE_KEYWORDS = ("plancha", "abdominal", "core", "hollow", "dead bug", "pallof", "crunch", "elevación de piernas", "elevacion de piernas", "farmer")
+_TRICEPS_KEYWORDS = ("tríceps", "triceps", "extensión tríceps", "extension triceps", "pushdown", "jalón de tríceps", "jalon de triceps", "fondos", "press francés", "press frances", "skull")
+
+
+def _nrm_name(s: str) -> str:
+    return (s or "").strip().lower()
+
+
+def _has_core_or_finisher(dia: dict) -> bool:
+    for ej in dia.get("ejercicios", []) or []:
+        nm = _nrm_name(ej.get("nombre", ""))
+        if nm.startswith(_CORE_PREFIX):
+            return True
+        if any(k in nm for k in _CORE_KEYWORDS):
+            return True
+    return False
+
+
+def _is_lower_day(dia: dict) -> bool:
+    nm = _nrm_name(dia.get("nombre", ""))
+    if any(k in nm for k in ("legs", "pierna", "lower")):
+        return True
+    # Heurística: si >=50% de ejercicios son de pierna, lo tratamos como lower
+    leg_terms = ("sentadilla", "prensa", "zancada", "femoral", "isquio", "gemelo", "cuádriceps", "cuadriceps", "glúteo", "gluteo", "hip thrust", "peso muerto rumano")
+    ej = dia.get("ejercicios", []) or []
+    if not ej:
+        return False
+    leg_like = sum(1 for e in ej if any(t in _nrm_name(e.get("nombre", "")) for t in leg_terms))
+    return leg_like >= max(1, round(len(ej) * 0.5))
+
+
+def _parse_rest_to_seconds(rest: str) -> float:
+    import re as _re
+    s = _nrm_name(rest).replace(" ", "")
+    if not s:
+        return 60.0
+    # 2-3m
+    m = _re.match(r"^(\d+(?:\.\d+)?)\-(\d+(?:\.\d+)?)(?:m|min)$", s)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        return ((a + b) / 2.0) * 60.0
+    # 120-180s
+    m = _re.match(r"^(\d+(?:\.\d+)?)\-(\d+(?:\.\d+)?)(?:s|seg)$", s)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        return (a + b) / 2.0
+    # 2m / 120s
+    m = _re.match(r"^(\d+(?:\.\d+)?)(?:m|min)$", s)
+    if m:
+        return float(m.group(1)) * 60.0
+    m = _re.match(r"^(\d+(?:\.\d+)?)(?:s|seg)$", s)
+    if m:
+        return float(m.group(1))
+    return 60.0
+
+
+def _estimate_day_minutes(dia: dict) -> float:
+    """Estimación simple de duración basada en series + descanso.
+
+    No es perfecta, pero sirve para detectar desviaciones grandes (>60 min) y forzar refino.
+    """
+    total_sec = 0.0
+    for ej in dia.get("ejercicios", []) or []:
+        try:
+            sets = int(ej.get("series", 3) or 3)
+        except Exception:
+            sets = 3
+        reps = _nrm_name(str(ej.get("reps", "10")))
+        # trabajo por serie aproximado
+        work = 45.0 if any(ch.isdigit() for ch in reps) and ("-" in reps or reps.isdigit()) and (int(reps.split("-")[-1]) if reps.split("-")[-1].isdigit() else 10) <= 10 else 35.0
+        rest = _parse_rest_to_seconds(str(ej.get("descanso", "60s")))
+        # tiempo de la serie + descanso (no contamos el descanso del final del ejercicio)
+        total_sec += sets * work
+        if sets > 1:
+            total_sec += (sets - 1) * rest
+        # pequeñas transiciones / setup
+        total_sec += sets * 12.0
+    # transiciones entre ejercicios
+    total_sec += max(0, (len(dia.get("ejercicios", []) or []) - 1)) * 25.0
+    return total_sec / 60.0
+
+
+def _postprocess_plan(plan: dict, A: dict) -> dict:
+    """Ajustes deterministas para reducir desvíos típicos.
+
+    - Fuerza nombres de días a '<DíaSemana> - <Sesión>' si hay template.
+    - Asegura que existe core/finisher diario (añadiéndolo si hay hueco).
+    """
+    try:
+        dias = plan.get("dias") or []
+        disp = A.get("disponibilidad") or []
+        template = A.get("split_template")
+        for i, d in enumerate(dias):
+            if not isinstance(d, dict):
+                continue
+            # Nombres según disponibilidad + template
+            if i < len(disp):
+                if template and i < len(template):
+                    d["nombre"] = f"{disp[i]} - {template[i]}"
+                else:
+                    d["nombre"] = disp[i]
+            # Core/finisher
+            ej = d.get("ejercicios") or []
+            if isinstance(ej, list):
+                if not _has_core_or_finisher(d):
+                    core_name = "Core: Plancha" if i % 2 == 0 else "Core: Pallof press"
+                    core_ej = {"nombre": core_name, "series": 3, "reps": "30-45", "descanso": "45-60s", "rir": "1-3", "notas": "core/finisher"}
+                    if len(ej) < 8:
+                        ej.append(core_ej)
+                    elif ej:
+                        ej[-1] = core_ej
+                    d["ejercicios"] = ej
+    except Exception:
+        return plan
+    return plan
+
+
+def validar_estructura_split(plan: Dict[str, Any], A: Dict[str, Any], datos: Dict[str, Any]) -> List[str]:
+    """Validación estricta para minimizar el desvío entre prompt y salida."""
+    errs: List[str] = []
+    dias = plan.get("dias") or []
+    if not isinstance(dias, list):
+        return ["Campo 'dias' inválido (no es lista)."]
+
+    # 5-8 ejercicios y core/finisher diario
+    for i, d in enumerate(dias, start=1):
+        if not isinstance(d, dict):
+            continue
+        ej = d.get("ejercicios") or []
+        if isinstance(ej, list):
+            if len(ej) < 5 or len(ej) > 8:
+                errs.append(f"Día {i}: debe tener 5-8 ejercicios (tiene {len(ej)}).")
+        if not _has_core_or_finisher(d):
+            errs.append(f"Día {i}: falta core/finisher (último ejercicio debe empezar por 'Core:' o 'Finisher:').")
+
+    # Días exactos + split en nombre
+    disp = A.get("disponibilidad") or []
+    template = A.get("split_template")
+    if disp and isinstance(template, list) and len(template) == len(disp) == len(dias):
+        for i, (d_exp, s_exp) in enumerate(zip(disp, template), start=1):
+            got = _nrm_name((dias[i-1].get("nombre") or ""))
+            if _nrm_name(d_exp) not in got or _nrm_name(s_exp) not in got:
+                errs.append(f"Día {i}: nombre debe ser '{d_exp} - {s_exp}'.")
+
+    # No duplicar ejercicio exacto en la semana (salvo core/finisher)
+    seen = set()
+    dup = set()
+    for d in dias:
+        for ej in d.get("ejercicios", []) or []:
+            nm = _nrm_name(ej.get("nombre", ""))
+            if not nm:
+                continue
+            if nm.startswith(_CORE_PREFIX):
+                continue
+            if nm in seen:
+                dup.add(nm)
+            seen.add(nm)
+    for n in sorted(dup):
+        errs.append(f"No repetir ejercicio exacto en la semana: '{n}'.")
+
+    # Lower: evitar tríceps
+    for i, d in enumerate(dias, start=1):
+        if _is_lower_day(d):
+            for ej in d.get("ejercicios", []) or []:
+                nm = _nrm_name(ej.get("nombre", ""))
+                if any(k in nm for k in _TRICEPS_KEYWORDS):
+                    errs.append(f"Día {i} (Lower): contiene tríceps '{ej.get('nombre','')}'.")
+
+    # Duración estimada
+    try:
+        dur = int(A.get("duracion") or datos.get("duracion") or 60)
+    except Exception:
+        dur = 60
+    for i, d in enumerate(dias, start=1):
+        mins = _estimate_day_minutes(d)
+        # tolerancia pequeña
+        if mins > (dur + 5):
+            errs.append(f"Día {i}: estimación de tiempo ~{mins:.0f} min (objetivo {dur} min). Reduce series/descansos o usa superseries solo en accesorios.")
+
+    # Deload alineado con semanas de ciclo si existe
+    try:
+        semanas = int(datos.get("semanas_ciclo") or 0)
+    except Exception:
+        semanas = 0
+    if semanas:
+        try:
+            dld = int((plan.get("progresion") or {}).get("deload_semana") or 0)
+        except Exception:
+            dld = 0
+        if dld and dld != semanas:
+            errs.append(f"Deload: debe ser en la semana {semanas} (se recibió {dld}).")
+
+    return errs
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
 
     # --- Pre-análisis y normalización (cumplir consignas) ---
@@ -1131,8 +1287,6 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
         "dias": A["dias"],
         "duracion": A["duracion"],
         "duracion_min": A["duracion"],
-        "split_pref": A.get("split_pref") or datos.get("split_pref") or "",
-        "cycle_sessions": int(A.get("cycle_sessions") or A["dias"] or 0),
         "disponibilidad": A["disponibilidad"],
         "material": A["material"],
         "limitaciones": A.get("limitaciones") or "",
@@ -1145,7 +1299,7 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     client = _client()
     _system = build_system()
     _prompt = build_prompt(datos)
-    raw = _chat(client, _prompt)
+    raw = _chat(client, _prompt, temperature=0.1)
 
     # Primer intento de parseo
     try:
@@ -1156,6 +1310,7 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     # Validación + coerción
     coerced = _coerce_to_schema(data, datos)
     coerced = _sanitize_plan_reps(coerced)
+    coerced = _postprocess_plan(coerced, A)
     errs = []
     errs += validar_negocio(coerced)
     try:
@@ -1166,43 +1321,65 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
         errs += validar_objetivo(coerced, A)
     except Exception:
         pass
+    try:
+        errs += validar_estructura_split(coerced, A, datos)
+    except Exception:
+        pass
 
     if not errs:
         return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
 
-    # Intento de REFINADO: devolver al modelo el JSON + errores para que lo corrija
+    # Intento de REFINADO: bucle de corrección (máx 3) con temperatura baja.
     nl = chr(10)
-    fix_prompt = (
-    "Corrige el siguiente JSON de rutina para cumplir las reglas. Devuelve solo JSON válido." + nl +
-    "ERRORES:" + nl + json.dumps(errs, ensure_ascii=False, indent=2) + nl + nl +
-    "JSON ORIGINAL:" + nl + json.dumps(coerced, ensure_ascii=False)
-    )
-    fixed_raw = _chat(client, fix_prompt)
+    fixed = None
+    last_raw = raw
+    last_errs = errs
+    for _attempt in range(3):
+        fix_prompt = (
+            "Corrige el JSON de rutina para que cumpla EXACTAMENTE todas las reglas.\n"
+            "IMPORTANTE: Devuelve EXCLUSIVAMENTE JSON válido. Sin texto extra.\n\n"
+            "REGLAS (resumen):\n"
+            "- 5-8 ejercicios por día.\n"
+            "- Último ejercicio de cada día: Core/Finisher y debe empezar por 'Core:' o 'Finisher:'.\n"
+            "- Respetar el split y el nombre del día '<DíaSemana> - <Sesión>' si se especifica.\n"
+            "- No repetir exactamente el mismo ejercicio en la semana (salvo core/finisher).\n"
+            "- Ajustar volumen/descansos para cumplir el tiempo.\n\n"
+            "ERRORES A CORREGIR (no ignores ninguno):\n" + json.dumps(last_errs, ensure_ascii=False, indent=2) + "\n\n"
+            "PROMPT ORIGINAL (para referencia):\n" + _prompt + "\n\n"
+            "JSON ORIGINAL:\n" + json.dumps(coerced if fixed is None else fixed, ensure_ascii=False)
+        )
+        fixed_raw = _chat(client, fix_prompt, temperature=0.0)
+        last_raw = fixed_raw
+        try:
+            fixed = _try_parse_json(fixed_raw)
+        except Exception:
+            fixed = None
+            continue
 
+        fixed = _coerce_to_schema(fixed, datos)
+        fixed = _sanitize_plan_reps(fixed)
+        fixed = _postprocess_plan(fixed, A)
 
-    try:
-        fixed = _try_parse_json(fixed_raw)
-    except Exception as e:
-        return {"ok": False, "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw, "prompt": _prompt, "system": _system}
+        errs2 = []
+        errs2 += validar_negocio(fixed)
+        try:
+            errs2 += validar_comentarios(fixed, (datos.get("comentarios") or ""))
+        except Exception:
+            pass
+        try:
+            errs2 += validar_objetivo(fixed, A)
+        except Exception:
+            pass
+        try:
+            errs2 += validar_estructura_split(fixed, A, datos)
+        except Exception:
+            pass
 
-    fixed = _coerce_to_schema(fixed, datos)
-    fixed = _sanitize_plan_reps(fixed)
-
-    errs2 = []
-    errs2 += validar_negocio(fixed)
-    try:
-        errs2 += validar_comentarios(fixed, (datos.get("comentarios") or ""))
-    except Exception:
-        pass
-    try:
-        errs2 += validar_objetivo(fixed, A)
-    except Exception:
-        pass
-
-    if errs2:
-        return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed, "prompt": _prompt, "system": _system}
-
-    return {"ok": True, "data": fixed, "prompt": _prompt, "system": _system}
+        if not errs2:
+            return {"ok": True, "data": fixed, "prompt": _prompt, "system": _system}
+        last_errs = errs2
+    # Si no pudo corregirse, devolvemos el último estado para depurar.
+    return {"ok": False, "error": f"Refinado aún con errores: {last_errs}", "raw": last_raw, "prompt": _prompt, "system": _system}
 import re as _re2
 
 def _sanitize_reps_value(val) -> str:
