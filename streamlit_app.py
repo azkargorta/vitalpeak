@@ -1455,18 +1455,21 @@ elif page == "🤖 Creador de rutinas":
         return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
     def _split_options(dias: int):
-        if dias <= 1:
-            return ["Full body", "Torso", "Pierna", "Recomiéndame"]
-        if dias == 2:
-            return ["Full body", "Torso/Pierna", "Upper/Lower", "Recomiéndame"]
-        if dias == 3:
-            return ["Full body", "Torso/Pierna", "PPL", "Recomiéndame"]
-        if dias == 4:
-            return ["Upper/Lower", "Torso/Pierna", "PPL (4 días)", "Recomiéndame"]
-        if dias == 5:
-            return ["PPL", "Upper/Lower + extra", "Full body", "Recomiéndame"]
-        return ["PPL", "Upper/Lower + extra", "Full body", "Recomiéndame"]
+        # "días/semana" del usuario NO limita el tamaño del ciclo.
+        # Ej.: entrenas 4 días/semana pero puedes usar un ciclo PPL de 6 sesiones (A/B) que rota en el calendario.
+        base = ["Recomiéndame"]
 
+        if dias <= 1:
+            return ["Full body", "Torso", "Pierna"] + base
+        if dias == 2:
+            return ["Full body", "Torso/Pierna", "Upper/Lower"] + base
+        if dias == 3:
+            return ["Full body", "Torso/Pierna", "PPL (ciclo 3 sesiones)", "PPL (ciclo 6 sesiones)"] + base
+        if dias == 4:
+            return ["Upper/Lower", "Torso/Pierna", "PPL (ciclo 6 sesiones)", "PPL (ciclo 3 sesiones)"] + base
+        if dias == 5:
+            return ["PPL (ciclo 6 sesiones)", "Upper/Lower + extra", "Full body"] + base
+        return ["PPL (ciclo 6 sesiones)", "Upper/Lower + extra", "Full body"] + base
     def _material_from_preset(preset: str, custom: list[str]):
         preset = (preset or "").strip()
         if preset == "Gimnasio completo":
@@ -2019,62 +2022,103 @@ AFINADO:
                                file_name="rutina.json", mime="application/json")
 
             st.markdown("---")
-            st.subheader("📅 Nombra, asigna días y programa semanas")
+            st.subheader("📅 Nombra sesiones y programa en rotación")
 
             dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-            with st.form("planificacion_form", clear_on_submit=False):
-                schedule = []
-                for i, dia in enumerate(rutina_view.get("dias", [])):
-                    st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
-                    c1, c2 = st.columns(2)
-                    weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
-                    custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
-                    schedule.append({
-                        "day_index": i,
-                        "weekday": dias_semana.index(weekday),
-                        "name": custom_name
-                    })
-                cA, cB, cC = st.columns(3)
-                start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
-                weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
-                guardar = cC.form_submit_button("💾 Guardar y programar")
+            sesiones = rutina_view.get("dias", []) or []
 
-            if guardar:
-                existing = [r["name"] for r in list_routines(user)]
-                def _ensure_unique(name, existing_names):
-                    base, n, cand = name, 1, name
-                    while cand in existing_names:
-                        n += 1
-                        cand = f"{base} ({n})"
-                    existing_names.append(cand)
-                    return cand
+            if not sesiones:
+                st.info("No hay sesiones para programar.")
+            else:
+                # Por defecto, programamos según la disponibilidad del usuario (días reales de gimnasio)
+                default_gym_days = st.session_state.get("cr_data", {}).get("disponibilidad") or ["Lunes", "Martes", "Jueves", "Viernes"]
 
-                created = []
-                for s in schedule:
-                    d = rutina_view["dias"][s["day_index"]]
-                    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
-                    items = []
-                    for ej in d.get("ejercicios", []):
-                        reps = ej.get("reps","10")
-                        try:
-                            reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
-                        except:
-                            reps_val = 10
-                        items.append({"exercise": ej.get("nombre",""), "sets": int(ej.get("series",3)), "reps": reps_val, "weight": 0.0})
-                    add_routine(user, rname, items)
-                    created.append((s["weekday"], rname))
+                with st.form("planificacion_form_rotativa", clear_on_submit=False):
+                    st.caption("Estas sesiones forman un ciclo. Se asignarán en orden cada día que vayas al gimnasio, aunque cambie el día de la semana.")
 
-                try:
-                    base_mon = start_date - _dt.timedelta(days=start_date.weekday())
-                    for w in range(int(weeks)):
-                        for wd, rname in created:
-                            d = base_mon + _dt.timedelta(weeks=w, days=int(wd))
-                            _set_plan(user, d.isoformat(), rname)
-                    st.success("Rutinas guardadas y programadas ✅")
-                except NameError:
-                    st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
-                except Exception as e:
-                    st.error(f"Error al programar: {e}")
+                    st.markdown("#### Sesiones del ciclo (puedes renombrarlas)")
+                    nombres = []
+                    for i, ses in enumerate(sesiones):
+                        default_name = ses.get("nombre") or f"Sesión {i+1}"
+                        nombres.append(st.text_input(f"Nombre sesión {i+1}", value=default_name, key=f"sname_ai_{i}"))
+
+                    st.markdown("#### Programación en calendario (rotativa)")
+                    cA, cB, cC = st.columns(3)
+                    start_date = cA.date_input("Inicio", value=_dt.date.today(), key="rot_start")
+                    weeks = cB.number_input("Semanas a programar", min_value=1, max_value=52, value=int(st.session_state.get("cr_data", {}).get("semanas_ciclo") or 6), step=1, key="rot_weeks")
+                    gym_days = cC.multiselect("Días de gimnasio", dias_semana, default=default_gym_days, key="rot_gym_days")
+
+                    start_session = st.number_input(
+                        "Empezar por la sesión nº",
+                        min_value=1,
+                        max_value=len(sesiones),
+                        value=1,
+                        step=1,
+                        key="rot_start_session",
+                        help="Útil si ya has hecho algunas sesiones del ciclo y quieres continuar donde toca.",
+                    )
+
+                    save_plan = st.form_submit_button("Guardar rutinas y programar (rotación)", use_container_width=True)
+
+                if save_plan:
+                    if not gym_days:
+                        st.error("Selecciona al menos un día de gimnasio para programar.")
+                    else:
+                        existing = [r.get("name") for r in list_routines(user)]
+
+                        def _ensure_unique(name: str, existing_names: list[str]):
+                            base = name or "Rutina"
+                            cand = base
+                            n = 1
+                            while cand in existing_names:
+                                n += 1
+                                cand = f"{base} ({n})"
+                            existing_names.append(cand)
+                            return cand
+
+                        # 1) Guardar sesiones como rutinas
+                        created_names = []
+                        for i, ses in enumerate(sesiones):
+                            rname = _ensure_unique((nombres[i] or "").strip() or (ses.get("nombre") or f"Sesión {i+1}"), existing)
+                            items = []
+                            for ej in ses.get("ejercicios", []):
+                                reps = ej.get("reps","10")
+                                try:
+                                    reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
+                                except Exception:
+                                    reps_val = 10
+                                items.append({
+                                    "exercise": ej.get("nombre","Ejercicio"),
+                                    "sets": int(ej.get("series",3) or 3),
+                                    "reps": reps_val,
+                                    "weight": 0.0
+                                })
+
+                            add_routine(user, rname, items)
+                            created_names.append(rname)
+
+                        # 2) Fechas de gimnasio y asignación rotativa
+                        day_idxs = sorted({dias_semana.index(d) for d in gym_days})
+                        end_date = start_date + _dt.timedelta(days=int(weeks) * 7 - 1)
+
+                        fechas = []
+                        cur = start_date
+                        while cur <= end_date:
+                            if cur.weekday() in day_idxs:
+                                fechas.append(cur)
+                            cur += _dt.timedelta(days=1)
+
+                        if not fechas:
+                            st.warning("No se encontraron fechas con los días seleccionados en el rango elegido.")
+                        else:
+                            start_idx = int(start_session) - 1
+                            try:
+                                for j, d in enumerate(fechas):
+                                    ses_idx = (start_idx + j) % len(created_names)
+                                    _set_plan(user, d.isoformat(), created_names[ses_idx])
+                                st.success(f"Rutinas guardadas ({len(created_names)}) y programadas en {len(fechas)} días ✅")
+                            except NameError:
+                                st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
 
             if st.session_state.get("ia_prompt"):
                 with st.expander("🧠 Ver prompt construido con tus parámetros", expanded=False):

@@ -234,10 +234,21 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
     if "meta" not in data or not isinstance(data.get("meta"), dict):
         data["meta"] = {
             "nivel": datos.get("nivel", "intermedio"),
-            "dias": int(datos.get("dias", 4) or 4),
+            "dias": int(datos.get("dias", 4) or 4),  # días/semana del usuario
             "duracion_min": int(datos.get("duracion", 60) or 60),
             "objetivo": datos.get("objetivo", "mixto"),
+            "split": datos.get("split_pref", "") or datos.get("split", ""),
+            "cycle_sessions": int(datos.get("cycle_sessions", datos.get("dias", 4) or 4) or 0),
         }
+
+    # Completar meta con campos de ciclo/rotación si faltan
+    try:
+        if isinstance(data.get("meta"), dict):
+            data["meta"].setdefault("split", datos.get("split_pref", "") or datos.get("split", ""))
+            data["meta"].setdefault("cycle_sessions", int(datos.get("cycle_sessions", datos.get("dias", 4) or 4) or 0))
+    except Exception:
+        pass
+
 
     # --- PROGRESION ---
     pref_in = data.get("progresion")
@@ -614,9 +625,35 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
 - Ajusta volumen/descansos para cumplir {dur} min.
 """.format(dur=duracion)
 
+
+    # --- Split / ciclo de sesiones ---
+    split_pref = str(datos.get("split_pref") or "").strip()
+    if not split_pref:
+        # fallback: intentar extraer de ia_detalles si viene en texto
+        txt_det = str(datos.get("ia_detalles") or "")
+        m = re.search(r"split\s+preferido\s*:\s*(.+)", txt_det, flags=re.IGNORECASE)
+        if m:
+            split_pref = m.group(1).strip()
+
+    split_l = split_pref.lower()
+    if "ppl" in split_l:
+        # Por defecto, PPL "completo" = 6 sesiones (A/B). Si el usuario pide explícitamente 3, usamos 3.
+        if "ciclo 3" in split_l or "3 sesiones" in split_l or ("3" in split_l and "ciclo" in split_l):
+            cycle_sessions = 3
+        else:
+            cycle_sessions = 6
+    else:
+        cycle_sessions = dias
+
     # --- Restricciones (checklist) ---
     restricciones: List[str] = []
-    restricciones.append(f"- NO INVENTAR: usa exactamente estos días: {disp} (y solo {dias} días).")
+    restricciones.append(f"- NO INVENTAR: días de gimnasio del usuario: {disp} ({dias} días/semana).")
+    if cycle_sessions != dias:
+        restricciones.append(f"- IMPORTANTE: el plan debe ser un CICLO de {cycle_sessions} sesiones (no semanas). La app lo asignará en ROTACIÓN sobre esos {dias} días/semana.")
+        restricciones.append("- NO fijes sesiones a Lunes/Martes dentro del JSON; nómbralas como 'Sesión 1', 'Sesión 2', etc.")
+        restricciones.append(f"- El JSON debe incluir EXACTAMENTE {cycle_sessions} sesiones en 'dias'.")
+    if split_pref:
+        restricciones.append(f"- Split preferido: {split_pref}.")
     restricciones.append(f"- Duración por sesión: {duracion} min (ajusta descansos/series para cumplir).")
     restricciones.append(f"- Nivel: {nivel}.")
     restricciones.append(f"- Objetivo: {objetivo}.")
@@ -648,6 +685,8 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
         "nivel": nivel,
         "dias": dias,
         "duracion": duracion,
+        "split_pref": split_pref,
+        "cycle_sessions": int(cycle_sessions),
         "disponibilidad": disp,
         "material": material,
         "full_gym": full_gym,
@@ -676,6 +715,7 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     reglas_generales = (
         "REGLAS GENERALES (siempre):" + nl +
         "- Devuelve EXCLUSIVAMENTE JSON válido (sin markdown, sin explicación)." + nl +
+        "- NO asignes días de la semana dentro del JSON; trata cada elemento de 'dias' como una SESIÓN del ciclo (p. ej. 'Sesión 1', 'Sesión 2', ...)." + nl +
         "- Cada día debe tener 5-8 ejercicios (ideal 6-7)." + nl +
         "- Upper (si aparece): balancea empuje y tirón." + nl +
         "- Lower (si aparece): evita meter tríceps como parte principal." + nl +
@@ -701,11 +741,22 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     schema_hint = '''
 ESQUEMA JSON (obligatorio):
 {
-  "meta": {"nivel": "principiante|intermedio|avanzado", "dias": N, "duracion_min": N, "objetivo": "fuerza|hipertrofia|resistencia|mixto"},
+  "meta": {
+    "nivel": "principiante|intermedio|avanzado",
+    "dias": N,                  // días/semana del usuario
+    "duracion_min": N,
+    "objetivo": "fuerza|hipertrofia|resistencia|mixto",
+    "split": "texto",
+    "cycle_sessions": N         // nº de sesiones del ciclo (p.ej., PPL completo = 6)
+  },
   "dias": [
-    {"nombre": "Lunes", "ejercicios": [
-      {"nombre": "...", "series": 3, "reps": "8-12", "intensidad": "RIR 1-2", "descanso": "60-90s"}
-    ], "notas": "..."}
+    {
+      "nombre": "Sesión 1",
+      "ejercicios": [
+        {"nombre": "...", "series": 3, "reps": "8-12", "descanso": "60-90s", "rir": "2", "notas": ""}
+      ],
+      "notas": ""
+    }
   ],
   "progresion": {"principales": "...", "accesorios": "...", "deload_semana": N}
 }
@@ -717,7 +768,9 @@ ESQUEMA JSON (obligatorio):
         "DATOS NORMALIZADOS:" + nl +
         f"- Objetivo: {A['objetivo']}" + nl +
         f"- Nivel: {A['nivel']}" + nl +
-        f"- Días/semana: {A['dias']}" + nl +
+        f"- Días/semana (usuario): {A['dias']}" + nl +
+        f"- Split preferido: {A.get('split_pref', '')}" + nl +
+        f"- Sesiones del ciclo: {A.get('cycle_sessions', A['dias'])}" + nl +
         f"- Duración: {A['duracion']} min" + nl +
         f"- Días exactos: {A['disponibilidad']}" + nl + nl +
         reglas_generales + nl +
@@ -735,7 +788,7 @@ def _client() -> OpenAI:
 def _chat(client: OpenAI, prompt: str) -> str:
     resp = client.chat.completions.create(
         model=MODEL,
-        temperature=0.4,
+        temperature=0.2,
         messages=[
             {"role":"system","content": build_system()},
             {"role":"user","content": prompt}
@@ -979,6 +1032,37 @@ def validar_objetivo(plan: Dict[str, Any], A: Dict[str, Any]) -> List[str]:
         return ['Plan inválido (no es dict).']
 
     objetivo = (A.get('objetivo') or '').lower()
+    cycle_sessions = int(A.get('cycle_sessions') or (A.get('dias') or 0) or 0)
+    split_pref = (A.get('split_pref') or '').lower().strip()
+
+    # Validación de nº de sesiones del ciclo (cuando aplica)
+    try:
+        dias_plan_list = plan.get('dias') or []
+        if cycle_sessions and isinstance(dias_plan_list, list) and len(dias_plan_list) != cycle_sessions:
+            errs.append(f"Se pidió un ciclo de {cycle_sessions} sesiones y el JSON tiene {len(dias_plan_list)}.")
+    except Exception:
+        pass
+
+    # Split PPL completo: debe incluir Push/Pull/Legs A y B (6 sesiones)
+    if 'ppl' in split_pref and cycle_sessions == 6:
+        try:
+            labels = []
+            for d in (plan.get('dias') or []):
+                if isinstance(d, dict):
+                    labels.append((d.get('nombre') or '').lower())
+            def _cat(s: str) -> str:
+                if any(k in s for k in ('push','empuje')):
+                    return 'push'
+                if any(k in s for k in ('pull','tiron','tirón')):
+                    return 'pull'
+                if any(k in s for k in ('leg','pierna')):
+                    return 'legs'
+                return ''
+            cats = [_cat(x) for x in labels]
+            if cats.count('push') < 2 or cats.count('pull') < 2 or cats.count('legs') < 2:
+                errs.append("PPL (6 sesiones): nombra y estructura las sesiones como Push A/B, Pull A/B y Pierna A/B (mínimo 2 de cada).")
+        except Exception:
+            pass
     dias_user = A.get('disponibilidad') or []
     # Días exactos
     try:
@@ -1047,6 +1131,8 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
         "dias": A["dias"],
         "duracion": A["duracion"],
         "duracion_min": A["duracion"],
+        "split_pref": A.get("split_pref") or datos.get("split_pref") or "",
+        "cycle_sessions": int(A.get("cycle_sessions") or A["dias"] or 0),
         "disponibilidad": A["disponibilidad"],
         "material": A["material"],
         "limitaciones": A.get("limitaciones") or "",
