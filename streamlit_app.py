@@ -1389,20 +1389,26 @@ elif page == "📘 Rutinas":
 
 
 
+
+
 elif page == "🤖 Creador de rutinas":
     require_auth()
     st.title("CREADOR DE RUTINAS")
-    user = st.session_state["user"]
+    st.caption("Creador V2: split claro + validación estricta + calendario fijo o rotativo (ciclo)")
 
     import os, json
     import datetime as _dt
-    import streamlit as st
-    from app.ai_generator import call_gpt, build_prompt, analyze_user_data
+
+    from app.ai_generator import call_gpt, analyze_user_data
     from app.rules_fallback import generate_fallback
     from app.pdf_export import rutina_a_pdf_bytes
     from app.routines import add_routine, list_routines
 
-    # Utilidades de plan (mismo formato que en 📘 Rutinas)
+    user = st.session_state["user"]
+
+    # ----------------------------
+    #  Plan en calendario (rutina_plan)
+    # ----------------------------
     def _get_plan(u: str):
         data = load_user(u)
         return dict(data.get("routine_plan", {}))
@@ -1417,31 +1423,9 @@ elif page == "🤖 Creador de rutinas":
         data["routine_plan"] = plan
         save_user(u, data)
 
-    # ============================
-    #  Creador híbrido (3 pasos)
-    # ============================
-    if "cr_step" not in st.session_state:
-        st.session_state["cr_step"] = 1
-    if "cr_data" not in st.session_state:
-        st.session_state["cr_data"] = {}
-    if "cr_questions" not in st.session_state:
-        st.session_state["cr_questions"] = []
-    if "cr_q_index" not in st.session_state:
-        st.session_state["cr_q_index"] = 0
-    if "cr_chat" not in st.session_state:
-        st.session_state["cr_chat"] = []
-    if "cr_auto_details" not in st.session_state:
-        st.session_state["cr_auto_details"] = ""
+    DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
-    def _cr_reset(to_step: int = 1):
-        st.session_state["cr_step"] = to_step
-        st.session_state["cr_questions"] = []
-        st.session_state["cr_q_index"] = 0
-        st.session_state["cr_chat"] = []
-        st.session_state["cr_auto_details"] = ""
-
-    def _default_disponibilidad(n: int):
-        # Defaults prácticos (lun-dom)
+    def _default_gym_days(n: int):
         if n <= 1:
             return ["Lunes"]
         if n == 2:
@@ -1453,19 +1437,6 @@ elif page == "🤖 Creador de rutinas":
         if n == 5:
             return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
         return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
-
-    def _split_options(dias: int):
-        if dias <= 1:
-            return ["Full body", "Torso", "Pierna", "Recomiéndame"]
-        if dias == 2:
-            return ["Full body", "Torso/Pierna", "Upper/Lower", "Recomiéndame"]
-        if dias == 3:
-            return ["Full body", "Torso/Pierna", "PPL", "Recomiéndame"]
-        if dias == 4:
-            return ["Upper/Lower", "Torso/Pierna", "PPL (4 días)", "Recomiéndame"]
-        if dias == 5:
-            return ["PPL", "Upper/Lower + extra", "Full body", "Recomiéndame"]
-        return ["PPL", "Upper/Lower + extra", "Full body", "Recomiéndame"]
 
     def _material_from_preset(preset: str, custom: list[str]):
         preset = (preset or "").strip()
@@ -1481,607 +1452,400 @@ elif page == "🤖 Creador de rutinas":
             return custom if custom else []
         return ["todo"]
 
-    def _build_questions(base: dict):
-        obj = (base.get("objetivo") or "").lower()
-        dias = int(base.get("dias", 4) or 4)
-        preset = base.get("material_preset") or "Gimnasio completo"
-        limit = (base.get("limitaciones") or "").strip()
+    def _split_options_v2():
+        return [
+            "Recomiéndame",
+            "PPL (4 días) — Push/Pull/Legs/Upper",
+            "PPL (ciclo 6 sesiones) — Push/Pull/Legs A/B",
+            "Upper/Lower (4 días)",
+            "Torso/Pierna (4 días)",
+            "Full body",
+        ]
 
-        qs = []
+    def _extract_reps_to_int(reps: str, default: int = 10) -> int:
+        try:
+            s = str(reps).replace("–", "-").replace("—", "-").strip()
+            if "-" in s:
+                return int(s.split("-")[-1].strip())
+            return int(s)
+        except Exception:
+            return default
 
-        # 1) Split / estructura
-        qs.append({
-            "key": "split_pref",
-            "text": "¿Qué estilo de rutina prefieres (split)?",
-            "type": "select",
-            "options": _split_options(dias),
-        })
+    def _ensure_unique_name(name: str, existing_names: list[str]) -> str:
+        base = (name or "Rutina").strip() or "Rutina"
+        cand = base
+        n = 1
+        while cand in existing_names:
+            n += 1
+            cand = f"{base} ({n})"
+        existing_names.append(cand)
+        return cand
 
-        # 2) Prioridades
-        qs.append({
-            "key": "prioridades",
-            "text": "¿Qué grupos quieres priorizar (si alguno)?",
-            "type": "multiselect",
-            "options": ["pecho", "espalda", "pierna", "glúteo", "hombro", "brazos", "core", "ninguno"],
-        })
-
-        # 3) Fuerza: básicos a mejorar
-        if obj == "fuerza":
-            qs.append({
-                "key": "basicos_objetivo",
-                "text": "Para fuerza: ¿qué 1–2 levantamientos quieres mejorar?",
-                "type": "multiselect",
-                "options": ["sentadilla", "press banca", "peso muerto", "press militar", "dominadas lastradas", "remo"],
-                "max_items": 2,
-            })
-
-        # 4) Grasa/resistencia: cardio
-        if obj in ("pérdida de grasa", "perdida de grasa", "resistencia", "rendimiento / salud", "salud"):
-            qs.append({
-                "key": "cardio_pref",
-                "text": "¿Quieres incluir cardio? (si sí, indica tipo y frecuencia)",
-                "type": "select",
-                "options": ["No", "Sí: LISS/Zona 2 (suave)", "Sí: HIIT (intenso)", "Sí: combinado", "Recomiéndame"],
-            })
-
-        # 5) Equipo: si NO es gym completo, pedir detalle
-        if preset != "Gimnasio completo":
-            qs.append({
-                "key": "material_extra",
-                "text": "¿Qué material exacto tienes disponible?",
-                "type": "multiselect",
-                "options": ["barra", "mancuernas", "poleas", "máquinas", "banco", "rack", "dominadas", "gomas", "kettlebells", "discos"],
-            })
-            qs.append({
-                "key": "cargas_max",
-                "text": "¿Qué cargas máximas tienes (aprox.)? (ej. mancuernas 24kg, barra 80kg)",
-                "type": "text",
-            })
-
-        # 6) Lesiones/limitaciones: concretar
-        if limit:
-            qs.append({
-                "key": "lesion_detalle",
-                "text": "Sobre tus limitaciones: ¿qué movimientos te molestan o quieres evitar específicamente?",
-                "type": "text",
-            })
-
-        # 7) Evitar sí o sí
-        qs.append({
-            "key": "evitar_txt",
-            "text": "¿Hay ejercicios o movimientos que quieras evitar sí o sí? (coma separada)",
-            "type": "text",
-        })
-
-        # 8) Condicionamiento/core/movilidad
-        qs.append({
-            "key": "condicionamiento",
-            "text": "¿Quieres añadir core, movilidad o un finisher al final? (opcional)",
-            "type": "select",
-            "options": ["No", "Core 2-3 días", "Movilidad 5-10 min", "Finisher 5-8 min", "Combinado", "Recomiéndame"],
-        })
-
-        return qs
-
-    # UI header
-    st.caption("✅ Flujo recomendado: 1) Base (desplegables) → 2) Afinado (preguntas cortas) → 3) Resumen editable + Generar")
-    steps = 3
-    st.progress(min(max(int(st.session_state["cr_step"]), 1), steps) / steps)
-
-    top_actions = st.columns([1, 1, 3])
-    with top_actions[0]:
-        if st.button("🔄 Reiniciar", use_container_width=True):
-            _cr_reset(1)
+    # ----------------------------
+    #  UI (V2)
+    # ----------------------------
+    ctop = st.columns([1, 1, 2])
+    with ctop[0]:
+        if st.button("🧹 Limpiar resultado", use_container_width=True):
+            st.session_state.pop("cr2_result", None)
+            st.session_state.pop("cr2_prompt", None)
             st.rerun()
-    with top_actions[1]:
-        if st.button("🧹 Borrar rutina generada", use_container_width=True):
-            st.session_state.pop("rutina_ia", None)
-            st.session_state.pop("ia_prompt", None)
-            st.session_state.pop("ia_system", None)
+    with ctop[1]:
+        if st.button("🔄 Reset formulario", use_container_width=True):
+            st.session_state.pop("cr2_form", None)
+            st.session_state.pop("cr2_result", None)
+            st.session_state.pop("cr2_prompt", None)
             st.rerun()
 
-    # ============================
-    # Paso 1: Base (form)
-    # ============================
-    if st.session_state["cr_step"] == 1:
-        data = st.session_state["cr_data"]
+    form = st.session_state.get("cr2_form") or {
+        "objetivo": "hipertrofia",
+        "nivel": "intermedio",
+        "dias_gym": 4,
+        "duracion": 60,
+        "gym_days": ["Lunes", "Martes", "Jueves", "Viernes"],
+        "split": "PPL (4 días) — Push/Pull/Legs/Upper",
+        "calendar_mode": "Semanal fijo",
+        "material_preset": "Gimnasio completo",
+        "material_custom": [],
+        "limitaciones": "",
+        "evitar": "",
+        "rir": 2,
+        "progresion": "doble_progresion",
+        "volumen": "media",
+        "semanas": 6,
+        "deload": 6,
+        "superseries": True,
+        "notas": "",
+    }
 
-        dias_default = int(data.get("dias", 4) or 4)
-        disponibilidad_default = data.get("disponibilidad") or _default_disponibilidad(dias_default)
+    with st.form("cr2_form"):
+        st.subheader("1) Datos base")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            form["objetivo"] = st.selectbox("Objetivo", ["hipertrofia", "fuerza", "resistencia", "mixto"], index=["hipertrofia","fuerza","resistencia","mixto"].index(form["objetivo"]))
+            form["nivel"] = st.selectbox("Nivel", ["principiante", "intermedio", "avanzado"], index=["principiante","intermedio","avanzado"].index(form["nivel"]))
+        with c2:
+            form["dias_gym"] = st.number_input("Días reales que vas al gym", min_value=1, max_value=6, value=int(form["dias_gym"]), step=1)
+            form["duracion"] = st.slider("Duración por sesión (min)", min_value=30, max_value=120, value=int(form["duracion"]), step=5)
+        with c3:
+            form["rir"] = st.slider("RIR objetivo", min_value=0, max_value=4, value=int(form["rir"]))
+            form["superseries"] = st.checkbox("Permitir superseries (solo accesorios)", value=bool(form["superseries"]))
 
-        with st.form("cr_base_form"):
-            c1, c2, c3, c4 = st.columns([1.2, 1.0, 1.0, 1.0])
-            with c1:
-                objetivo = st.selectbox(
-                    "Objetivo principal",
-                    ["hipertrofia", "fuerza", "pérdida de grasa", "rendimiento / salud"],
-                    index=["hipertrofia", "fuerza", "pérdida de grasa", "rendimiento / salud"].index(data.get("objetivo", "hipertrofia"))
-                )
-            with c2:
-                nivel = st.selectbox(
-                    "Nivel",
-                    ["principiante", "intermedio", "avanzado"],
-                    index=["principiante", "intermedio", "avanzado"].index(data.get("nivel", "intermedio"))
-                )
-            with c3:
-                dias = st.number_input("Días/semana", min_value=1, max_value=6, value=int(data.get("dias", 4) or 4), step=1)
-            with c4:
-                duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=int(data.get("duracion", 60) or 60), step=5)
+        default_days = form.get("gym_days") or _default_gym_days(int(form["dias_gym"]))
+        form["gym_days"] = st.multiselect(
+            "Días exactos de entrenamiento",
+            DIAS_SEMANA,
+            default=default_days,
+            help="Deben coincidir con tus días reales. Si eliges un ciclo (6 sesiones), la app lo colocará en rotación sobre estos días.",
+        )
 
-            dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-            disponibilidad = st.multiselect(
-                "Disponibilidad (elige los días que realmente puedes entrenar)",
-                dias_semana,
-                default=disponibilidad_default,
+        st.subheader("2) Split y calendario")
+        cA, cB = st.columns(2)
+        with cA:
+            form["split"] = st.selectbox("Split", _split_options_v2(), index=_split_options_v2().index(form["split"]) if form["split"] in _split_options_v2() else 0)
+        with cB:
+            # Default calendario: si el split es ciclo 6, sugerimos rotación
+            default_mode = form.get("calendar_mode") or "Semanal fijo"
+            if "ciclo 6" in (form["split"] or "").lower():
+                default_mode = "Ciclo rotativo"
+            form["calendar_mode"] = st.selectbox("Modo de calendario", ["Semanal fijo", "Ciclo rotativo"], index=["Semanal fijo","Ciclo rotativo"].index(default_mode))
+
+        st.subheader("3) Equipo y restricciones")
+        m1, m2 = st.columns([1.2, 1.8])
+        with m1:
+            form["material_preset"] = st.radio(
+                "Equipo (preset)",
+                ["Gimnasio completo", "Casa (mancuernas/bandas)", "Mancuernas", "Bandas / peso corporal", "Personalizado"],
+                index=["Gimnasio completo","Casa (mancuernas/bandas)","Mancuernas","Bandas / peso corporal","Personalizado"].index(form["material_preset"]),
+                horizontal=True,
             )
-
-            st.markdown("#### Equipo y límites")
-            e1, e2 = st.columns([1.2, 1.8])
-            with e1:
-                material_preset = st.radio(
-                    "Equipo (preset)",
-                    ["Gimnasio completo", "Casa (mancuernas/bandas)", "Mancuernas", "Bandas / peso corporal", "Personalizado"],
-                    index=["Gimnasio completo", "Casa (mancuernas/bandas)", "Mancuernas", "Bandas / peso corporal", "Personalizado"].index(data.get("material_preset", "Gimnasio completo")),
-                    horizontal=True,
+        with m2:
+            form["material_custom"] = []
+            if form["material_preset"] == "Personalizado":
+                form["material_custom"] = st.multiselect(
+                    "Material disponible",
+                    ["barra", "mancuernas", "poleas", "máquinas", "banco", "rack", "prensa", "dominadas", "anillas", "gomas", "kettlebells", "discos"],
+                    default=form.get("material_custom", []),
                 )
-            with e2:
-                material_custom = []
-                if material_preset == "Personalizado":
-                    material_custom = st.multiselect(
-                        "Material disponible",
-                        ["barra", "mancuernas", "poleas", "máquinas", "banco", "rack", "prensa", "dominadas", "anillas", "gomas", "kettlebells", "discos"],
-                        default=data.get("material_custom", []),
-                    )
 
-            limitaciones = st.text_input("Lesiones/limitaciones (opcional)", value=data.get("limitaciones", ""), placeholder="Hombro, rodilla, lumbar…")
+        form["limitaciones"] = st.text_input("Lesiones/limitaciones (opcional)", value=form.get("limitaciones", ""))
+        form["evitar"] = st.text_input("Evitar (coma separada)", value=form.get("evitar", ""))
 
-            st.markdown("#### Intensidad y estilo")
-            s1, s2, s3 = st.columns(3)
-            with s1:
-                rir_obj = st.slider("Intensidad objetivo (RIR)", min_value=0, max_value=4, value=int(data.get("rir_obj", 2) or 2), help="RIR 0 = al fallo; 2 = exigente; 4 = suave")
-            with s2:
-                superseries_ok = st.checkbox("Permitir superseries", value=bool(data.get("superseries_ok", True)))
-            with s3:
-                unidades = st.selectbox("Unidades", ["kg", "lb"], index=["kg", "lb"].index(data.get("unidades", "kg")))
+        with st.expander("Ajustes avanzados", expanded=False):
+            a1, a2, a3 = st.columns(3)
+            with a1:
+                form["progresion"] = st.selectbox("Progresión preferida", ["doble_progresion", "lineal", "RPE_autorregulada"], index=["doble_progresion","lineal","RPE_autorregulada"].index(form["progresion"]))
+                form["volumen"] = st.select_slider("Tolerancia a volumen", options=["baja", "media", "alta"], value=form["volumen"])
+            with a2:
+                form["semanas"] = st.number_input("Semanas del ciclo", min_value=4, max_value=12, value=int(form["semanas"]))
+                form["deload"] = st.number_input("Deload (semana)", min_value=0, max_value=12, value=int(form["deload"]), help="0 = sin deload. Recomendado: igual a semanas del ciclo.")
+            with a3:
+                st.caption("Para PPL 4 días, por defecto usamos Push/Pull/Legs/Upper.")
 
-            idioma = st.selectbox("Idioma salida", ["es", "en"], index=["es", "en"].index(data.get("idioma", "es")))
+        form["notas"] = st.text_area("Notas adicionales (opcional)", value=form.get("notas", ""), height=120)
 
-            go = st.form_submit_button("Continuar ➜ Afinar", use_container_width=True)
+        submit = st.form_submit_button("🤖 Generar rutina", use_container_width=True)
 
-        if go:
-            base = {
-                "objetivo": objetivo,
-                "nivel": nivel,
-                "dias": int(dias),
-                "duracion": int(duracion),
-                "disponibilidad": disponibilidad if disponibilidad else _default_disponibilidad(int(dias)),
-                "material_preset": material_preset,
-                "material_custom": material_custom,
-                "limitaciones": (limitaciones or "").strip(),
-                "rir_obj": int(rir_obj),
-                "superseries_ok": bool(superseries_ok),
-                "unidades": unidades,
-                "idioma": idioma,
-            }
-            st.session_state["cr_data"] = {**st.session_state["cr_data"], **base}
-            st.session_state["cr_questions"] = _build_questions(st.session_state["cr_data"])
-            st.session_state["cr_q_index"] = 0
-            st.session_state["cr_chat"] = []
-            st.session_state["cr_step"] = 2
-            st.rerun()
+    # Persistir formulario
+    st.session_state["cr2_form"] = form
 
-    # ============================
-    # Paso 2: Afinado (chat corto)
-    # ============================
-    elif st.session_state["cr_step"] == 2:
-        data = st.session_state["cr_data"]
-        qs = st.session_state.get("cr_questions") or _build_questions(data)
-        st.session_state["cr_questions"] = qs
+    def _compute_plan_sessions(split: str, gym_days: int) -> int:
+        s = (split or "").lower()
+        if "ciclo 6" in s:
+            return 6
+        # PPL 4 -> 4 sesiones
+        if "ppl" in s and "4" in s:
+            return 4
+        return int(gym_days)
 
-        idx = int(st.session_state.get("cr_q_index", 0))
-        total = len(qs)
+    def _make_disponibilidad_for_ai(calendar_mode: str, plan_sessions: int, gym_days_list: list[str]) -> list[str]:
+        # Si es rotativo y el plan tiene más sesiones que días reales, usamos etiquetas genéricas
+        if (calendar_mode or "").lower().startswith("ciclo") and plan_sessions != len(gym_days_list):
+            return [f"Sesión {i+1}" for i in range(plan_sessions)]
+        # Si es fijo, usamos los días reales
+        out = list(gym_days_list)
+        # Ajustar longitud
+        if len(out) > plan_sessions:
+            out = out[:plan_sessions]
+        while len(out) < plan_sessions:
+            out.append(f"Día {len(out)+1}")
+        return out
 
-        head = st.columns([1, 2, 2])
-        with head[0]:
-            if st.button("⬅️ Volver", use_container_width=True):
-                st.session_state["cr_step"] = 1
-                st.rerun()
-        with head[1]:
-            st.write(f"**Pregunta {min(idx+1, total)} / {total}**")
-        with head[2]:
-            st.write("Responde lo mínimo: solo lo que de verdad cambie tu rutina.")
+    def _split_pref_for_ai(split_ui: str) -> str:
+        s = (split_ui or "")
+        if s.startswith("PPL (4"):
+            return "PPL (4 días)"
+        if "ciclo 6" in s.lower():
+            return "PPL (6 días)"
+        return s
 
-        # Transcript (simple)
-        if st.session_state["cr_chat"]:
-            with st.expander("Ver tus respuestas", expanded=False):
-                for turn in st.session_state["cr_chat"]:
-                    st.markdown(f"**P:** {turn.get('q','')}")
-                    st.markdown(f"**R:** {turn.get('a','—')}")
-                    st.markdown("---")
+    if submit:
+        # Validación de días exactos
+        gym_days_list = form.get("gym_days") or []
+        gym_days_target = int(form.get("dias_gym") or 4)
+        # Si el usuario eligió mal número, lo ajustamos a lo más cercano (sin bloquear)
+        if len(gym_days_list) != gym_days_target:
+            if gym_days_list:
+                gym_days_list = gym_days_list[:gym_days_target]
+                for d in DIAS_SEMANA:
+                    if len(gym_days_list) >= gym_days_target:
+                        break
+                    if d not in gym_days_list:
+                        gym_days_list.append(d)
+            else:
+                gym_days_list = _default_gym_days(gym_days_target)
 
-        if idx >= total:
-            st.session_state["cr_step"] = 3
-            st.rerun()
+        plan_sessions = _compute_plan_sessions(form["split"], gym_days_target)
+        disponibilidad_ai = _make_disponibilidad_for_ai(form["calendar_mode"], plan_sessions, gym_days_list)
 
-        q = qs[idx]
-        st.subheader(q["text"])
+        material_final = _material_from_preset(form["material_preset"], form.get("material_custom", []))
+        evitar_list = [s.strip() for s in (form.get("evitar") or "").split(",") if s.strip()]
 
-        def _render_input(qdef: dict, key: str):
-            t = qdef.get("type", "text")
-            if t == "select":
-                return st.selectbox("Respuesta", qdef.get("options", []), index=0, key=key)
-            if t == "multiselect":
-                opts = qdef.get("options", [])
-                max_items = qdef.get("max_items")
-                sel = st.multiselect("Respuesta", opts, default=[], key=key)
-                if max_items and len(sel) > int(max_items):
-                    st.warning(f"Elige como máximo {max_items}.")
-                return sel
-            if t == "bool":
-                return st.radio("Respuesta", ["Sí", "No"], horizontal=True, key=key)
-            return st.text_input("Respuesta (puedes dejarlo vacío y saltar)", value="", key=key)
+        split_pref = _split_pref_for_ai(form["split"])
 
-        with st.form(f"cr_q_form_{idx}"):
-            ans = _render_input(q, key=f"cr_ans_{idx}")
-            cA, cB = st.columns(2)
-            with cA:
-                save_ans = st.form_submit_button("Guardar respuesta", use_container_width=True)
-            with cB:
-                skip_ans = st.form_submit_button("Saltar", use_container_width=True)
-
-        def _normalize_ans(a):
-            if isinstance(a, list):
-                return [x for x in a if x and x != "ninguno"]
-            if isinstance(a, str):
-                return a.strip()
-            return a
-
-        if save_ans or skip_ans:
-            a_norm = "" if skip_ans else _normalize_ans(ans)
-            st.session_state["cr_chat"].append({"q": q["text"], "a": a_norm if a_norm else "—"})
-            if not skip_ans and a_norm:
-                st.session_state["cr_data"][q["key"]] = a_norm
-            st.session_state["cr_q_index"] = idx + 1
-            st.rerun()
-
-    # ============================
-    # Paso 3: Resumen + generar
-    # ============================
-    else:
-        data = st.session_state["cr_data"]
-
-        # Auto-detalles (se manda a la IA como "ia_detalles")
-        material = _material_from_preset(data.get("material_preset", "Gimnasio completo"), data.get("material_custom", []))
-        if data.get("material_extra"):
-            material = data.get("material_extra")
-
-        evitar_list = []
-        if isinstance(data.get("evitar_txt"), str) and data.get("evitar_txt").strip():
-            evitar_list = [s.strip() for s in data.get("evitar_txt").split(",") if s.strip()]
-
-        prioridades = data.get("prioridades", [])
-        if isinstance(prioridades, str):
-            prioridades = [prioridades]
-
-        basicos = data.get("basicos_objetivo", [])
-        if isinstance(basicos, str):
-            basicos = [basicos]
-
-        auto_details = f"""BASE (no inventar):
-- Objetivo: {data.get('objetivo','')}
-- Nivel: {data.get('nivel','')}
-- Días/semana: {data.get('dias','')}
-- Duración: {data.get('duracion','')} min
-- Disponibilidad: {data.get('disponibilidad', [])}
-- Equipo/material: {material}
-- Limitaciones: {data.get('limitaciones','')}
-- Intensidad objetivo: RIR {data.get('rir_obj', 2)}
+        # Construimos ia_detalles (lo ve la IA tal cual)
+        ia_detalles = f"""BASE (no inventar):
+- Objetivo: {form['objetivo']}
+- Nivel: {form['nivel']}
+- Días/semana: {plan_sessions}
+- Duración: {form['duracion']} min
+- Disponibilidad: {disponibilidad_ai}
+- Equipo/material: {material_final}
+- Limitaciones: {form.get('limitaciones','')}
+- Intensidad objetivo: RIR {form.get('rir',2)}
 AFINADO:
-- Split preferido: {data.get('split_pref','Recomiéndame')}
-- Prioridades: {prioridades}
-- Básicos a mejorar: {basicos}
-- Cardio: {data.get('cardio_pref','')}
-- Cargas máximas: {data.get('cargas_max','')}
-- Detalle lesión/movimientos que molestan: {data.get('lesion_detalle','')}
+- Split preferido: {split_pref} (PPL 4 días = Push/Pull/Legs/Upper)
+- Modo calendario: {form.get('calendar_mode','Semanal fijo')} (si es ciclo rotativo, la app asigna sesiones en orden)
 - Evitar: {evitar_list}
-- Condicionamiento: {data.get('condicionamiento','')}
 """.strip()
-        if not st.session_state.get("cr_auto_details"):
-            st.session_state["cr_auto_details"] = auto_details
 
-        st.markdown("### Resumen")
-        s1, s2, s3, s4 = st.columns(4)
-        s1.metric("Objetivo", str(data.get("objetivo","")))
-        s2.metric("Días/semana", str(data.get("dias","")))
-        s3.metric("Duración", f"{data.get('duracion','')} min")
-        s4.metric("Nivel", str(data.get("nivel","")))
+        datos_usuario = {
+            "nivel": form["nivel"],
+            "dias": int(plan_sessions),
+            "duracion": int(form["duracion"]),
+            "objetivo": form["objetivo"],
+            "material": material_final,
+            "limitaciones": (form.get("limitaciones") or "").strip(),
+            "lesiones": (form.get("limitaciones") or "").strip(),
+            "disponibilidad": disponibilidad_ai,
+            "progresion_preferida": form.get("progresion", "doble_progresion"),
+            "volumen_tolerancia": form.get("volumen", "media"),
+            "semanas_ciclo": int(form.get("semanas", 6)),
+            "superseries_ok": bool(form.get("superseries", True)),
+            "deload_preferido_semana": int(form.get("deload", 0)),
+            "unidades": "kg",
+            "idioma": "es",
+            "pr_recientes": {"unidad": "kg"},
+            "enfasis_accesorios": [],
+            "evitar": evitar_list,
+            "calentamiento": "breve",
+            "agrupacion": "Un solo grupo principal por día" if "ppl" in (split_pref or "").lower() else "Varios grupos principales por día",
+            "split_pref": split_pref,
+            "ia_detalles": ia_detalles,
+            "comentarios": (form.get("notas") or "").strip(),
+            "rir_obj": int(form.get("rir", 2)),
+        }
 
-        st.markdown("---")
-        st.subheader("Generar rutina")
+        # Mostrar análisis previo
+        try:
+            analysis = analyze_user_data(datos_usuario)
+            with st.expander("🧠 Análisis de consignas (antes de generar)", expanded=False):
+                st.markdown("**Restricciones interpretadas:**")
+                st.markdown("\n".join(analysis.get("restricciones", [])) or "(Sin restricciones adicionales)")
+        except Exception:
+            pass
 
-        with st.form("cr_generate_form"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                objetivo = st.selectbox("Objetivo", ["hipertrofia", "fuerza", "pérdida de grasa", "rendimiento / salud"], index=["hipertrofia", "fuerza", "pérdida de grasa", "rendimiento / salud"].index(data.get("objetivo","hipertrofia")))
-                nivel = st.selectbox("Nivel", ["principiante", "intermedio", "avanzado"], index=["principiante","intermedio","avanzado"].index(data.get("nivel","intermedio")))
-            with c2:
-                dias = st.number_input("Días/semana", min_value=1, max_value=6, value=int(data.get("dias",4) or 4), step=1)
-                duracion = st.slider("Duración (min)", min_value=30, max_value=120, value=int(data.get("duracion",60) or 60), step=5)
-            with c3:
-                rir_obj = st.slider("RIR objetivo", min_value=0, max_value=4, value=int(data.get("rir_obj",2) or 2))
-                superseries_ok = st.checkbox("Permitir superseries", value=bool(data.get("superseries_ok", True)))
+        api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+        if not api_key_ok:
+            st.warning("No se detecta OPENAI_API_KEY en Streamlit Secrets. Se usará rutina predeterminada.")
 
-            dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-            disponibilidad = st.multiselect("Disponibilidad", dias_semana, default=data.get("disponibilidad") or _default_disponibilidad(int(dias)))
-
-            e1, e2 = st.columns([1.2, 1.8])
-            with e1:
-                material_preset = st.radio(
-                    "Equipo (preset)",
-                    ["Gimnasio completo", "Casa (mancuernas/bandas)", "Mancuernas", "Bandas / peso corporal", "Personalizado"],
-                    index=["Gimnasio completo", "Casa (mancuernas/bandas)", "Mancuernas", "Bandas / peso corporal", "Personalizado"].index(data.get("material_preset", "Gimnasio completo")),
-                    horizontal=True,
-                )
-            with e2:
-                material_custom = []
-                if material_preset == "Personalizado":
-                    material_custom = st.multiselect(
-                        "Material disponible",
-                        ["barra", "mancuernas", "poleas", "máquinas", "banco", "rack", "prensa", "dominadas", "anillas", "gomas", "kettlebells", "discos"],
-                        default=data.get("material_custom", []),
-                    )
-
-            split_pref = st.selectbox("Split preferido", _split_options(int(dias)), index=_split_options(int(dias)).index(data.get("split_pref","Recomiéndame")) if data.get("split_pref","Recomiéndame") in _split_options(int(dias)) else 0)
-
-            prioridades_sel = st.multiselect(
-                "Prioridades (opcional)",
-                ["pecho", "espalda", "pierna", "glúteo", "hombro", "brazos", "core"],
-                default=[p for p in (data.get("prioridades", []) or []) if p != "ninguno"],
-            )
-
-            basicos_sel = st.multiselect(
-                "Básicos a mejorar (solo fuerza, opcional)",
-                ["sentadilla", "press banca", "peso muerto", "press militar", "dominadas lastradas", "remo"],
-                default=data.get("basicos_objetivo", []) if isinstance(data.get("basicos_objetivo", []), list) else [],
-            )
-
-            limitaciones = st.text_input("Lesiones/limitaciones", value=data.get("limitaciones",""))
-            evitar_txt = st.text_input("Evitar (coma separada)", value=data.get("evitar_txt",""))
-            lesion_detalle = st.text_input("Detalle lesión/movimientos que molestan (opcional)", value=data.get("lesion_detalle",""))
-
-            with st.expander("Ajustes avanzados (opcional)", expanded=False):
-                cA, cB, cC = st.columns(3)
-                with cA:
-                    progresion_pref = st.selectbox("Progresión preferida", ["doble_progresion", "lineal", "RPE_autorregulada"], index=0)
-                    volumen_tol = st.select_slider("Tolerancia a volumen", options=["baja", "media", "alta"], value="media")
-                with cB:
-                    semanas_ciclo = st.number_input("Semanas del ciclo", min_value=4, max_value=12, value=6)
-                    deload_semana_pref = st.number_input("Deload preferido (semana)", min_value=0, max_value=12, value=5, help="0 = sin preferencia")
-                with cC:
-                    calentamiento = st.selectbox("Calentamiento", ["breve", "medio", "largo"], index=0)
-                    cardio_pref = st.selectbox("Cardio", ["", "No", "Sí: LISS/Zona 2 (suave)", "Sí: HIIT (intenso)", "Sí: combinado", "Recomiéndame"], index=0)
-
-                st.caption("Si entrenas en casa o con equipo limitado:")
-                cargas_max = st.text_input("Cargas máximas (opcional)", value=data.get("cargas_max",""), placeholder="Mancuernas 24kg, barra 80kg…")
-
-            ia_detalles = st.text_area(
-                "Detalles que se enviarán a la IA (puedes editarlo)",
-                value=st.session_state.get("cr_auto_details", auto_details),
-                height=220
-            )
-            notas_extra = st.text_area("Notas adicionales (opcional)", value="", height=120, placeholder="Ej.: quiero 2 ejercicios de glúteo por sesión • evitar press militar • más core…")
-
-            generate = st.form_submit_button("🤖 Generar rutina", use_container_width=True)
-
-        if generate:
-            # Persistir lo editado en sesión
-            st.session_state["cr_data"].update({
-                "objetivo": objetivo,
-                "nivel": nivel,
-                "dias": int(dias),
-                "duracion": int(duracion),
-                "disponibilidad": disponibilidad if disponibilidad else _default_disponibilidad(int(dias)),
-                "material_preset": material_preset,
-                "material_custom": material_custom,
-                "split_pref": split_pref,
-                "prioridades": prioridades_sel,
-                "basicos_objetivo": basicos_sel,
-                "limitaciones": (limitaciones or "").strip(),
-                "evitar_txt": (evitar_txt or "").strip(),
-                "lesion_detalle": (lesion_detalle or "").strip(),
-                "rir_obj": int(rir_obj),
-                "superseries_ok": bool(superseries_ok),
-            })
-            st.session_state["cr_auto_details"] = ia_detalles
-
-            material_final = _material_from_preset(material_preset, material_custom)
-            if st.session_state["cr_data"].get("material_extra"):
-                material_final = st.session_state["cr_data"]["material_extra"]
-
-            evitar_list = [s.strip() for s in (evitar_txt or "").split(",") if s.strip()]
-
-            # Agrupación: aproximación según split
-            split_l = (split_pref or "").lower()
-            if "ppl" in split_l or split_l in ("torso", "pierna"):
-                agrupacion = "Un solo grupo principal por día"
-            else:
-                agrupacion = "Varios grupos principales por día"
-
-            datos_usuario = {
-                "nivel": nivel,
-                "dias": int(dias),
-                "duracion": int(duracion),
-                "objetivo": objetivo,
-                "material": material_final,
-                "limitaciones": (limitaciones or "").strip(),
-                "lesiones": (limitaciones or "").strip(),  # compat
-                "disponibilidad": st.session_state["cr_data"].get("disponibilidad", []),
-                "progresion_preferida": locals().get("progresion_pref", "doble_progresion"),
-                "volumen_tolerancia": locals().get("volumen_tol", "media"),
-                "semanas_ciclo": int(locals().get("semanas_ciclo", 6)),
-                "superseries_ok": bool(superseries_ok),
-                "deload_preferido_semana": int(locals().get("deload_semana_pref", 5)),
-                "unidades": st.session_state["cr_data"].get("unidades", "kg"),
-                "idioma": st.session_state["cr_data"].get("idioma", "es"),
-                "pr_recientes": {"unidad": st.session_state["cr_data"].get("unidades", "kg")},
-                "enfasis_accesorios": prioridades_sel,
-                "evitar": evitar_list,
-                "calentamiento": locals().get("calentamiento", "breve"),
-                "agrupacion": agrupacion,
-                "ia_detalles": (ia_detalles or "").strip(),
-                "comentarios": (notas_extra or "").strip(),
-            }
-
-
-
-            # --- Análisis previo: interpretamos consignas y restricciones antes de generar ---
-            try:
-                analysis = analyze_user_data(datos_usuario)
-                with st.expander("🧠 Análisis de consignas (antes de generar)", expanded=False):
-                    st.markdown("**Interpretación automática (lo que la IA debe cumplir):**")
-                    st.markdown(chr(10).join(analysis.get('restricciones', [])) or "(Sin restricciones adicionales)")
-                    st.markdown("---")
-                    st.caption("Si algo no te cuadra, ajusta la disponibilidad/material/notas y vuelve a generar.")
-            except Exception:
-                pass
-            api_key_ok = bool(os.getenv("OPENAI_API_KEY"))
+        with st.spinner("Generando con IA..."):
             if api_key_ok:
-                with st.spinner("Generando con IA..."):
-                    result = call_gpt(datos_usuario)
-                    if result.get("ok"):
-                        st.session_state["rutina_ia"] = result["data"]
-                        try:
-                            st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
-                        except Exception:
-                            st.session_state["ia_prompt"] = None
-                        st.session_state["ia_system"] = result.get("system")
-                    else:
-                        _asegurar_dias_minimos(datos_usuario)
-                        st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                        try:
-                            st.session_state["ia_prompt"] = result.get("prompt") or build_prompt(datos_usuario)
-                        except Exception:
-                            st.session_state["ia_prompt"] = None
-                        st.session_state["ia_system"] = result.get("system")
-                        err = result.get("error", "Error desconocido")
-                        st.warning("Se usó el plan de respaldo por fallo al generar con OpenAI.")
-                        st.error(f"Fallo al generar con OpenAI: {err}")
+                result = call_gpt(datos_usuario)
             else:
-                st.session_state["rutina_ia"] = generate_fallback(datos_usuario)
-                try:
-                    st.session_state["ia_prompt"] = build_prompt(datos_usuario)
-                except Exception:
-                    st.session_state["ia_prompt"] = None
-                st.session_state["ia_system"] = None
-                st.warning("Se usó el plan de respaldo. Falta OPENAI_API_KEY en el entorno.")
+                result = {"ok": False, "error": "Falta OPENAI_API_KEY"}
 
-        # ---------- Mostrar desde sesión ----------
-        rutina_view = st.session_state.get("rutina_ia")
-        if rutina_view:
-            # ---------- Función de render tipo PDF ----------
-            def render_rutina_tabular(rutina: dict):
-                st.subheader("Plan (vista tipo PDF)")
-                dias_plan = rutina.get("dias", [])
-                if not dias_plan:
-                    st.info("No hay días en la rutina.")
-                    return
-                tab_labels = [d.get("nombre", f"Día {i+1}") for i, d in enumerate(dias_plan)]
-                tab_labels.append("📈 Progreso de ejercicios")
-                tabs = st.tabs(tab_labels)
+        if not result.get("ok"):
+            # Fallback
+            fallback = generate_fallback(datos_usuario)
+            st.session_state["cr2_result"] = fallback
+            st.session_state["cr2_prompt"] = result.get("prompt")
+            st.session_state["cr2_error"] = result.get("error")
+        else:
+            st.session_state["cr2_result"] = result["data"]
+            st.session_state["cr2_prompt"] = result.get("prompt")
+            st.session_state["cr2_error"] = None
 
-                for i, dia in enumerate(dias_plan):
-                    with tabs[i]:
-                        rows = [{
-                            "Ejercicio": ej.get("nombre",""),
-                            "Series": ej.get("series",""),
-                            "Reps": ej.get("reps",""),
-                            "Descanso": ej.get("descanso",""),
-                            "Intensidad": ej.get("intensidad","") or ""
-                        } for ej in dia.get("ejercicios", [])]
-                        import pandas as _pd
-                        st.table(_pd.DataFrame(rows, columns=["Ejercicio","Series","Reps","Descanso","Intensidad"]))
-                        if dia.get("notas"):
-                            st.caption("Notas: " + dia["notas"])
+        # Guardamos también contexto útil para programación
+        st.session_state["cr2_ctx"] = {
+            "gym_days": gym_days_list,
+            "calendar_mode": form.get("calendar_mode", "Semanal fijo"),
+            "plan_sessions": plan_sessions,
+        }
+        st.rerun()
 
-                prog = rutina.get("progresion", {})
-                st.markdown("### Progresión")
-                st.write(
-                    f"- **Principales:** {prog.get('principales','')}\n"
-                    f"- **Accesorios:** {prog.get('accesorios','')}\n"
-                    f"- **Deload (semana):** {prog.get('deload_semana','')}"
+    # ----------------------------
+    #  Render resultado
+    # ----------------------------
+    plan = st.session_state.get("cr2_result")
+    if plan:
+        st.subheader("Resultado")
+
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            pdf_bytes = rutina_a_pdf_bytes(plan)
+            st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina_ia.pdf", mime="application/pdf", use_container_width=True)
+        with c2:
+            st.download_button(
+                "🧾 Descargar JSON",
+                data=json.dumps(plan, ensure_ascii=False, indent=2),
+                file_name="rutina_ia.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+        with c3:
+            if st.session_state.get("cr2_error"):
+                st.warning(f"Se usó fallback o hubo errores: {st.session_state.get('cr2_error')}")
+
+        with st.expander("Ver plan (JSON)", expanded=False):
+            st.json(plan)
+        with st.expander("Ver prompt enviado a la IA", expanded=False):
+            st.code(st.session_state.get("cr2_prompt") or "(sin prompt)")
+
+        # ----------------------------
+        #  Guardar sesiones como rutinas
+        # ----------------------------
+        st.markdown("---")
+        st.subheader("Guardar sesiones y programar calendario")
+
+        sesiones = plan.get("dias", []) or []
+        if not sesiones:
+            st.info("El plan no contiene sesiones.")
+        else:
+            existing = [r.get("name") for r in list_routines(user)]
+
+            with st.form("cr2_save_plan"):
+                st.caption("Puedes renombrar cada sesión antes de guardarla.")
+                nombres = []
+                for i, ses in enumerate(sesiones):
+                    default_name = (ses.get("nombre") or f"Sesión {i+1}")
+                    # Quitar prefijo de día/etiqueta si existe "X - Y"
+                    if " - " in default_name:
+                        default_name = default_name.split(" - ", 1)[1].strip() or default_name
+                    nombres.append(st.text_input(f"Nombre rutina {i+1}", value=default_name, key=f"cr2_name_{i}"))
+
+                st.markdown("#### Programación")
+                ctx = st.session_state.get("cr2_ctx") or {}
+                default_gym = ctx.get("gym_days") or form.get("gym_days") or _default_gym_days(int(form.get("dias_gym") or 4))
+
+                p1, p2, p3 = st.columns(3)
+                start_date = p1.date_input("Inicio", value=_dt.date.today(), key="cr2_start_date")
+                weeks = p2.number_input("Semanas a programar", min_value=1, max_value=52, value=int(form.get("semanas", 6)), step=1, key="cr2_weeks")
+                gym_days = p3.multiselect("Días de gimnasio", DIAS_SEMANA, default=default_gym, key="cr2_gym_days")
+
+                start_session = st.number_input(
+                    "Empezar por la sesión nº",
+                    min_value=1,
+                    max_value=len(sesiones),
+                    value=1,
+                    step=1,
+                    key="cr2_start_session",
+                    help="Si ya has hecho algunas sesiones del ciclo, empieza donde toca.",
                 )
 
-            render_rutina_tabular(rutina_view)
+                save_and_program = st.form_submit_button("Guardar y programar", use_container_width=True)
 
-            pdf_bytes = rutina_a_pdf_bytes(rutina_view)
-            st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="rutina.pdf", mime="application/pdf")
-            st.download_button("📥 Descargar JSON", data=json.dumps(rutina_view, ensure_ascii=False, indent=2),
-                               file_name="rutina.json", mime="application/json")
+            if save_and_program:
+                if not gym_days:
+                    st.error("Selecciona al menos un día de gimnasio.")
+                else:
+                    # 1) Guardar rutinas
+                    saved_names = []
+                    names_local = list(existing)
+                    for i, ses in enumerate(sesiones):
+                        rname = _ensure_unique_name((nombres[i] or "").strip(), names_local)
+                        items = []
+                        for ej in ses.get("ejercicios", []) or []:
+                            items.append({
+                                "exercise": ej.get("nombre", "Ejercicio"),
+                                "sets": int(ej.get("series", 3) or 3),
+                                "reps": _extract_reps_to_int(ej.get("reps", "10"), default=10),
+                                "weight": 0.0,
+                            })
+                        add_routine(user, rname, items)
+                        saved_names.append(rname)
 
-            st.markdown("---")
-            st.subheader("📅 Nombra, asigna días y programa semanas")
+                    # 2) Programar calendario
+                    day_idxs = sorted({DIAS_SEMANA.index(d) for d in gym_days})
+                    end_date = start_date + _dt.timedelta(days=int(weeks) * 7 - 1)
 
-            dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-            with st.form("planificacion_form", clear_on_submit=False):
-                schedule = []
-                for i, dia in enumerate(rutina_view.get("dias", [])):
-                    st.write(f"**{i+1}. {dia.get('nombre','Día')}**")
-                    c1, c2 = st.columns(2)
-                    weekday = c1.selectbox("Día de la semana", dias_semana, key=f"weekday_ai_{i}")
-                    custom_name = c2.text_input("Nombre de la rutina", value=dia.get("nombre","Día"), key=f"dname_ai_{i}")
-                    schedule.append({
-                        "day_index": i,
-                        "weekday": dias_semana.index(weekday),
-                        "name": custom_name
-                    })
-                cA, cB, cC = st.columns(3)
-                start_date = cA.date_input("Inicio", value=_dt.date.today(), key="plan_start")
-                weeks = cB.number_input("Semanas", min_value=1, max_value=52, value=4, step=1, key="plan_weeks")
-                guardar = cC.form_submit_button("💾 Guardar y programar")
+                    fechas = []
+                    cur = start_date
+                    while cur <= end_date:
+                        if cur.weekday() in day_idxs:
+                            fechas.append(cur)
+                        cur += _dt.timedelta(days=1)
 
-            if guardar:
-                existing = [r["name"] for r in list_routines(user)]
-                def _ensure_unique(name, existing_names):
-                    base, n, cand = name, 1, name
-                    while cand in existing_names:
-                        n += 1
-                        cand = f"{base} ({n})"
-                    existing_names.append(cand)
-                    return cand
+                    if not fechas:
+                        st.warning("No se encontraron fechas con los días seleccionados en el rango elegido.")
+                    else:
+                        mode = (ctx.get("calendar_mode") or form.get("calendar_mode") or "Semanal fijo")
+                        start_idx = int(start_session) - 1
 
-                created = []
-                for s in schedule:
-                    d = rutina_view["dias"][s["day_index"]]
-                    rname = _ensure_unique(s["name"].strip() or d.get("nombre","Día"), existing)
-                    items = []
-                    for ej in d.get("ejercicios", []):
-                        reps = ej.get("reps","10")
-                        try:
-                            reps_val = int(str(reps).replace("–","-").split("-")[-1].strip())
-                        except:
-                            reps_val = 10
-                        items.append({"exercise": ej.get("nombre",""), "sets": int(ej.get("series",3)), "reps": reps_val, "weight": 0.0})
-                    add_routine(user, rname, items)
-                    created.append((s["weekday"], rname))
+                        if mode == "Semanal fijo" and len(saved_names) == len(gym_days):
+                            # Asigna siempre la misma sesión al mismo día de la semana
+                            # (orden según la lista gym_days que eligió el usuario)
+                            mapping = {DIAS_SEMANA.index(d): i for i, d in enumerate(gym_days)}
+                            for d in fechas:
+                                ses_idx = mapping.get(d.weekday(), 0) % len(saved_names)
+                                _set_plan(user, d.isoformat(), saved_names[ses_idx])
+                        else:
+                            # Ciclo rotativo: consume sesiones en orden
+                            for j, d in enumerate(fechas):
+                                ses_idx = (start_idx + j) % len(saved_names)
+                                _set_plan(user, d.isoformat(), saved_names[ses_idx])
 
-                try:
-                    base_mon = start_date - _dt.timedelta(days=start_date.weekday())
-                    for w in range(int(weeks)):
-                        for wd, rname in created:
-                            d = base_mon + _dt.timedelta(weeks=w, days=int(wd))
-                            _set_plan(user, d.isoformat(), rname)
-                    st.success("Rutinas guardadas y programadas ✅")
-                except NameError:
-                    st.warning("No se encontró _set_plan; se guardaron las rutinas, pero no se pudo programar en calendario.")
-                except Exception as e:
-                    st.error(f"Error al programar: {e}")
-
-            if st.session_state.get("ia_prompt"):
-                with st.expander("🧠 Ver prompt construido con tus parámetros", expanded=False):
-                    st.code(st.session_state.get("ia_prompt"))
-
-            with st.expander("Ver JSON (avanzado)", expanded=False):
-                st.json(rutina_view)
+                        st.success(f"Rutinas guardadas ({len(saved_names)}) y programadas en {len(fechas)} días ✅")
 
 
 elif page == "👤 Perfil":
