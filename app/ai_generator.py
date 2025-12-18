@@ -532,6 +532,7 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
         duracion = 60
     duracion = max(30, min(120, duracion))
 
+
     # --- Disponibilidad ---
     disp = datos.get("disponibilidad") or []
     if isinstance(disp, str):
@@ -539,27 +540,51 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     disp = list(disp) if isinstance(disp, (list, tuple)) else []
 
     dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-    if disp:
-        disp_norm = []
-        for d in disp:
-            d0 = str(d).strip().capitalize()
-            if d0.lower() in ("miercoles","miércoles"):
-                d0 = "Miércoles"
-            if d0.lower() in ("sabado","sábado"):
-                d0 = "Sábado"
-            if d0 in dias_semana and d0 not in disp_norm:
-                disp_norm.append(d0)
-        disp = disp_norm
+    label_mode = False
 
-    # Ajuste a número de días
+    if disp:
+        cleaned = []
+        for d in disp:
+            d0 = str(d).strip()
+            if not d0:
+                continue
+            low = d0.lower()
+            if low in ("miercoles", "miércoles"):
+                d0 = "Miércoles"
+            elif low in ("sabado", "sábado"):
+                d0 = "Sábado"
+            else:
+                d0 = d0[0].upper() + d0[1:] if len(d0) > 1 else d0.upper()
+            cleaned.append(d0)
+
+        # Si hay etiquetas que NO son días de la semana (p.ej. "Sesión 1"), las tratamos como etiquetas de sesión.
+        if any(x not in dias_semana for x in cleaned):
+            label_mode = True
+            disp_norm = []
+            for x in cleaned:
+                if x not in disp_norm:
+                    disp_norm.append(x)
+            disp = disp_norm
+        else:
+            disp_norm = []
+            for x in cleaned:
+                if x in dias_semana and x not in disp_norm:
+                    disp_norm.append(x)
+            disp = disp_norm
+
+    # Ajuste a número de días/sesiones
     if len(disp) != dias:
         if disp:
             disp = disp[:dias]
-            for d in dias_semana:
-                if len(disp) >= dias:
-                    break
-                if d not in disp:
-                    disp.append(d)
+            if not label_mode:
+                for d in dias_semana:
+                    if len(disp) >= dias:
+                        break
+                    if d not in disp:
+                        disp.append(d)
+            else:
+                while len(disp) < dias:
+                    disp.append(f"Sesión {len(disp)+1}")
         else:
             defaults = ["Lunes","Martes","Jueves","Viernes","Miércoles","Sábado"]
             disp = defaults[:dias]
@@ -590,7 +615,7 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     if "ppl" in split_low:
         # Para 4 días: PPL + 1 extra de tren superior (Push B por defecto)
         if dias == 4:
-            split_template = ["Push A", "Pull A", "Legs", "Push B"]
+            split_template = ["Push", "Pull", "Legs", "Upper"]
         elif dias == 3:
             split_template = ["Push", "Pull", "Legs"]
         elif dias == 6:
@@ -715,9 +740,13 @@ def build_prompt(datos: Dict[str, Any]) -> str:
     if A.get("split_pref"):
         split_rules += "REGLAS DE SPLIT (OBLIGATORIO):" + nl
         if A.get("split_template"):
-            # Se exige el orden, y que se refleje en el nombre del día para que la app lo valide.
+            # Se exige el orden, y que se refleje en el nombre del día/sesión para que la app lo valide.
             split_rules += f"- Usa este orden exacto de sesiones: {A['split_template']}." + nl
-            split_rules += "- El campo 'nombre' de cada día debe ser: '<DíaSemana> - <Sesión>' (ej: 'Lunes - Push A')." + nl
+            dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+            if all(d in dias_semana for d in A.get("disponibilidad", [])):
+                split_rules += "- El campo 'nombre' de cada día debe ser: '<DíaSemana> - <Sesión>' (ej: 'Lunes - Push')." + nl
+            else:
+                split_rules += "- El campo 'nombre' de cada sesión debe ser: '<Etiqueta> - <Sesión>' (ej: 'Sesión 1 - Push A')." + nl
         else:
             split_rules += f"- Split preferido: {A['split_pref']}. Respétalo." + nl
         split_rules += nl
