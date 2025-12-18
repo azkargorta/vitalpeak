@@ -439,6 +439,9 @@ def validar_negocio(plan: Dict[str, Any]) -> List[str]:
         errs.append("'meta.duracion_min' debe ser un número en minutos.")
 
     dias = plan.get("dias") or plan.get("dias_semana") or plan.get("workout") or plan.get("days")
+    # Normaliza: si viene con otra clave, muévelo a "dias" para validadores posteriores.
+    if isinstance(dias, list) and "dias" not in plan:
+        plan["dias"] = dias
     if not isinstance(dias, list) or len(dias) == 0:
         errs.append("'dias' debe ser una lista con al menos 1 día.")
         return errs
@@ -842,17 +845,20 @@ def _chat(client: OpenAI, prompt: str, *, temperature: float = 0.1) -> str:
     return resp.choices[0].message.content
 
 def _try_parse_json(text: str) -> Dict[str, Any]:
-    """Intenta parsear JSON tolerante a respuestas con texto adicional o fences."""
-    # Respuesta vacía -> error claro
+    """Intenta parsear JSON tolerante a respuestas con texto adicional o fences.
+
+    Nota: _extract_json devuelve una *cadena* con el bloque JSON; después hay que json.loads().
+    """
     if not text or not str(text).strip():
         raise ValueError("Respuesta de OpenAI vacía")
     try:
-        # Intento directo
         return json.loads(text)
     except Exception:
-        # Intento robusto: extraer bloque JSON o primer objeto balanceado
-        return _extract_json(text)
-
+        extracted = _extract_json(text)
+        try:
+            return json.loads(extracted)
+        except Exception as e:
+            raise ValueError(f"JSON no válido tras extraer bloque: {e}")
 
 # === Reglas adicionales derivadas de 'comentarios' del usuario ===
 from typing import Any, Dict
