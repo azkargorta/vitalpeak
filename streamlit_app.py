@@ -285,6 +285,7 @@ with st.sidebar:
         [
             "🔐 Login / Registro",
             "🏠 Inicio",
+            "🗓️ Mini calendario",
             "🏋️ Añadir entrenamiento",
             "📚 Gestor de ejercicios",
             "📈 Tabla de entrenamientos",
@@ -472,6 +473,68 @@ elif page == "🏠 Inicio":
     # Extra: tabla (útil para copiar/leer en móvil)
     df_week = pd.DataFrame({"Día": dias_full, "Fecha": [d.isoformat() for d in week_dates], "Rutina": values})
     st.dataframe(df_week, use_container_width=True, hide_index=True)
+
+
+elif page == "🗓️ Mini calendario":
+    require_auth()
+    st.title("Mini calendario")
+
+    user = st.session_state["user"]
+    data_u = load_user(user)
+    plan = dict(data_u.get("routine_plan", {}))
+
+    st.caption("Vista rápida del mes con las rutinas asignadas. (La asignación se gestiona desde Inicio → Planificador).")
+
+    import calendar as _cal
+    import datetime as _dt
+
+    cal_month = st.date_input("Elegir mes", value=date.today(), key="mini_cal_month_page")
+    y, m = cal_month.year, cal_month.month
+
+    cal = _cal.Calendar(firstweekday=0)
+    weeks = cal.monthdayscalendar(y, m)
+
+    palette = ["#E3F2FD", "#FCE4EC", "#E8F5E9", "#FFF3E0", "#F3E5F5", "#E0F2F1", "#F9FBE7", "#ECEFF1", "#FBE9E7", "#EDE7F6"]
+
+    def color_for(name: str) -> str:
+        if not name:
+            return "transparent"
+        return palette[abs(hash(name)) % len(palette)]
+
+    weekdays = ["L", "M", "X", "J", "V", "S", "D"]
+    html = "<style>.cal td{padding:6px 8px;border:1px solid #ddd;vertical-align:top;width:14%;} .cal th{padding:6px 8px;border:1px solid #ddd;background:#fafafa;} .tag{display:block;margin-top:4px;padding:2px 4px;border-radius:4px;font-size:11px;}</style>"
+    html += "<table class='cal' style='border-collapse:collapse;width:100%'>"
+    html += "<thead><tr>" + "".join(f"<th>{d}</th>" for d in weekdays) + "</tr></thead><tbody>"
+
+    for week in weeks:
+        html += "<tr>"
+        for day in week:
+            if day == 0:
+                html += "<td></td>"
+            else:
+                d = _dt.date(y, m, day)
+                iso = d.isoformat()
+                name = plan.get(iso, "")
+                bg = color_for(name)
+                tag = f"<span class='tag' style='background:{bg}'>{name}</span>" if name else "<span class='tag' style='opacity:0.4'>Libre</span>"
+                html += f"<td><div><strong>{day}</strong></div>{tag}</td>"
+        html += "</tr>"
+
+    html += "</tbody></table>"
+
+    assigned_names = set()
+    for week in weeks:
+        for day in week:
+            if day != 0:
+                iso_key = _dt.date(y, m, day).isoformat()
+                val = plan.get(iso_key)
+                if val:
+                    assigned_names.add(val)
+
+    if assigned_names:
+        html += "<div style='margin-top:8px'><strong>Leyenda:</strong> " + " ".join(f"<span class='tag' style='background:{color_for(n)}'>{n}</span>" for n in sorted(assigned_names)) + "</div>"
+
+    st.markdown(html, unsafe_allow_html=True)
 
 
 elif page == "🏋️ Añadir entrenamiento":
@@ -1198,47 +1261,6 @@ elif page == "📘 Rutinas":
                         count += 1
                 st.success(f"Desasignadas {count} fechas de los {weekday_names[weekday_index]} de {target_month:02d}/{target_year}.")
                 st.rerun()
-
-    # ---------- Mini-calendario mensual coloreado ----------
-    with st.expander("Mini-calendario mensual (vista rápida)", expanded=False):
-        import calendar as _cal
-        import datetime as _dt
-        cal_month = st.date_input("Elegir mes", value=date.today(), key="mini_cal_month")
-        y, m = cal_month.year, cal_month.month
-        cal = _cal.Calendar(firstweekday=0)
-        weeks = cal.monthdayscalendar(y, m)
-        palette = ["#E3F2FD", "#FCE4EC", "#E8F5E9", "#FFF3E0", "#F3E5F5", "#E0F2F1", "#F9FBE7", "#ECEFF1", "#FBE9E7", "#EDE7F6"]
-        def color_for(name: str) -> str:
-            if not name: return "transparent"
-            return palette[abs(hash(name)) % len(palette)]
-        weekdays = ["L", "M", "X", "J", "V", "S", "D"]
-        html = "<style>.cal td{padding:6px 8px;border:1px solid #ddd;vertical-align:top;width:14%;} .cal th{padding:6px 8px;border:1px solid #ddd;background:#fafafa;} .tag{display:block;margin-top:4px;padding:2px 4px;border-radius:4px;font-size:11px;}</style>"
-        html += "<table class='cal' style='border-collapse:collapse;width:100%'>"
-        html += "<thead><tr>" + "".join(f"<th>{d}</th>" for d in weekdays) + "</tr></thead><tbody>"
-        for week in weeks:
-            html += "<tr>"
-            for day in week:
-                if day == 0:
-                    html += "<td></td>"
-                else:
-                    d = _dt.date(y, m, day)
-                    iso = d.isoformat()
-                    name = plan.get(iso, "")
-                    bg = color_for(name)
-                    tag = f"<span class='tag' style='background:{bg}'>{name}</span>" if name else "<span class='tag' style='opacity:0.4'>Libre</span>"
-                    html += f"<td><div><strong>{day}</strong></div>{tag}</td>"
-            html += "</tr>"
-        html += "</tbody></table>"
-        assigned_names = set()
-        for week in weeks:
-            for day in week:
-                if day != 0:
-                    iso_key = _dt.date(y, m, day).isoformat()
-                    val = plan.get(iso_key)
-                    if val: assigned_names.add(val)
-        if assigned_names:
-            html += "<div style='margin-top:8px'><strong>Leyenda:</strong> " + " ".join(f"<span class='tag' style='background:{color_for(n)}'>{n}</span>" for n in sorted(assigned_names)) + "</div>"
-        st.markdown(html, unsafe_allow_html=True)
 
     # ---------- Copiar plan de un mes a otro (por día de la semana) ----------
     with st.expander("Copiar plan de un mes a otro (por día de la semana)", expanded=False):
