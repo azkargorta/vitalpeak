@@ -6,6 +6,9 @@ from typing import List, Dict
 
 import streamlit as st
 
+from .technique_cards import get_card, render_card, render_card_editor
+from .technique_animation_component import render_minimal_3d_animation
+
 
 @dataclass
 class TechniqueItem:
@@ -62,22 +65,45 @@ def get_library() -> Dict[str, TechniqueItem]:
 
 
 def render_technique_page() -> None:
-    st.subheader("🎥 Técnica de ejercicios (animación)")
-    st.caption("Vídeos cortos tipo esquema + claves técnicas. Cámara lateral recomendada.")
+    st.subheader("🎥 Técnica")
+    st.caption("Ficha estándar por ejercicio + mini-animación 3D minimal (2 vistas) + vídeo opcional.")
+
+    user = st.session_state.get("user")
+    if not user:
+        st.warning("Inicia sesión para ver/editar tus fichas técnicas.")
+        return
 
     lib = get_library()
     exercise = st.selectbox("Ejercicio", list(lib.keys()), index=0, key="tech_exercise")
     item = lib[exercise]
 
-    video_path = assets_dir() / item.video_filename
-    if video_path.exists():
-        st.video(str(video_path))
-    else:
-        st.warning("No se encontró el vídeo de técnica en assets/technique.")
-        st.code(str(video_path))
+    tab_card, tab_anim, tab_video = st.tabs(["📄 Ficha técnica", "🧍 Mini-animación 3D", "🎬 Vídeo (opcional)"])
 
-    st.markdown("### Claves técnicas")
-    for cue in item.cues:
-        st.markdown(f"- {cue}")
+    with tab_card:
+        card = get_card(user, exercise)
+        render_card(card)
 
-    st.info("Tip: estos vídeos están pensados como guía rápida. Si quieres, puedo añadir versión 'errores comunes' por ejercicio.")
+        with st.expander("Editar ficha", expanded=False):
+            render_card_editor(user, exercise, initial=card)
+
+    with tab_anim:
+        st.caption("Plantilla 3D reutilizable (mismo estilo para todo). 2 vistas fijas: lateral + frontal.")
+        # Preferimos los cues de la ficha si existen; si no, usamos los del item.
+        card = get_card(user, exercise)
+        cues = (card.get("quick_cues") or []) if isinstance(card, dict) else []
+        cues = [c for c in cues if str(c).strip()]
+        if not cues:
+            cues = item.cues[:3]
+        render_minimal_3d_animation(item.exercise_id, cues=cues)
+
+    with tab_video:
+        video_path = assets_dir() / item.video_filename
+        if video_path.exists():
+            st.video(str(video_path))
+        else:
+            st.warning("No se encontró el vídeo de técnica en assets/technique.")
+            st.code(str(video_path))
+
+        st.markdown("### Claves técnicas (rápidas)")
+        for cue in item.cues:
+            st.markdown(f"- {cue}")
