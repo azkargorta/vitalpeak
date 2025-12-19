@@ -23,17 +23,55 @@ load_dotenv()
 # Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
 try:
     if hasattr(st, 'secrets'):
-        if 'OPENAI_API_KEY' in st.secrets and not os.getenv('OPENAI_API_KEY'):
-            os.environ['OPENAI_API_KEY'] = str(st.secrets['OPENAI_API_KEY']).strip()
-        if 'OPENAI_MODEL' in st.secrets and str(st.secrets['OPENAI_MODEL']).strip():
-            os.environ['OPENAI_MODEL'] = str(st.secrets['OPENAI_MODEL']).strip()
+        def _get_secret_any(key: str):
+            # top-level
+            if key in st.secrets:
+                return str(st.secrets[key]).strip()
+            # nested [openai] / [supabase]
+            if key.startswith('OPENAI_') and 'openai' in st.secrets:
+                tbl = st.secrets.get('openai')
+                if hasattr(tbl, 'keys'):
+                    kk = key.replace('OPENAI_', '').lower()
+                    for cand in (kk, kk.upper(), key, key.lower()):
+                        if cand in tbl:
+                            return str(tbl[cand]).strip()
+            if key.startswith('SUPABASE_') and 'supabase' in st.secrets:
+                tbl = st.secrets.get('supabase')
+                if hasattr(tbl, 'keys'):
+                    kk = key.replace('SUPABASE_', '').lower()
+                    alias = {
+                        'service_role_key': ['service_role_key','service_key','key'],
+                        'url': ['url'],
+                        'bucket': ['bucket'],
+                    }
+                    if kk in alias:
+                        for cand in alias[kk]:
+                            if cand in tbl:
+                                return str(tbl[cand]).strip()
+                    if kk in tbl:
+                        return str(tbl[kk]).strip()
+            return ""
+
+        # OpenAI
+        if not os.getenv('OPENAI_API_KEY'):
+            v = _get_secret_any('OPENAI_API_KEY')
+            if v:
+                os.environ['OPENAI_API_KEY'] = v
+        v = _get_secret_any('OPENAI_MODEL')
+        if v:
+            os.environ['OPENAI_MODEL'] = v
+
         # Supabase (Posture MVP)
-        if 'SUPABASE_URL' in st.secrets and str(st.secrets['SUPABASE_URL']).strip():
-            os.environ['SUPABASE_URL'] = str(st.secrets['SUPABASE_URL']).strip()
-        if 'SUPABASE_SERVICE_ROLE_KEY' in st.secrets and str(st.secrets['SUPABASE_SERVICE_ROLE_KEY']).strip():
-            os.environ['SUPABASE_SERVICE_ROLE_KEY'] = str(st.secrets['SUPABASE_SERVICE_ROLE_KEY']).strip()
-        if 'SUPABASE_BUCKET' in st.secrets and str(st.secrets['SUPABASE_BUCKET']).strip():
-            os.environ['SUPABASE_BUCKET'] = str(st.secrets['SUPABASE_BUCKET']).strip()
+        v = _get_secret_any('SUPABASE_URL')
+        if v:
+            os.environ['SUPABASE_URL'] = v
+        # accept both names
+        v = _get_secret_any('SUPABASE_SERVICE_ROLE_KEY') or _get_secret_any('SUPABASE_SERVICE_KEY')
+        if v:
+            os.environ['SUPABASE_SERVICE_ROLE_KEY'] = v
+        v = _get_secret_any('SUPABASE_BUCKET')
+        if v:
+            os.environ['SUPABASE_BUCKET'] = v
 except Exception:
     pass
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -75,6 +113,7 @@ from app.posture_mvp import (
     get_signed_urls_for_record,
     delete_posture_record,
 )
+from app.supabase_utils import supabase_config_status
 from app.health import (
     add_weight, list_weights,
 )
@@ -574,10 +613,24 @@ elif page == "🧍 Corrector de postura":
                     st.json(a)
 
             except Exception as e:
+                sbst = supabase_config_status()
                 st.error(
                     "Error en el análisis/guardado.\n\n"
-                    "Comprueba que tienes configurado en Streamlit Secrets: OPENAI_API_KEY, SUPABASE_URL, "
-                    "SUPABASE_SERVICE_ROLE_KEY y que existe la tabla `posture_analyses`.\n\n"
+                    "✅ Revisa Streamlit Secrets (Manage app → Settings → Secrets).\n\n"
+                    "**OpenAI** (obligatorio):\n"
+                    "- OPENAI_API_KEY\n\n"
+                    "**Supabase** (obligatorio):\n"
+                    "- SUPABASE_URL\n"
+                    "- SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY)\n"
+                    "- (opcional) SUPABASE_BUCKET=posture\n\n"
+                    "También acepto formato anidado TOML:\n"
+                    "[supabase]\n"
+                    "url = \"...\"\n"
+                    "service_role_key = \"...\"\n\n"
+                    "Estado detectado (sin mostrar valores): "
+                    f"has_url={sbst.get('has_url')}, has_key={sbst.get('has_key')}, "
+                    f"secrets_keys={sbst.get('secrets_keys', [])}\n\n"
+                    "Además, confirma que existe la tabla `posture_analyses` y el bucket `posture`.\n\n"
                     f"Detalle: {e}"
                 )
 

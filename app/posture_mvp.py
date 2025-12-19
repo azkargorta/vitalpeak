@@ -19,6 +19,7 @@ from .supabase_utils import (
     db_select,
     get_supabase_bucket,
     get_supabase_client,
+    supabase_config_status,
     storage_remove,
     storage_signed_url,
     storage_upload_bytes,
@@ -158,8 +159,14 @@ def analyze_and_store_posture(
     # --- Supabase config
     sb = get_supabase_client()
     if sb is None:
+        st = supabase_config_status()
+        # Don't leak secrets values; only show which keys are present.
         raise RuntimeError(
-            "Supabase no está configurado. Añade SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Secrets." 
+            "Supabase no está configurado o no se detectan las claves necesarias. "
+            "Configura en Streamlit Secrets SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY). "
+            "También acepto formato anidado TOML [supabase] url=... service_role_key=... . "
+            f"Detectado: has_url={st.get('has_url')}, has_key={st.get('has_key')}, "
+            f"keys={st.get('secrets_keys', [])}"
         )
     bucket = get_supabase_bucket("posture")
 
