@@ -23,55 +23,10 @@ load_dotenv()
 # Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
 try:
     if hasattr(st, 'secrets'):
-        def _get_secret_any(key: str):
-            # top-level
-            if key in st.secrets:
-                return str(st.secrets[key]).strip()
-            # nested [openai] / [supabase]
-            if key.startswith('OPENAI_') and 'openai' in st.secrets:
-                tbl = st.secrets.get('openai')
-                if hasattr(tbl, 'keys'):
-                    kk = key.replace('OPENAI_', '').lower()
-                    for cand in (kk, kk.upper(), key, key.lower()):
-                        if cand in tbl:
-                            return str(tbl[cand]).strip()
-            if key.startswith('SUPABASE_') and 'supabase' in st.secrets:
-                tbl = st.secrets.get('supabase')
-                if hasattr(tbl, 'keys'):
-                    kk = key.replace('SUPABASE_', '').lower()
-                    alias = {
-                        'service_role_key': ['service_role_key','service_key','key'],
-                        'url': ['url'],
-                        'bucket': ['bucket'],
-                    }
-                    if kk in alias:
-                        for cand in alias[kk]:
-                            if cand in tbl:
-                                return str(tbl[cand]).strip()
-                    if kk in tbl:
-                        return str(tbl[kk]).strip()
-            return ""
-
-        # OpenAI
-        if not os.getenv('OPENAI_API_KEY'):
-            v = _get_secret_any('OPENAI_API_KEY')
-            if v:
-                os.environ['OPENAI_API_KEY'] = v
-        v = _get_secret_any('OPENAI_MODEL')
-        if v:
-            os.environ['OPENAI_MODEL'] = v
-
-        # Supabase (Posture MVP)
-        v = _get_secret_any('SUPABASE_URL')
-        if v:
-            os.environ['SUPABASE_URL'] = v
-        # accept both names
-        v = _get_secret_any('SUPABASE_SERVICE_ROLE_KEY') or _get_secret_any('SUPABASE_SERVICE_KEY')
-        if v:
-            os.environ['SUPABASE_SERVICE_ROLE_KEY'] = v
-        v = _get_secret_any('SUPABASE_BUCKET')
-        if v:
-            os.environ['SUPABASE_BUCKET'] = v
+        if 'OPENAI_API_KEY' in st.secrets and not os.getenv('OPENAI_API_KEY'):
+            os.environ['OPENAI_API_KEY'] = str(st.secrets['OPENAI_API_KEY']).strip()
+        if 'OPENAI_MODEL' in st.secrets and str(st.secrets['OPENAI_MODEL']).strip():
+            os.environ['OPENAI_MODEL'] = str(st.secrets['OPENAI_MODEL']).strip()
 except Exception:
     pass
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -105,30 +60,6 @@ from app.exercises import (
 from app.training import (
     add_training_set, list_training, last_values_for_exercise,
 )
-
-# Posture MVP (video upload + simple feedback + Supabase history)
-from app.posture_mvp import (
-    analyze_and_store_posture,
-    list_posture_history,
-    get_signed_urls_for_record,
-    delete_posture_record,
-)
-try:
-    # Supabase helpers are optional at import-time; if missing deps, we still want the app to boot.
-    from app.supabase_utils import supabase_config_status
-except Exception:
-    def supabase_config_status():  # type: ignore
-        keys_present = []
-        try:
-            keys_present = sorted([str(k) for k in st.secrets.keys()]) if hasattr(st, "secrets") else []
-        except Exception:
-            keys_present = []
-        return {
-            "has_url": bool(os.getenv("SUPABASE_URL")),
-            "has_key": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")),
-            "has_bucket": bool(os.getenv("SUPABASE_BUCKET")),
-            "secrets_keys": keys_present,
-        }
 from app.health import (
     add_weight, list_weights,
 )
@@ -141,6 +72,9 @@ from app.goals import (
 from app.routines import (
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
+
+# Biblioteca de técnica (animaciones cortas + claves)
+from app.technique_library import render_technique_page
 
 def pagina_progreso():
     """Progreso de ejercicios basado en los entrenamientos guardados (usuarios_data/<user>.json).
@@ -354,7 +288,7 @@ with st.sidebar:
         [
             "🔐 Login / Registro",
             "🏠 Inicio",
-            "🧍 Corrector de postura",
+            "🎥 Técnica",
             "🏋️ Añadir entrenamiento",
             "📚 Gestor de ejercicios",
             "📈 Tabla de entrenamientos",
@@ -544,165 +478,9 @@ elif page == "🏠 Inicio":
     st.dataframe(df_week, use_container_width=True, hide_index=True)
 
 
-elif page == "🧍 Corrector de postura":
+elif page == "🎥 Técnica":
     require_auth()
-    st.title("Corrector de postura (MVP)")
-
-    user = st.session_state["user"]  # usamos el mismo identificador que el resto de la app
-
-    sbst = supabase_config_status()
-    using_supabase = bool(sbst.get("has_url")) and bool(sbst.get("has_key"))
-    st.caption(
-        "MVP: cámara lateral (90°) y feedback simple (score + máximo 3 correcciones). "
-        + ("Se guarda vídeo + 3 capturas en Supabase y queda en tu historial." if using_supabase else "Guardado local activado (Supabase no configurado).")
-    )
-    if not using_supabase:
-        st.warning(
-            "Supabase no está configurado. El corrector seguirá funcionando, pero el historial/vídeos "
-            "se guardan **localmente** (en Streamlit Cloud pueden perderse tras redeploy/reinicio). "
-            "Si quieres guardado persistente, añade SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Secrets.",
-            icon="⚠️",
-        )
-
-    tab1, tab2 = st.tabs(["🎥 Analizar", "📚 Historial"])
-
-    with tab1:
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            ejercicio = st.selectbox(
-                "Ejercicio",
-                [
-                    ("Sentadilla", "squat"),
-                    ("Peso muerto", "deadlift"),
-                    ("Press banca", "bench_press"),
-                ],
-                format_func=lambda x: x[0],
-            )
-        with c2:
-            # Microservicio (MediaPipe). Puede estar en Secrets o en variables de entorno.
-            posture_api_url = os.getenv("POSTURE_API_URL") or (st.secrets.get("POSTURE_API_URL") if "POSTURE_API_URL" in st.secrets else "")
-            st.text_input("POSTURE_API_URL", value=posture_api_url or "(no configurado)", disabled=True)
-
-        st.info(
-            "📷 **Grabación (obligatorio)**: cámara lateral 90°, altura de cadera, se ven pies y cuerpo entero. "
-            "Para peso muerto y banca: que se vea también la barra y manos.\n\n"
-            "⏱️ Recomendado: 10–25s."
-        )
-
-        vid = st.file_uploader("Sube tu vídeo (mp4/mov)", type=["mp4", "mov", "m4v", "avi"])
-
-        if vid is not None:
-            st.video(vid)
-
-        if st.button("Analizar", use_container_width=True, disabled=(vid is None)):
-            try:
-                with st.spinner("Analizando vídeo…"):
-                    res = analyze_and_store_posture(
-                        user_id=user,
-                        exercise=ejercicio[1],
-                        video_bytes=vid.getvalue() if vid is not None else b"",
-                        posture_api_url=posture_api_url or None,
-                    )
-
-                st.success(f"Guardado en historial. ID: {res.analysis_id}")
-
-                a = res.analysis
-                cols = st.columns(3)
-                cols[0].metric("Score", int(a.get("score", 0) or 0))
-                cols[1].metric("Estado", str(a.get("status", "")))
-                cols[2].metric("Ejercicio", str(a.get("exercise", "")))
-
-                st.subheader("Correcciones (máx. 3)")
-                cues = a.get("top_cues") or []
-                if cues:
-                    for cue in cues[:3]:
-                        st.write(f"- **{cue.get('title','')}**: {cue.get('detail','')}")
-                else:
-                    st.write("✅ Sin correcciones relevantes.")
-
-                st.subheader("Capturas clave")
-                kcols = st.columns(3)
-                for i, lbl in enumerate(["start", "mid", "end"]):
-                    url = res.keyframe_urls.get(lbl, "")
-                    if url:
-                        kcols[i].image(url, caption=lbl)
-                    else:
-                        kcols[i].write(f"(sin imagen {lbl})")
-
-                with st.expander("Ver vídeo (URL firmada)"):
-                    if res.video_url:
-                        st.video(res.video_url)
-                    else:
-                        st.info("No se pudo generar URL firmada del vídeo.")
-
-                with st.expander("JSON completo"):
-                    st.json(a)
-
-            except Exception as e:
-                sbst2 = supabase_config_status()
-                st.error(
-                    "Error en el análisis.\n\n"
-                    "✅ Revisa Streamlit Secrets (Manage app → Settings → Secrets).\n\n"
-                    "**Corrector (obligatorio):** POSTURE_API_URL (URL del microservicio MediaPipe)\n\n"
-                    "**Supabase (opcional para guardado persistente):** SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY\n\n"
-                    "Estado detectado (sin mostrar valores): "
-                    f"has_url={sbst2.get('has_url')}, has_key={sbst2.get('has_key')}, "
-                    f"secrets_keys={sbst2.get('secrets_keys', [])}\n\n"
-                    f"Detalle: {e}"
-                )
-
-    with tab2:
-        st.subheader("Historial")
-        rows = []
-        try:
-            rows = list_posture_history(user, limit=50)
-        except Exception as e:
-            st.error(f"No pude cargar el historial: {e}")
-
-        if not rows:
-            st.info("Aún no tienes análisis guardados.")
-        else:
-            # selector simple
-            def _label(r):
-                dt = str(r.get("created_at", ""))[:19].replace("T", " ")
-                return f"{dt} · {r.get('exercise')} · {r.get('score')} · {r.get('status')}"
-
-            selected = st.selectbox("Selecciona un análisis", rows, format_func=_label)
-            video_url, kf_urls = ("", {})
-            try:
-                video_url, kf_urls = get_signed_urls_for_record(selected, ttl_sec=3600)
-            except Exception:
-                pass
-
-            st.write("**Correcciones**")
-            for cue in (selected.get("top_cues") or [])[:3]:
-                st.write(f"- **{cue.get('title','')}**: {cue.get('detail','')}")
-
-            st.write("**Capturas**")
-            kcols2 = st.columns(3)
-            for i, lbl in enumerate(["start", "mid", "end"]):
-                if lbl in kf_urls and kf_urls[lbl]:
-                    kcols2[i].image(kf_urls[lbl], caption=lbl)
-                else:
-                    kcols2[i].write(f"(sin {lbl})")
-
-            with st.expander("Vídeo"):
-                if video_url:
-                    st.video(video_url)
-                else:
-                    st.info("No se pudo generar URL del vídeo.")
-
-            with st.expander("JSON"):
-                st.json(selected)
-
-            if st.button("🗑️ Eliminar este análisis", type="secondary"):
-                try:
-                    delete_posture_record(user, str(selected.get("id")))
-                    st.success("Eliminado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"No se pudo eliminar: {e}")
-
+    render_technique_page()
 
 elif page == "🏋️ Añadir entrenamiento":
     require_auth()
