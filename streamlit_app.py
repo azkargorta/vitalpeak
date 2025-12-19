@@ -579,7 +579,9 @@ elif page == "🧍 Corrector de postura":
                 format_func=lambda x: x[0],
             )
         with c2:
-            vision_model = st.text_input("Modelo visión", value=os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini"))
+            # Microservicio (MediaPipe). Puede estar en Secrets o en variables de entorno.
+            posture_api_url = os.getenv("POSTURE_API_URL") or (st.secrets.get("POSTURE_API_URL") if "POSTURE_API_URL" in st.secrets else "")
+            st.text_input("POSTURE_API_URL", value=posture_api_url or "(no configurado)", disabled=True)
 
         st.info(
             "📷 **Grabación (obligatorio)**: cámara lateral 90°, altura de cadera, se ven pies y cuerpo entero. "
@@ -592,14 +594,14 @@ elif page == "🧍 Corrector de postura":
         if vid is not None:
             st.video(vid)
 
-        if st.button("Analizar con IA", use_container_width=True, disabled=(vid is None)):
+        if st.button("Analizar", use_container_width=True, disabled=(vid is None)):
             try:
                 with st.spinner("Analizando vídeo…"):
                     res = analyze_and_store_posture(
                         user_id=user,
                         exercise=ejercicio[1],
                         video_bytes=vid.getvalue() if vid is not None else b"",
-                        vision_model=vision_model or "gpt-4o-mini",
+                        posture_api_url=posture_api_url or None,
                     )
 
                 st.success(f"Guardado en historial. ID: {res.analysis_id}")
@@ -641,7 +643,7 @@ elif page == "🧍 Corrector de postura":
                 st.error(
                     "Error en el análisis.\n\n"
                     "✅ Revisa Streamlit Secrets (Manage app → Settings → Secrets).\n\n"
-                    "**OpenAI (obligatorio):** OPENAI_API_KEY\n\n"
+                    "**Corrector (obligatorio):** POSTURE_API_URL (URL del microservicio MediaPipe)\n\n"
                     "**Supabase (opcional para guardado persistente):** SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY\n\n"
                     "Estado detectado (sin mostrar valores): "
                     f"has_url={sbst2.get('has_url')}, has_key={sbst2.get('has_key')}, "

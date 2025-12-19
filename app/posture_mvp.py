@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import cv2
-
-from openai import OpenAI
+import httpx
 
 from .supabase_utils import (
     db_delete,
@@ -130,60 +129,63 @@ def extract_keyframes(video_path: str) -> tuple[dict[str, bytes], dict[str, Any]
     return frames, meta
 
 
-def _vision_prompt(exercise: Exercise) -> str:
-    # Simple MVP prompt: 3 cues max, lateral camera.
-    exercise_name = {
-        "squat": "sentadilla",
-        "deadlift": "peso muerto",
-        "bench_press": "press banca",
-    }[exercise]
-    return (
-        "Eres un entrenador personal experto.\n"
-        "Vas a evaluar un ejercicio grabado con cámara lateral (90°).\n"
-        f"Ejercicio: {exercise_name}.\n\n"
-        "Devuelve SOLO JSON válido con ESTE esquema (sin markdown, sin texto extra):\n"
-        "{\n"
-        "  \"exercise\": \"squat|deadlift|bench_press\",\n"
-        "  \"camera\": \"side\",\n"
-        "  \"status\": \"ok|improve|no_eval\",\n"
-        "  \"score\": 0-100,\n"
-        "  \"top_cues\": [\n"
-        "    {\"title\": \"...\", \"detail\": \"...\"}\n"
-        "  ],\n"
-        "  \"keyframes\": [\n"
-        "    {\"label\": \"start\", \"notes\": \"...\"},\n"
-        "    {\"label\": \"mid\", \"notes\": \"...\"},\n"
-        "    {\"label\": \"end\", \"notes\": \"...\"}\n"
-        "  ],\n"
-        "  \"metrics\": {\n"
-        "    \"reps_est\": 0,\n"
-        "    \"rom\": \"ok|short|unknown\",\n"
-        "    \"torso_angle_max_deg\": 0,\n"
-        "    \"knee_forward_max\": \"ok|high|unknown\",\n"
-        "    \"back_neutral_proxy\": \"ok|risk|unknown\",\n"
-        "    \"bar_path_proxy\": \"ok|drifts|unknown\"\n"
-        "  }\n"
-        "}\n\n"
-        "REGLAS:\n"
-        "- Si no puedes evaluar con fiabilidad (no se ve cuerpo entero/pies/barra, mala luz, encuadre malo), status=no_eval y score<=40.\n"
-        "- top_cues: máximo 3 elementos (si status=ok, pueden ser 0-1 cues tipo refinamiento).\n"
-        "- Sé concreto y accionable.\n"
-    )
+def _normalize_posture_analysis(raw: Any, exercise: Exercise) -> dict[str, Any]:
+    """Normalize/validate analysis payload from the posture microservice."""
+    if not isinstance(raw, dict):
+        raw = {}
 
+    status = raw.get("status")
+    if status not in {"ok", "improve", "no_eval"}:
+        status = "no_eval"
 
-def _safe_json_load(s: str) -> Optional[dict[str, Any]]:
     try:
-        return json.loads(s)
+        score = int(raw.get("score", 0))
     except Exception:
-        # try to extract first JSON object
-        start = s.find("{")
-        end = s.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(s[start : end + 1])
-            except Exception:
-                return None
-        return None
+        score = 0
+    score = max(0, min(100, score))
+
+    top_cues = raw.get("top_cues")
+    if not isinstance(top_cues, list):
+        top_cues = []
+    # max 3 cues
+    top_cues = top_cues[:3]
+    cleaned_cues = []
+    for c in top_cues:
+        if not isinstance(c, dict):
+            continue
+        title = str(c.get("title", "")).strip()
+        detail = str(c.get("detail", "")).strip()
+        if not title and not detail:
+            continue
+        cleaned_cues.append({"title": title or "Ajuste", "detail": detail or ""})
+
+    # Ensure keyframes labels exist (notes can be empty)
+    kfs = raw.get("keyframes")
+    if not isinstance(kfs, list):
+        kfs = []
+    by_label: dict[str, dict[str, Any]] = {}
+    for k in kfs:
+        if isinstance(k, dict) and k.get("label") in {"start", "mid", "end"}:
+            by_label[str(k.get("label"))] = {"label": str(k.get("label")), "notes": str(k.get("notes", ""))}
+    keyframes = [
+        by_label.get("start", {"label": "start", "notes": ""}),
+        by_label.get("mid", {"label": "mid", "notes": ""}),
+        by_label.get("end", {"label": "end", "notes": ""}),
+    ]
+
+    metrics = raw.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+
+    return {
+        "exercise": raw.get("exercise") or exercise,
+        "camera": raw.get("camera") or "side",
+        "status": status,
+        "score": score,
+        "top_cues": cleaned_cues,
+        "keyframes": keyframes,
+        "metrics": metrics,
+    }
 
 
 def analyze_and_store_posture(
@@ -191,22 +193,18 @@ def analyze_and_store_posture(
     user_id: str,
     exercise: Exercise,
     video_bytes: bytes,
-    vision_model: str = "gpt-4o-mini",
-    openai_api_key: Optional[str] = None,
+    posture_api_url: Optional[str] = None,
     signed_url_ttl_sec: int = 3600,
-    force_local: bool = False,
 ) -> PostureResult:
-    """MVP: Extract 3 frames, ask vision model for JSON feedback.
+    """MVP (gratis): envía el vídeo a un microservicio de postura (MediaPipe) y guarda el resultado.
 
-    If Supabase is configured, we store video + keyframes + record in Supabase.
-    If Supabase is NOT configured, we fall back to local storage in usuarios_data
-    so the feature still works (best-effort; Streamlit Cloud storage may be
-    ephemeral across redeploys).
+    - El análisis NO usa OpenAI.
+    - Si Supabase está configurado, guarda vídeo+keyframes+historial de forma persistente.
+      Si no, guarda localmente (best-effort; en Streamlit Cloud puede perderse).
     """
 
     # --- Supabase config (optional)
-    # If force_local=True, we skip Supabase even if configured.
-    sb = None if force_local else get_supabase_client()
+    sb = get_supabase_client()
     use_supabase = (sb is not None)
     bucket = get_supabase_bucket("posture") if use_supabase else ""
 
@@ -219,75 +217,29 @@ def analyze_and_store_posture(
     # --- Extract frames
     frames, meta = extract_keyframes(video_path)
 
-    # --- Vision request
-    api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("Falta OPENAI_API_KEY (Streamlit Secrets)")
-    client = OpenAI(api_key=api_key)
-
-    # Build multi-part message with 3 images
-    content = [
-        {"type": "text", "text": _vision_prompt(exercise)},
-        {
-            "type": "text",
-            "text": "Frames (start/mid/end) del mismo vídeo. Evalúa la técnica global.",
-        },
-    ]
-    for lbl in ["start", "mid", "end"]:
-        b64 = base64.b64encode(frames[lbl]).decode("utf-8")
-        content.append({"type": "text", "text": f"Frame: {lbl}"})
-        content.append(
-            {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-            }
+    # --- Posture microservice request (MediaPipe / gratis)
+    api_url = (posture_api_url or os.getenv("POSTURE_API_URL") or "").strip()
+    if not api_url:
+        raise RuntimeError(
+            "POSTURE_API_URL no está configurado.\n"
+            "Para usar el corrector gratis (MediaPipe), despliega el microservicio incluido en /services/posture_service "
+            "y añade POSTURE_API_URL en Streamlit Secrets."
         )
 
-    resp = client.chat.completions.create(
-        model=vision_model,
-        messages=[{"role": "user", "content": content}],
-        temperature=0.2,
-        max_tokens=900,
-    )
-    text = (resp.choices[0].message.content or "").strip()
-    analysis = _safe_json_load(text)
+    endpoint = api_url.rstrip("/") + "/analyze"
+    try:
+        with httpx.Client(timeout=90.0) as client:
+            r = client.post(
+                endpoint,
+                data={"exercise": exercise, "camera": "side"},
+                files={"video": ("upload.mp4", video_bytes, "video/mp4")},
+            )
+        r.raise_for_status()
+        analysis_raw = r.json()
+    except Exception as e:
+        raise RuntimeError(f"Fallo al llamar al servicio de postura: {e}")
 
-    if not isinstance(analysis, dict):
-        analysis = {
-            "exercise": exercise,
-            "camera": "side",
-            "status": "no_eval",
-            "score": 20,
-            "top_cues": [
-                {
-                    "title": "No pude leer el resultado",
-                    "detail": "Vuelve a intentarlo. Asegúrate de que se ve el cuerpo entero, pies y barra (si aplica).",
-                }
-            ],
-            "keyframes": [
-                {"label": "start", "notes": ""},
-                {"label": "mid", "notes": ""},
-                {"label": "end", "notes": ""},
-            ],
-            "metrics": {
-                "reps_est": 0,
-                "rom": "unknown",
-                "torso_angle_max_deg": 0,
-                "knee_forward_max": "unknown",
-                "back_neutral_proxy": "unknown",
-                "bar_path_proxy": "unknown",
-            },
-        }
-
-    # normalize fields
-    analysis.setdefault("exercise", exercise)
-    analysis.setdefault("camera", "side")
-    analysis.setdefault("top_cues", [])
-    analysis.setdefault("keyframes", [])
-    analysis.setdefault("metrics", {})
-    # enforce top_cues max 3
-    if isinstance(analysis.get("top_cues"), list):
-        analysis["top_cues"] = analysis["top_cues"][:3]
+    analysis = _normalize_posture_analysis(analysis_raw, exercise)
 
     # --- Store result (Supabase if available, otherwise local fallback)
     analysis_id = str(uuid.uuid4())
@@ -323,7 +275,7 @@ def analyze_and_store_posture(
             ],
             "duration_sec": meta.get("duration_sec"),
             "created_at": _now_iso(),
-            "model_version": "mvp_openai_vision_v1",
+            "model_version": "mvp_mediapipe_v1",
         }
 
         inserted = db_insert(sb, "posture_analyses", row)
