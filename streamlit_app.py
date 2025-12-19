@@ -600,8 +600,6 @@ elif page == "🧍 Corrector de postura":
                         exercise=ejercicio[1],
                         video_bytes=vid.getvalue() if vid is not None else b"",
                         vision_model=vision_model or "gpt-4o-mini",
-                        # Supabase es opcional: si no está configurado, forzamos guardado local.
-                        force_local=(not using_supabase),
                     )
 
                 st.success(f"Guardado en historial. ID: {res.analysis_id}")
