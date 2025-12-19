@@ -1,488 +1,333 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Optional
+from typing import Dict, Any, List
 
 import streamlit as st
 import streamlit.components.v1 as components
 
 
-def default_animations() -> Dict[str, dict]:
-    """Configuración mínima por ejercicio.
+def _default_config_for(exercise_name: str) -> Dict[str, Any]:
+    """Best-effort mapping from exercise label to an animation archetype."""
+    s = (exercise_name or "").lower()
 
-    exercise_id se usa para elegir el patrón de movimiento (plantilla única).
-    """
+    # Spanish/English keywords
+    if any(k in s for k in ["sentadilla", "squat"]):
+        kind = "squat"
+    elif any(k in s for k in ["peso muerto", "deadlift", "hinge"]):
+        kind = "hinge"
+    elif any(k in s for k in ["press banca", "bench", "banca"]):
+        kind = "bench"
+    elif any(k in s for k in ["press militar", "overhead", "militar", "shoulder press"]):
+        kind = "ohp"
+    elif any(k in s for k in ["remo", "row"]):
+        kind = "row"
+    elif any(k in s for k in ["dominad", "pull-up", "pull up", "chin-up", "chin up"]):
+        kind = "pullup"
+    elif any(k in s for k in ["jalón", "jalon", "pulldown"]):
+        kind = "pulldown"
+    elif any(k in s for k in ["curl", "bíceps", "biceps"]):
+        kind = "curl"
+    elif any(k in s for k in ["tríceps", "triceps", "pushdown", "extensión tríceps", "extension triceps"]):
+        kind = "pushdown"
+    elif any(k in s for k in ["zancada", "lunge"]):
+        kind = "lunge"
+    elif any(k in s for k in ["plancha", "plank"]):
+        kind = "plank"
+    else:
+        kind = "generic"
+
     return {
-        "squat": {
-            "pattern": "squat",
-            "title": "Sentadilla",
-            "highlights": ["hip", "knee", "ankle"],
-            "cues": ["Empuja el suelo", "Costillas abajo", "Rodillas siguen el pie"],
-        },
-        "deadlift": {
-            "pattern": "deadlift",
-            "title": "Peso muerto",
-            "highlights": ["hip", "knee", "spine"],
-            "cues": ["Bisagra de cadera", "Barra pegada", "Quita la holgura"],
-        },
-        "bench_press": {
-            "pattern": "bench",
-            "title": "Press banca",
-            "highlights": ["shoulder", "elbow", "wrist"],
-            "cues": ["Escápulas atrás y abajo", "Muñeca sobre codo", "Trayectoria estable"],
-        },
+        "kind": kind,
+        "tempo_ms": 2400,
+        "amplitude": 1.0,
+        "show_arrows": True,
+        "show_joints": True,
     }
 
 
-def render_minimal_3d_animation(
-    exercise_id: str,
-    *,
-    cues: Optional[List[str]] = None,
-    height: int = 460,
-) -> None:
-    """Mini-animación 3D minimal (plantilla reutilizable)."""
+def render_minimal_3d_animation(exercise_name: str, cues: List[str] | None = None, *, height: int = 520) -> None:
+    """
+    Renders a minimal, reusable 3D stick-figure mannequin animation with two fixed angles (frontal + lateral).
 
-    cfg = default_animations().get(exercise_id, {
-        "pattern": "generic",
-        "title": exercise_id,
-        "highlights": [],
-        "cues": cues or [],
-    })
-    if cues:
-        cfg["cues"] = cues[:3]
+    Notes:
+    - Uses Three.js via CDN.
+    - If CDN fails (no internet), it shows a fallback message.
+    """
+    cfg = _default_config_for(exercise_name)
+    cues = cues or []
 
-    payload = json.dumps(cfg)
+    payload = {
+        "exercise": exercise_name,
+        "config": cfg,
+        "cues": [c for c in cues if str(c).strip()][:4],
+    }
 
     html = f"""
-<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;">
-  <div style="display:flex; gap:12px; flex-wrap:wrap;">
-    <div style="flex:1; min-width:300px;">
-      <div style="font-size:13px; opacity:.75; margin:2px 0 6px;">Vista lateral</div>
-      <div id="vp_canvas_side" style="width:100%; height:{height}px; border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden;"></div>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {{ margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }}
+    .wrap {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; }}
+    .card {{ border: 1px solid rgba(0,0,0,.1); border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.7); }}
+    .head {{ padding: 8px 10px; font-size: 12px; opacity: .8; border-bottom: 1px solid rgba(0,0,0,.08); }}
+    canvas {{ display:block; width:100%; height:240px; }}
+    .cues {{ padding: 10px; font-size: 12px; line-height: 1.35; }}
+    .pill {{ display:inline-block; padding: 3px 8px; margin: 4px 6px 0 0; border-radius: 999px; border: 1px solid rgba(0,0,0,.12); opacity:.9; }}
+    .fallback {{ padding: 12px; font-size: 13px; }}
+    @media (max-width: 900px) {{ .wrap {{ grid-template-columns: 1fr; }} canvas {{ height: 260px; }} }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head">Vista frontal</div>
+      <canvas id="c1"></canvas>
+      <div class="cues" id="cues1"></div>
     </div>
-    <div style="flex:1; min-width:300px;">
-      <div style="font-size:13px; opacity:.75; margin:2px 0 6px;">Vista frontal</div>
-      <div id="vp_canvas_front" style="width:100%; height:{height}px; border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden;"></div>
+    <div class="card">
+      <div class="head">Vista lateral</div>
+      <canvas id="c2"></canvas>
+      <div class="cues" id="cues2"></div>
     </div>
   </div>
-  <div style="margin-top:10px; font-size:13px; line-height:1.3; opacity:.85;">
-    <b>Cues</b>: <span id="vp_cues"></span>
-  </div>
-</div>
 
-<script>
-  const VP_CFG = {payload};
-  const cues = (VP_CFG.cues || []).filter(Boolean);
-  document.getElementById('vp_cues').textContent = cues.length ? cues.join(' · ') : '—';
+  <script>
+    const DATA = {json.dumps(payload)};
+    const cues = (DATA.cues || []).map(t => String(t));
+    const cuesHTML = cues.length ? cues.map(t => `<span class="pill">${{t.replaceAll('<','&lt;').replaceAll('>','&gt;')}}</span>`).join('') : `<span style="opacity:.7">Cues: (no definidos)</span>`;
+    document.getElementById("cues1").innerHTML = cuesHTML;
+    document.getElementById("cues2").innerHTML = cuesHTML;
+  </script>
 
-  const loadScript = (src) => new Promise((resolve, reject) => {{
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  }});
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script>
+    function showFallback(msg) {{
+      document.body.innerHTML = `<div class="fallback"><b>Mini-animación no disponible</b><br/>${{msg}}</div>`;
+    }}
 
-  async function boot() {{
     if (!window.THREE) {{
-      await loadScript('https://unpkg.com/three@0.160.0/build/three.min.js');
-    }}
-
-    function makeRenderer(containerId) {{
-      const el = document.getElementById(containerId);
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      const renderer = new THREE.WebGLRenderer({{ antialias: true, alpha: true }});
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      el.appendChild(renderer.domElement);
-      return {{ el, renderer }};
-    }}
-
-    function addLights(scene) {{
-      const a = new THREE.AmbientLight(0xffffff, 0.85);
-      scene.add(a);
-      const d = new THREE.DirectionalLight(0xffffff, 0.55);
-      d.position.set(2.5, 4.0, 2.0);
-      scene.add(d);
-    }}
-
-    function addFloor(scene) {{
-      const g = new THREE.PlaneGeometry(10, 10);
-      const m = new THREE.MeshPhongMaterial({{ color: 0xf4f4f4, transparent:true, opacity: 0.65 }});
-      const p = new THREE.Mesh(g, m);
-      p.rotation.x = -Math.PI/2;
-      p.position.y = 0;
-      scene.add(p);
-      const grid = new THREE.GridHelper(10, 10, 0xdddddd, 0xeeeeee);
-      grid.position.y = 0.001;
-      scene.add(grid);
-    }}
-
-    function cyl(len, r, color, opacity=1) {{
-      const geo = new THREE.CylinderGeometry(r, r, len, 14);
-      const mat = new THREE.MeshStandardMaterial({{ color, roughness: 0.7, metalness: 0.05, transparent: opacity < 1, opacity }});
-      const mesh = new THREE.Mesh(geo, mat);
-      return mesh;
-    }}
-
-    function sphere(r, color, opacity=1) {{
-      const geo = new THREE.SphereGeometry(r, 18, 18);
-      const mat = new THREE.MeshStandardMaterial({{ color, roughness: 0.5, metalness: 0.08, transparent: opacity < 1, opacity }});
-      return new THREE.Mesh(geo, mat);
-    }}
-
-    function buildStandingFigure(scene) {{
-      const root = new THREE.Group();
-      scene.add(root);
-
-      // Body dimensions
-      const pelvisY = 1.05;
-      const torsoLen = 0.85;
-      const thighLen = 0.75;
-      const shinLen = 0.75;
-      const upperArmLen = 0.55;
-      const foreArmLen = 0.55;
-
-      const bodyColor = 0x2f2f2f;
-      const jointColor = 0xffc04d;
-
-      // Pelvis
-      const pelvis = sphere(0.08, jointColor);
-      pelvis.position.set(0, pelvisY, 0);
-      root.add(pelvis);
-
-      // Torso
-      const torsoPivot = new THREE.Group();
-      torsoPivot.position.set(0, pelvisY, 0);
-      root.add(torsoPivot);
-      const torso = cyl(torsoLen, 0.06, bodyColor);
-      torso.position.y = torsoLen/2;
-      torsoPivot.add(torso);
-      const neck = sphere(0.06, jointColor);
-      neck.position.y = torsoLen;
-      torsoPivot.add(neck);
-      const head = sphere(0.12, bodyColor, 0.95);
-      head.position.y = torsoLen + 0.22;
-      torsoPivot.add(head);
-
-      function buildLeg(sideSign) {{
-        const hip = new THREE.Group();
-        hip.position.set(0.12 * sideSign, pelvisY, 0);
-        root.add(hip);
-        const hipBall = sphere(0.06, jointColor);
-        hip.add(hipBall);
-
-        const thigh = cyl(thighLen, 0.05, bodyColor);
-        thigh.position.y = -thighLen/2;
-        hip.add(thigh);
-
-        const knee = new THREE.Group();
-        knee.position.y = -thighLen;
-        hip.add(knee);
-        const kneeBall = sphere(0.055, jointColor);
-        knee.add(kneeBall);
-
-        const shin = cyl(shinLen, 0.045, bodyColor);
-        shin.position.y = -shinLen/2;
-        knee.add(shin);
-
-        const ankle = new THREE.Group();
-        ankle.position.y = -shinLen;
-        knee.add(ankle);
-        const ankleBall = sphere(0.05, jointColor);
-        ankle.add(ankleBall);
-
-        const foot = new THREE.Mesh(
-          new THREE.BoxGeometry(0.22, 0.06, 0.38),
-          new THREE.MeshStandardMaterial({{ color: bodyColor, roughness: 0.85 }})
-        );
-        foot.position.set(0, -0.03, 0.12);
-        ankle.add(foot);
-
-        return {{ hip, knee, ankle, hipBall, kneeBall, ankleBall }};
-      }}
-
-      function buildArm(sideSign) {{
-        const shoulder = new THREE.Group();
-        shoulder.position.set(0.22 * sideSign, pelvisY + torsoLen, 0);
-        root.add(shoulder);
-        const shoulderBall = sphere(0.055, jointColor);
-        shoulder.add(shoulderBall);
-
-        const upper = cyl(upperArmLen, 0.04, bodyColor);
-        upper.position.y = -upperArmLen/2;
-        shoulder.add(upper);
-
-        const elbow = new THREE.Group();
-        elbow.position.y = -upperArmLen;
-        shoulder.add(elbow);
-        const elbowBall = sphere(0.05, jointColor);
-        elbow.add(elbowBall);
-
-        const fore = cyl(foreArmLen, 0.035, bodyColor);
-        fore.position.y = -foreArmLen/2;
-        elbow.add(fore);
-
-        const wrist = new THREE.Group();
-        wrist.position.y = -foreArmLen;
-        elbow.add(wrist);
-        const wristBall = sphere(0.045, jointColor);
-        wrist.add(wristBall);
-
-        const hand = sphere(0.045, bodyColor);
-        hand.position.y = -0.05;
-        wrist.add(hand);
-
-        return {{ shoulder, elbow, wrist, shoulderBall, elbowBall, wristBall }};
-      }}
-
-      const legL = buildLeg(-1);
-      const legR = buildLeg(1);
-      const armL = buildArm(-1);
-      const armR = buildArm(1);
-
-      // Simple bar (for deadlift / bench)
-      const bar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.03, 1.4, 16),
-        new THREE.MeshStandardMaterial({{ color: 0x1a1a1a, roughness: 0.4, metalness: 0.25 }})
-      );
-      bar.rotation.z = Math.PI/2;
-      bar.position.set(0, 0.65, 0.20);
-      root.add(bar);
-
-      // Trajectory arrow helper (updated during animation)
-      const arrowDir = new THREE.Vector3(0, 1, 0);
-      const arrow = new THREE.ArrowHelper(arrowDir, new THREE.Vector3(0, 0.5, 0.2), 0.6, 0x6b8cff, 0.14, 0.08);
-      scene.add(arrow);
-
-      return {{
-        root,
-        torsoPivot,
-        legL, legR,
-        armL, armR,
-        bar,
-        arrow,
-      }};
-    }}
-
-    function buildBenchFigure(scene) {{
-      const root = new THREE.Group();
-      scene.add(root);
-      const bodyColor = 0x2f2f2f;
-      const jointColor = 0xffc04d;
-
-      // Bench
-      const bench = new THREE.Mesh(
-        new THREE.BoxGeometry(2.1, 0.10, 0.55),
-        new THREE.MeshStandardMaterial({{ color: 0xf0f0f0, roughness: 0.9 }})
-      );
-      bench.position.set(0, 0.55, 0);
-      root.add(bench);
-
-      // Lying torso (along X)
-      const torso = cyl(0.95, 0.06, bodyColor);
-      torso.rotation.z = Math.PI/2;
-      torso.position.set(0, 0.68, 0);
-      root.add(torso);
-      const head = sphere(0.12, bodyColor, 0.95);
-      head.position.set(-0.58, 0.75, 0);
-      root.add(head);
-
-      // Shoulders
-      const shoulderL = new THREE.Group();
-      shoulderL.position.set(0.05, 0.72, -0.18);
-      root.add(shoulderL);
-      shoulderL.add(sphere(0.055, jointColor));
-
-      const shoulderR = new THREE.Group();
-      shoulderR.position.set(0.05, 0.72, 0.18);
-      root.add(shoulderR);
-      shoulderR.add(sphere(0.055, jointColor));
-
-      function buildBenchArm(shoulder) {{
-        const upperLen = 0.42;
-        const foreLen = 0.42;
-
-        const upper = cyl(upperLen, 0.04, bodyColor);
-        upper.position.y = -upperLen/2;
-        shoulder.add(upper);
-
-        const elbow = new THREE.Group();
-        elbow.position.y = -upperLen;
-        shoulder.add(elbow);
-        elbow.add(sphere(0.05, jointColor));
-
-        const fore = cyl(foreLen, 0.035, bodyColor);
-        fore.position.y = -foreLen/2;
-        elbow.add(fore);
-
-        const wrist = new THREE.Group();
-        wrist.position.y = -foreLen;
-        elbow.add(wrist);
-        wrist.add(sphere(0.045, jointColor));
-
-        const hand = sphere(0.045, bodyColor);
-        hand.position.y = -0.05;
-        wrist.add(hand);
-
-        return {{ shoulder, elbow, wrist }};
-      }}
-
-      const armL = buildBenchArm(shoulderL);
-      const armR = buildBenchArm(shoulderR);
-
-      // Bar above chest
-      const bar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.03, 1.4, 16),
-        new THREE.MeshStandardMaterial({{ color: 0x1a1a1a, roughness: 0.4, metalness: 0.25 }})
-      );
-      bar.rotation.x = Math.PI/2;
-      bar.position.set(0.15, 1.05, 0);
-      root.add(bar);
-
-      const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.15, 0.78, 0), 0.5, 0x6b8cff, 0.14, 0.08);
-      scene.add(arrow);
-
-      return {{ root, armL, armR, bar, arrow }};
-    }}
-
-    function setupScene(containerId, view) {{
-      const {{ el, renderer }} = makeRenderer(containerId);
-      const scene = new THREE.Scene();
-      addLights(scene);
-      addFloor(scene);
-
-      const camera = new THREE.PerspectiveCamera(42, el.clientWidth / el.clientHeight, 0.1, 50);
-      if (view === 'side') {{
-        camera.position.set(3.2, 2.4, 0.2);
-      }} else {{
-        camera.position.set(0.2, 2.4, 3.2);
-      }}
-      camera.lookAt(0, 1.0, 0);
-
-      const state = {{ el, renderer, scene, camera, view }};
-      window.addEventListener('resize', () => {{
-        const w = el.clientWidth;
-        const h = el.clientHeight;
-        renderer.setSize(w, h);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      }});
-      return state;
-    }}
-
-    const side = setupScene('vp_canvas_side', 'side');
-    const front = setupScene('vp_canvas_front', 'front');
-
-    // Build figure(s) based on pattern
-    let figSide, figFront;
-    if (VP_CFG.pattern === 'bench') {{
-      figSide = buildBenchFigure(side.scene);
-      figFront = buildBenchFigure(front.scene);
+      showFallback("No se pudo cargar Three.js (¿sin internet / CDN bloqueado?).");
     }} else {{
-      figSide = buildStandingFigure(side.scene);
-      figFront = buildStandingFigure(front.scene);
-    }}
+      const kind = (DATA.config && DATA.config.kind) || "generic";
+      const tempo = (DATA.config && DATA.config.tempo_ms) || 2400;
+      const amp = (DATA.config && DATA.config.amplitude) || 1.0;
+      const showArrows = !!(DATA.config && DATA.config.show_arrows);
+      const showJoints = !!(DATA.config && DATA.config.show_joints);
 
-    function clamp(x, a, b) {{ return Math.max(a, Math.min(b, x)); }}
+      function makeScene(canvas, cameraPos) {{
+        const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, alpha: true }});
+        const scene = new THREE.Scene();
 
-    function animateStanding(fig, t) {{
-      // t in [0,1]
-      const down = 0.5 - 0.5*Math.cos(t * 2*Math.PI); // 0..1
-      const pattern = VP_CFG.pattern;
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+        camera.position.set(cameraPos[0], cameraPos[1], cameraPos[2]);
+        camera.lookAt(0, 1.2, 0);
 
-      if (pattern === 'squat') {{
-        const hip = THREE.MathUtils.degToRad(-10 - 55*down);
-        const knee = THREE.MathUtils.degToRad(5 + 80*down);
-        fig.legL.hip.rotation.x = hip;
-        fig.legR.hip.rotation.x = hip;
-        fig.legL.knee.rotation.x = -knee;
-        fig.legR.knee.rotation.x = -knee;
-        fig.torsoPivot.rotation.x = THREE.MathUtils.degToRad(5 + 18*down);
-        fig.bar.position.y = 0.75 + 0.15*down;
-        fig.bar.position.z = 0.22;
-        fig.arrow.position.set(0, 0.35, 0.22);
-        fig.arrow.setDirection(new THREE.Vector3(0, 1, 0));
-        fig.arrow.setLength(0.55);
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        light1.position.set(3, 6, 4);
+        scene.add(light1);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+        // Ground
+        const g = new THREE.PlaneGeometry(10, 10, 1, 1);
+        const m = new THREE.MeshStandardMaterial({{ color: 0xffffff, transparent: true, opacity: 0.2 }});
+        const ground = new THREE.Mesh(g, m);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = 0;
+        scene.add(ground);
+
+        // Stick figure group
+        const grp = new THREE.Group();
+        scene.add(grp);
+
+        const matBody = new THREE.MeshStandardMaterial({{ color: 0x222222, roughness: 0.6, metalness: 0.0 }});
+        const matJoint = new THREE.MeshStandardMaterial({{ color: 0xaa0000, roughness: 0.4, metalness: 0.0 }});
+        const matArrow = new THREE.MeshStandardMaterial({{ color: 0x0066cc, roughness: 0.4, metalness: 0.0 }});
+
+        function capsule(radius, length) {{
+          const geo = new THREE.CapsuleGeometry(radius, length, 8, 16);
+          return new THREE.Mesh(geo, matBody);
+        }}
+
+        // Base skeleton (very simplified)
+        const torso = capsule(0.10, 0.55); torso.position.set(0, 1.25, 0);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), matBody); head.position.set(0, 1.65, 0);
+        const pelvis = capsule(0.10, 0.20); pelvis.position.set(0, 0.95, 0);
+
+        const upperArmL = capsule(0.07, 0.28); upperArmL.position.set(-0.28, 1.33, 0);
+        const lowerArmL = capsule(0.06, 0.24); lowerArmL.position.set(-0.46, 1.20, 0);
+
+        const upperArmR = capsule(0.07, 0.28); upperArmR.position.set(0.28, 1.33, 0);
+        const lowerArmR = capsule(0.06, 0.24); lowerArmR.position.set(0.46, 1.20, 0);
+
+        const thighL = capsule(0.08, 0.38); thighL.position.set(-0.15, 0.62, 0);
+        const shinL  = capsule(0.07, 0.34); shinL.position.set(-0.15, 0.22, 0);
+
+        const thighR = capsule(0.08, 0.38); thighR.position.set(0.15, 0.62, 0);
+        const shinR  = capsule(0.07, 0.34); shinR.position.set(0.15, 0.22, 0);
+
+        grp.add(torso, head, pelvis, upperArmL, lowerArmL, upperArmR, lowerArmR, thighL, shinL, thighR, shinR);
+
+        // Joints highlights
+        const joints = [];
+        function joint(x,y,z) {{
+          const s = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), matJoint);
+          s.position.set(x,y,z);
+          grp.add(s);
+          joints.push(s);
+        }}
+        if (showJoints) {{
+          joint(0, 1.37, 0); // sternum-ish
+          joint(-0.30, 1.34, 0); joint(0.30, 1.34, 0); // shoulders
+          joint(-0.50, 1.18, 0); joint(0.50, 1.18, 0); // elbows
+          joint(-0.15, 0.80, 0); joint(0.15, 0.80, 0); // hips
+          joint(-0.15, 0.42, 0); joint(0.15, 0.42, 0); // knees
+        }}
+
+        // Trajectory arrow (simple line)
+        let arrow = null;
+        if (showArrows) {{
+          const pts = [new THREE.Vector3(0,1.10,0), new THREE.Vector3(0,0.55,0)];
+          const geo = new THREE.BufferGeometry().setFromPoints(pts);
+          const line = new THREE.Line(geo, new THREE.LineBasicMaterial({{ color: 0x0066cc, transparent:true, opacity:0.8 }}));
+          scene.add(line);
+          arrow = line;
+        }}
+
+        function resize() {{
+          const rect = canvas.getBoundingClientRect();
+          const w = Math.max(1, rect.width);
+          const h = Math.max(1, rect.height);
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        }}
+        resize();
+        window.addEventListener("resize", resize);
+
+        return {{ renderer, scene, camera, grp, parts: {{
+          torso, pelvis, upperArmL, lowerArmL, upperArmR, lowerArmR, thighL, shinL, thighR, shinR, head
+        }}, arrow, resize }};
       }}
 
-      if (pattern === 'deadlift') {{
-        const hip = THREE.MathUtils.degToRad(-15 - 45*down);
-        const knee = THREE.MathUtils.degToRad(0 + 30*down);
-        fig.legL.hip.rotation.x = hip;
-        fig.legR.hip.rotation.x = hip;
-        fig.legL.knee.rotation.x = -knee;
-        fig.legR.knee.rotation.x = -knee;
-        fig.torsoPivot.rotation.x = THREE.MathUtils.degToRad(8 + 32*down);
+      const s1 = makeScene(document.getElementById("c1"), [0, 1.6, 3.4]); // frontal
+      const s2 = makeScene(document.getElementById("c2"), [3.2, 1.6, 0]); // lateral
 
-        // Bar path (vertical, close to shins)
-        const yLow = 0.30;
-        const yHigh = 1.05;
-        fig.bar.position.set(0, yLow + (yHigh - yLow)*clamp(down, 0, 1), 0.18);
-        fig.arrow.position.set(0, 0.28, 0.18);
-        fig.arrow.setDirection(new THREE.Vector3(0, 1, 0));
-        fig.arrow.setLength(0.85);
+      function applyPose(parts, t01) {{
+        // t01 goes 0..1..0 (loop)
+        // helpers
+        const swing = Math.sin(t01 * Math.PI); // 0->1->0
+        const a = amp;
+
+        // Reset-ish
+        parts.grp && (parts.grp.rotation.set(0,0,0));
+
+        // Generic subtle breathing
+        parts.torso.position.y = 1.25 + 0.02 * Math.sin(t01 * Math.PI*2);
+
+        if (kind === "squat") {{
+          // Knee/hip flexion: lower torso and rotate thighs/shins a bit
+          const depth = 0.45 * swing * a;
+          parts.torso.position.y = 1.25 - depth;
+          parts.pelvis.position.y = 0.95 - depth*0.8;
+
+          parts.thighL.rotation.x = -0.9 * swing * a;
+          parts.thighR.rotation.x = -0.9 * swing * a;
+          parts.shinL.rotation.x  =  0.7 * swing * a;
+          parts.shinR.rotation.x  =  0.7 * swing * a;
+
+        }} else if (kind === "hinge") {{
+          // Hip hinge: rotate torso forward
+          parts.torso.rotation.x = 0.9 * swing * a;
+          parts.head.position.y = 1.65 - 0.12*swing*a;
+
+        }} else if (kind === "bench") {{
+          // Bench press: arms extend up/down (we fake it in standing)
+          parts.upperArmL.rotation.z =  0.9 * swing * a;
+          parts.lowerArmL.rotation.z =  0.7 * swing * a;
+          parts.upperArmR.rotation.z = -0.9 * swing * a;
+          parts.lowerArmR.rotation.z = -0.7 * swing * a;
+
+        }} else if (kind === "ohp") {{
+          // Overhead press: arms raise
+          parts.upperArmL.rotation.x = -1.2 * swing * a;
+          parts.upperArmR.rotation.x = -1.2 * swing * a;
+          parts.lowerArmL.rotation.x = -0.8 * swing * a;
+          parts.lowerArmR.rotation.x = -0.8 * swing * a;
+
+        }} else if (kind === "row") {{
+          // Row: elbows pull back
+          parts.upperArmL.rotation.x =  0.8 * swing * a;
+          parts.upperArmR.rotation.x =  0.8 * swing * a;
+          parts.lowerArmL.rotation.x =  0.6 * swing * a;
+          parts.lowerArmR.rotation.x =  0.6 * swing * a;
+
+          parts.torso.rotation.x = 0.6 * a;
+
+        }} else if (kind === "pullup" || kind === "pulldown") {{
+          // Pull: arms pull down
+          parts.upperArmL.rotation.x = -1.0 * swing * a;
+          parts.upperArmR.rotation.x = -1.0 * swing * a;
+          parts.lowerArmL.rotation.x = -0.8 * swing * a;
+          parts.lowerArmR.rotation.x = -0.8 * swing * a;
+
+        }} else if (kind === "curl") {{
+          // Biceps curl: elbow flexion
+          parts.lowerArmL.rotation.x = -1.4 * swing * a;
+          parts.lowerArmR.rotation.x = -1.4 * swing * a;
+
+        }} else if (kind === "pushdown") {{
+          // Triceps pushdown: elbows extend down
+          parts.lowerArmL.rotation.x =  1.2 * swing * a;
+          parts.lowerArmR.rotation.x =  1.2 * swing * a;
+
+        }} else if (kind === "lunge") {{
+          const depth = 0.28 * swing * a;
+          parts.torso.position.y = 1.25 - depth;
+          parts.thighL.rotation.x = -0.7 * swing * a;
+          parts.shinL.rotation.x  =  0.6 * swing * a;
+          // keep right more stable
+        }} else if (kind === "plank") {{
+          parts.torso.rotation.x = 1.45;
+          parts.pelvis.rotation.x = 1.45;
+          parts.torso.position.y = 0.85;
+          parts.pelvis.position.y = 0.60;
+          parts.head.position.y = 1.05;
+        }} else {{
+          // generic: small arm swing
+          parts.upperArmL.rotation.x = -0.5 * swing * a;
+          parts.upperArmR.rotation.x = -0.5 * swing * a;
+        }}
       }}
 
-      // Generic: small bend
-      if (pattern === 'generic') {{
-        const hip = THREE.MathUtils.degToRad(-8 - 25*down);
-        const knee = THREE.MathUtils.degToRad(0 + 25*down);
-        fig.legL.hip.rotation.x = hip;
-        fig.legR.hip.rotation.x = hip;
-        fig.legL.knee.rotation.x = -knee;
-        fig.legR.knee.rotation.x = -knee;
-        fig.torsoPivot.rotation.x = THREE.MathUtils.degToRad(6 + 12*down);
-        fig.bar.position.y = 0.65 + 0.2*down;
+      function loop(ts) {{
+        const t = (ts % tempo) / tempo;         // 0..1
+        const t01 = t < 0.5 ? (t*2) : (2 - t*2); // triangle wave 0..1..0
+
+        applyPose({{...s1.parts}}, t01);
+        applyPose({{...s2.parts}}, t01);
+
+        if (s1.arrow) {{
+          // adapt arrow length depending on kind
+          const y1 = (kind === "bench" || kind === "ohp") ? 1.55 : 1.10;
+          const y2 = (kind === "bench" || kind === "ohp") ? 1.05 : 0.55;
+          const pts = [new THREE.Vector3(0,y1,0), new THREE.Vector3(0,y2,0)];
+          s1.arrow.geometry.setFromPoints(pts);
+          s2.arrow.geometry.setFromPoints(pts);
+        }}
+
+        s1.renderer.render(s1.scene, s1.camera);
+        s2.renderer.render(s2.scene, s2.camera);
+
+        requestAnimationFrame(loop);
       }}
-    }}
-
-    function animateBench(fig, t) {{
-      const down = 0.5 - 0.5*Math.cos(t * 2*Math.PI);
-      const elbowFlex = THREE.MathUtils.degToRad(10 + 70*down);
-      // Arms: rotate down a bit at shoulders and bend at elbows
-      fig.armL.shoulder.rotation.z = THREE.MathUtils.degToRad(15 + 10*down);
-      fig.armR.shoulder.rotation.z = -THREE.MathUtils.degToRad(15 + 10*down);
-      fig.armL.elbow.rotation.x = -elbowFlex;
-      fig.armR.elbow.rotation.x = -elbowFlex;
-
-      // Bar vertical path
-      const yLow = 0.82;
-      const yHigh = 1.10;
-      fig.bar.position.y = yLow + (yHigh - yLow) * (1-down);
-      fig.arrow.position.set(fig.bar.position.x, 0.76, 0);
-      fig.arrow.setDirection(new THREE.Vector3(0, 1, 0));
-      fig.arrow.setLength(0.55);
-    }}
-
-    let start = performance.now();
-    function loop(now) {{
-      const t = ((now - start) / 1600) % 1; // cycle
-
-      if (VP_CFG.pattern === 'bench') {{
-        animateBench(figSide, t);
-        animateBench(figFront, t);
-      }} else {{
-        animateStanding(figSide, t);
-        animateStanding(figFront, t);
-      }}
-
-      side.renderer.render(side.scene, side.camera);
-      front.renderer.render(front.scene, front.camera);
       requestAnimationFrame(loop);
     }}
-    requestAnimationFrame(loop);
-  }}
-
-  boot().catch((e) => {{
-    console.error(e);
-    const el1 = document.getElementById('vp_canvas_side');
-    const el2 = document.getElementById('vp_canvas_front');
-    if (el1) el1.innerHTML = '<div style="padding:14px; opacity:.75;">No se pudo cargar Three.js (¿sin internet?).</div>';
-    if (el2) el2.innerHTML = '<div style="padding:14px; opacity:.75;">No se pudo cargar Three.js (¿sin internet?).</div>';
-  }});
-</script>
+  </script>
+</body>
+</html>
 """
-
-    components.html(html, height=height + 90, scrolling=False)
+    components.html(html, height=height, scrolling=False)
