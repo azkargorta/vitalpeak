@@ -194,6 +194,7 @@ def analyze_and_store_posture(
     vision_model: str = "gpt-4o-mini",
     openai_api_key: Optional[str] = None,
     signed_url_ttl_sec: int = 3600,
+    force_local: bool = False,
 ) -> PostureResult:
     """MVP: Extract 3 frames, ask vision model for JSON feedback.
 
@@ -204,8 +205,9 @@ def analyze_and_store_posture(
     """
 
     # --- Supabase config (optional)
-    sb = get_supabase_client()
-    use_supabase = sb is not None
+    # If force_local=True, we skip Supabase even if configured.
+    sb = None if force_local else get_supabase_client()
+    use_supabase = (sb is not None)
     bucket = get_supabase_bucket("posture") if use_supabase else ""
 
     # --- Save video temp
