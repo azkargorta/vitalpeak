@@ -550,10 +550,19 @@ elif page == "🧍 Corrector de postura":
 
     user = st.session_state["user"]  # usamos el mismo identificador que el resto de la app
 
+    sbst = supabase_config_status()
+    using_supabase = bool(sbst.get("has_url")) and bool(sbst.get("has_key"))
     st.caption(
         "MVP: cámara lateral (90°) y feedback simple (score + máximo 3 correcciones). "
-        "Se guarda vídeo + 3 capturas en Supabase y queda en tu historial."
+        + ("Se guarda vídeo + 3 capturas en Supabase y queda en tu historial." if using_supabase else "Guardado local activado (Supabase no configurado).")
     )
+    if not using_supabase:
+        st.warning(
+            "Supabase no está configurado. El corrector seguirá funcionando, pero el historial/vídeos "
+            "se guardan **localmente** (en Streamlit Cloud pueden perderse tras redeploy/reinicio). "
+            "Si quieres guardado persistente, añade SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Secrets.",
+            icon="⚠️",
+        )
 
     tab1, tab2 = st.tabs(["🎥 Analizar", "📚 Historial"])
 
@@ -628,24 +637,15 @@ elif page == "🧍 Corrector de postura":
                     st.json(a)
 
             except Exception as e:
-                sbst = supabase_config_status()
+                sbst2 = supabase_config_status()
                 st.error(
-                    "Error en el análisis/guardado.\n\n"
+                    "Error en el análisis.\n\n"
                     "✅ Revisa Streamlit Secrets (Manage app → Settings → Secrets).\n\n"
-                    "**OpenAI** (obligatorio):\n"
-                    "- OPENAI_API_KEY\n\n"
-                    "**Supabase** (obligatorio):\n"
-                    "- SUPABASE_URL\n"
-                    "- SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY)\n"
-                    "- (opcional) SUPABASE_BUCKET=posture\n\n"
-                    "También acepto formato anidado TOML:\n"
-                    "[supabase]\n"
-                    "url = \"...\"\n"
-                    "service_role_key = \"...\"\n\n"
+                    "**OpenAI (obligatorio):** OPENAI_API_KEY\n\n"
+                    "**Supabase (opcional para guardado persistente):** SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY\n\n"
                     "Estado detectado (sin mostrar valores): "
-                    f"has_url={sbst.get('has_url')}, has_key={sbst.get('has_key')}, "
-                    f"secrets_keys={sbst.get('secrets_keys', [])}\n\n"
-                    "Además, confirma que existe la tabla `posture_analyses` y el bucket `posture`.\n\n"
+                    f"has_url={sbst2.get('has_url')}, has_key={sbst2.get('has_key')}, "
+                    f"secrets_keys={sbst2.get('secrets_keys', [])}\n\n"
                     f"Detalle: {e}"
                 )
 
