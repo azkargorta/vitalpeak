@@ -113,7 +113,22 @@ from app.posture_mvp import (
     get_signed_urls_for_record,
     delete_posture_record,
 )
-from app.supabase_utils import supabase_config_status
+try:
+    # Supabase helpers are optional at import-time; if missing deps, we still want the app to boot.
+    from app.supabase_utils import supabase_config_status
+except Exception:
+    def supabase_config_status():  # type: ignore
+        keys_present = []
+        try:
+            keys_present = sorted([str(k) for k in st.secrets.keys()]) if hasattr(st, "secrets") else []
+        except Exception:
+            keys_present = []
+        return {
+            "has_url": bool(os.getenv("SUPABASE_URL")),
+            "has_key": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")),
+            "has_bucket": bool(os.getenv("SUPABASE_BUCKET")),
+            "secrets_keys": keys_present,
+        }
 from app.health import (
     add_weight, list_weights,
 )

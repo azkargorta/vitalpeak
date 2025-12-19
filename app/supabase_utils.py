@@ -9,7 +9,11 @@ try:
 except Exception:  # pragma: no cover
     st = None  # type: ignore
 
-from supabase import create_client
+try:
+    # supabase-py
+    from supabase import create_client
+except Exception:  # pragma: no cover
+    create_client = None  # type: ignore
 
 
 def _get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
@@ -87,6 +91,9 @@ def _get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
 
 
 def get_supabase_client():
+    # If dependency isn't installed (or failed import), fail gracefully.
+    if create_client is None:
+        return None
     url = _get_secret("SUPABASE_URL")
     # Accept common aliases: people often name this differently in secrets.
     key = (
