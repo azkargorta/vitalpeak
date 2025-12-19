@@ -230,14 +230,6 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
 
-    # Mapear claves alternativas comunes a 'dias' (para evitar fallos por nombres distintos)
-    if ("dias" not in data) or (not isinstance(data.get("dias"), list)):
-        for _k in ("sessions", "days", "workouts", "dias_semana", "week", "plan", "rutina"):
-            _v = data.get(_k)
-            if isinstance(_v, list) and len(_v) > 0:
-                data["dias"] = _v
-                break
-
     # Preferencia deload: si el usuario define semanas de ciclo, el deload por defecto se coloca al final del ciclo.
     try:
         semanas_ciclo = int(datos.get("semanas_ciclo") or 0)
@@ -439,9 +431,6 @@ def validar_negocio(plan: Dict[str, Any]) -> List[str]:
         errs.append("'meta.duracion_min' debe ser un número en minutos.")
 
     dias = plan.get("dias") or plan.get("dias_semana") or plan.get("workout") or plan.get("days")
-    # Normaliza: si viene con otra clave, muévelo a "dias" para validadores posteriores.
-    if isinstance(dias, list) and "dias" not in plan:
-        plan["dias"] = dias
     if not isinstance(dias, list) or len(dias) == 0:
         errs.append("'dias' debe ser una lista con al menos 1 día.")
         return errs
@@ -550,80 +539,30 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     disp = list(disp) if isinstance(disp, (list, tuple)) else []
 
     dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-
-    # Modo calendario (para soportar ciclos rotativos con etiquetas tipo 'Sesión 1..N')
-    modo_cal = str(datos.get("modo_calendario") or "").strip().lower()
-    if not modo_cal:
-        if "ciclo rot" in txt or "rotativo" in txt:
-            modo_cal = "ciclo rotativo"
-
-    def _norm_weekday(s: str) -> str | None:
-        s0 = s.strip()
-        if not s0:
-            return None
-        s_cap = s0.capitalize()
-        low = s0.lower()
-        if low in ("miercoles","miércoles"):
-            s_cap = "Miércoles"
-        if low in ("sabado","sábado"):
-            s_cap = "Sábado"
-        return s_cap if s_cap in dias_semana else None
-
-    def _norm_session_label(s: str) -> str | None:
-        s0 = s.strip()
-        if not s0:
-            return None
-        m = re.match(r"^(?:sesion|sesión)\s*(\d+)$", s0, flags=re.IGNORECASE)
-        if m:
-            return f"Sesión {int(m.group(1))}"
-        m = re.match(r"^(?:dia|día)\s*(\d+)$", s0, flags=re.IGNORECASE)
-        if m:
-            return f"Sesión {int(m.group(1))}"
-        return None
-
-    disp_norm: List[str] = []
     if disp:
+        disp_norm = []
         for d in disp:
-            s = str(d)
-            wd = _norm_weekday(s)
-            if wd and wd not in disp_norm:
-                disp_norm.append(wd)
-                continue
-            ss = _norm_session_label(s)
-            if ss and ss not in disp_norm:
-                disp_norm.append(ss)
+            d0 = str(d).strip().capitalize()
+            if d0.lower() in ("miercoles","miércoles"):
+                d0 = "Miércoles"
+            if d0.lower() in ("sabado","sábado"):
+                d0 = "Sábado"
+            if d0 in dias_semana and d0 not in disp_norm:
+                disp_norm.append(d0)
         disp = disp_norm
-    else:
-        disp = []
 
     # Ajuste a número de días
-
     if len(disp) != dias:
-        using_sessions = any(str(x).lower().startswith("sesión") or str(x).lower().startswith("sesion") for x in disp) or ("ciclo" in modo_cal or "rot" in modo_cal)
-
         if disp:
             disp = disp[:dias]
-            if using_sessions:
-                # Completa con 'Sesión n' en orden
-                n = 1
-                while len(disp) < dias:
-                    cand = f"Sesión {n}"
-                    if cand not in disp:
-                        disp.append(cand)
-                    n += 1
-            else:
-                # Completa con días de semana
-                for d in dias_semana:
-                    if len(disp) >= dias:
-                        break
-                    if d not in disp:
-                        disp.append(d)
+            for d in dias_semana:
+                if len(disp) >= dias:
+                    break
+                if d not in disp:
+                    disp.append(d)
         else:
-            if using_sessions:
-                disp = [f"Sesión {i+1}" for i in range(dias)]
-            else:
-                defaults = ["Lunes","Martes","Jueves","Viernes","Miércoles","Sábado"]
-                disp = defaults[:dias]
+            defaults = ["Lunes","Martes","Jueves","Viernes","Miércoles","Sábado"]
+            disp = defaults[:dias]
 
     # --- Material ---
     material = datos.get("material") or datos.get("equipo") or []
@@ -651,7 +590,7 @@ def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
     if "ppl" in split_low:
         # Para 4 días: PPL + 1 extra de tren superior (Push B por defecto)
         if dias == 4:
-            split_template = ["Push", "Pull", "Legs", "Upper"]
+            split_template = ["Push A", "Pull A", "Legs", "Push B"]
         elif dias == 3:
             split_template = ["Push", "Pull", "Legs"]
         elif dias == 6:
@@ -778,7 +717,7 @@ def build_prompt(datos: Dict[str, Any]) -> str:
         if A.get("split_template"):
             # Se exige el orden, y que se refleje en el nombre del día para que la app lo valide.
             split_rules += f"- Usa este orden exacto de sesiones: {A['split_template']}." + nl
-            split_rules += "- El campo 'nombre' de cada día debe ser: '<Etiqueta> - <Sesión>' (ej: 'Lunes - Push A')." + nl
+            split_rules += "- El campo 'nombre' de cada día debe ser: '<DíaSemana> - <Sesión>' (ej: 'Lunes - Push A')." + nl
         else:
             split_rules += f"- Split preferido: {A['split_pref']}. Respétalo." + nl
         split_rules += nl
@@ -845,20 +784,17 @@ def _chat(client: OpenAI, prompt: str, *, temperature: float = 0.1) -> str:
     return resp.choices[0].message.content
 
 def _try_parse_json(text: str) -> Dict[str, Any]:
-    """Intenta parsear JSON tolerante a respuestas con texto adicional o fences.
-
-    Nota: _extract_json devuelve una *cadena* con el bloque JSON; después hay que json.loads().
-    """
+    """Intenta parsear JSON tolerante a respuestas con texto adicional o fences."""
+    # Respuesta vacía -> error claro
     if not text or not str(text).strip():
         raise ValueError("Respuesta de OpenAI vacía")
     try:
+        # Intento directo
         return json.loads(text)
     except Exception:
-        extracted = _extract_json(text)
-        try:
-            return json.loads(extracted)
-        except Exception as e:
-            raise ValueError(f"JSON no válido tras extraer bloque: {e}")
+        # Intento robusto: extraer bloque JSON o primer objeto balanceado
+        return _extract_json(text)
+
 
 # === Reglas adicionales derivadas de 'comentarios' del usuario ===
 from typing import Any, Dict
@@ -1228,143 +1164,39 @@ def _estimate_day_minutes(dia: dict) -> float:
     return total_sec / 60.0
 
 
-
 def _postprocess_plan(plan: dict, A: dict) -> dict:
     """Ajustes deterministas para reducir desvíos típicos.
 
-    - Fuerza nombres de días a '<Etiqueta> - <Sesión>' si hay template.
+    - Fuerza nombres de días a '<DíaSemana> - <Sesión>' si hay template.
     - Asegura que existe core/finisher diario (añadiéndolo si hay hueco).
-    - En hipertrofia, asegura al menos 1 trabajo directo semanal de bíceps, tríceps y deltoide lateral.
     """
     try:
         dias = plan.get("dias") or []
-        if not isinstance(dias, list):
-            return plan
-
         disp = A.get("disponibilidad") or []
         template = A.get("split_template")
-
-        # 1) Nombres + core/finisher
         for i, d in enumerate(dias):
             if not isinstance(d, dict):
                 continue
-
+            # Nombres según disponibilidad + template
             if i < len(disp):
                 if template and i < len(template):
                     d["nombre"] = f"{disp[i]} - {template[i]}"
                 else:
                     d["nombre"] = disp[i]
-
+            # Core/finisher
             ej = d.get("ejercicios") or []
-            if not isinstance(ej, list):
-                ej = []
-
-            if not _has_core_or_finisher(d):
-                core_name = "Core: Plancha" if i % 2 == 0 else "Core: Pallof press"
-                core_ej = {
-                    "nombre": core_name,
-                    "series": 3,
-                    "reps": "30-45",
-                    "descanso": "45-60s",
-                    "rir": "1-3",
-                    "notas": "core/finisher",
-                }
-                if len(ej) < 8:
-                    ej.append(core_ej)
-                elif ej:
-                    ej[-1] = core_ej
-                d["ejercicios"] = ej
-
-        # 2) Accesorios mínimos (hipertrofia)
-        objetivo = ""
-        try:
-            objetivo = str((plan.get("meta") or {}).get("objetivo") or "").lower()
-        except Exception:
-            objetivo = ""
-
-        if "hiper" in objetivo:
-            all_names = " ".join(
-                [
-                    str(e.get("nombre", "")).lower()
-                    for d in dias
-                    if isinstance(d, dict)
-                    for e in (d.get("ejercicios") or [])
-                    if isinstance(e, dict)
-                ]
-            )
-
-            need_bi = not re.search(r"(bíceps|biceps|curl)", all_names)
-            need_tri = not re.search(r"(tríceps|triceps|pushdown|extensi[oó]n\s+de\s+tr[ií]ceps)", all_names)
-            need_lat = not re.search(r"(elevaciones\s+laterales|lateral\s+raise|deltoide\s+lateral)", all_names)
-
-            def _day_indices_by_tag(tag: str) -> list[int]:
-                idxs: list[int] = []
-                if template:
-                    for ii, t in enumerate(template):
-                        if tag.lower() in str(t).lower():
-                            idxs.append(ii)
-                if not idxs:
-                    idxs = list(range(len(dias)))
-                return idxs
-
-            def _inject(day_i: int, ex: dict):
-                if day_i < 0 or day_i >= len(dias):
-                    return
-                d = dias[day_i]
-                if not isinstance(d, dict):
-                    return
-                ej = d.get("ejercicios") or []
-                if not isinstance(ej, list):
-                    ej = []
-
-                # Insertar antes del core/finisher (último)
-                insert_at = max(0, len(ej) - 1)
-                if len(ej) < 8:
-                    ej.insert(insert_at, ex)
-                else:
-                    if len(ej) >= 2:
-                        ej[-2] = ex
-                    else:
-                        ej.append(ex)
-                d["ejercicios"] = ej
-
-            if need_bi:
-                idxs = _day_indices_by_tag("Pull") + _day_indices_by_tag("Upper")
-                _inject(idxs[0] if idxs else 0, {
-                    "nombre": "Curl de bíceps en polea",
-                    "series": 3,
-                    "reps": "12-15",
-                    "descanso": "60-75s",
-                    "rir": "1-2",
-                    "notas": "accesorio bíceps",
-                })
-
-            if need_tri:
-                idxs = _day_indices_by_tag("Push") + _day_indices_by_tag("Upper")
-                _inject(idxs[0] if idxs else 0, {
-                    "nombre": "Extensión de tríceps en polea",
-                    "series": 3,
-                    "reps": "12-15",
-                    "descanso": "60-75s",
-                    "rir": "1-2",
-                    "notas": "accesorio tríceps",
-                })
-
-            if need_lat:
-                idxs = _day_indices_by_tag("Push") + _day_indices_by_tag("Upper")
-                _inject(idxs[0] if idxs else 0, {
-                    "nombre": "Elevaciones laterales con mancuernas",
-                    "series": 3,
-                    "reps": "12-20",
-                    "descanso": "45-75s",
-                    "rir": "0-2",
-                    "notas": "deltoide lateral",
-                })
-
-        plan["dias"] = dias
-        return plan
+            if isinstance(ej, list):
+                if not _has_core_or_finisher(d):
+                    core_name = "Core: Plancha" if i % 2 == 0 else "Core: Pallof press"
+                    core_ej = {"nombre": core_name, "series": 3, "reps": "30-45", "descanso": "45-60s", "rir": "1-3", "notas": "core/finisher"}
+                    if len(ej) < 8:
+                        ej.append(core_ej)
+                    elif ej:
+                        ej[-1] = core_ej
+                    d["ejercicios"] = ej
     except Exception:
         return plan
+    return plan
 
 
 def validar_estructura_split(plan: Dict[str, Any], A: Dict[str, Any], datos: Dict[str, Any]) -> List[str]:
@@ -1509,7 +1341,7 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
             "REGLAS (resumen):\n"
             "- 5-8 ejercicios por día.\n"
             "- Último ejercicio de cada día: Core/Finisher y debe empezar por 'Core:' o 'Finisher:'.\n"
-            "- Respetar el split y el nombre del día '<Etiqueta> - <Sesión>' si se especifica.\n"
+            "- Respetar el split y el nombre del día '<DíaSemana> - <Sesión>' si se especifica.\n"
             "- No repetir exactamente el mismo ejercicio en la semana (salvo core/finisher).\n"
             "- Ajustar volumen/descansos para cumplir el tiempo.\n\n"
             "ERRORES A CORREGIR (no ignores ninguno):\n" + json.dumps(last_errs, ensure_ascii=False, indent=2) + "\n\n"
