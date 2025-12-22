@@ -7,6 +7,7 @@ from typing import Dict, Any, List
 import streamlit as st
 import streamlit.components.v1 as components
 import html as html_lib
+import os
 
 # Compat: Streamlit versions may not have cache_data
 def _cache_data(**kwargs):
@@ -46,11 +47,15 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
             st.warning("Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
             st.code(str(glb_file))
             return
-    
-        # Si es enorme, avisa (en móvil puede ir lento)
-        size_mb = glb_file.stat().st_size / (1024 * 1024)
-        if size_mb > 15:
-            st.warning(f"El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
+        # Si es enorme, avisa (en móvil puede ir lento). Usamos os.path.getsize por compatibilidad.
+        try:
+            size_mb = os.path.getsize(glb_file) / (1024 * 1024)
+            if size_mb > 15:
+                st.warning(f"El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
+        except Exception:
+            # Si falla el size (entornos raros), no bloqueamos el render.
+            pass
+
     
         glb_b64 = _read_glb_base64(str(glb_file))
     
