@@ -1,100 +1,160 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from dataclasses import dataclass
+from typing import Dict, List
 
 import streamlit as st
 
-from .exercises import list_all_exercises
-from .technique_cards import get_card, save_card, card_to_markdown
-from .technique_animation_component import render_minimal_3d_animation
+from app.technique_cards import (
+    SECTION_LABELS,
+    get_card,
+    save_card,
+    textarea_to_list,
+    list_to_textarea,
+)
+from app.technique_3d_component import render_mannequin_3d
 
 
-def _split_lines(text: str) -> List[str]:
-    # Accept either bullet list or newline separated.
-    lines = []
-    for raw in (text or "").splitlines():
-        t = raw.strip()
-        if t.startswith("-"):
-            t = t.lstrip("-").strip()
-        if t:
-            lines.append(t)
-    return lines
+@dataclass
+class TechniqueExercise:
+    label: str
+    exercise_id: str
+    default_cues: List[str]
 
 
-def _edit_card_ui(card: Dict[str, Any], *, key_prefix: str) -> Dict[str, Any]:
-    st.caption("Estructura estándar (misma para todos los ejercicios). Puedes editar y guardar.")
-    colA, colB = st.columns(2)
-    with colA:
-        setup_txt = st.text_area("Setup (3–5 bullets)", value="\n".join(card.get("setup") or []), height=140, key=f"{key_prefix}_setup")
-        exec_txt = st.text_area("Ejecución (3–5 bullets)", value="\n".join(card.get("execution") or []), height=140, key=f"{key_prefix}_exec")
-        cues_txt = st.text_area("Cues rápidos (2–3 frases)", value="\n".join(card.get("quick_cues") or []), height=110, key=f"{key_prefix}_cues")
-    with colB:
-        feel_txt = st.text_area("Qué debería sentir (músculos objetivo)", value="\n".join(card.get("should_feel") or []), height=140, key=f"{key_prefix}_feel")
-        notfeel_txt = st.text_area("Qué NO debería sentir (dolor/articulación)", value="\n".join(card.get("should_not_feel") or []), height=140, key=f"{key_prefix}_notfeel")
+def get_library() -> Dict[str, TechniqueExercise]:
+    # Biblioteca inicial: añade más ejercicios aquí
+    items = [
+        TechniqueExercise(
+            label="Press banca",
+            exercise_id="bench_press",
+            default_cues=[
+                "Escápulas atrás y abajo; pecho arriba sin arquear lumbar en exceso.",
+                "Muñecas neutras; antebrazo vertical cerca del punto medio.",
+                "Baja con control al pecho y empuja “hacia arriba y ligeramente atrás”.",
+            ],
+        ),
+        TechniqueExercise(
+            label="Sentadilla",
+            exercise_id="squat",
+            default_cues=[
+                "Pies firmes, rodillas siguen la línea de los pies.",
+                "Core firme (“costillas abajo”), espalda neutra.",
+                "Baja controlado, sube empujando el suelo.",
+            ],
+        ),
+        TechniqueExercise(
+            label="Peso muerto",
+            exercise_id="deadlift",
+            default_cues=[
+                "Barra pegada al cuerpo; hombros sobre la barra al inicio.",
+                "Bisagra de cadera: siente isquios/glúteo, no la espalda baja.",
+                "Empuja el suelo y extiende cadera al final sin hiperextender.",
+            ],
+        ),
+    ]
+    return {i.label: i for i in items}
 
-    st.markdown("**Errores comunes (3) + corrección**")
-    errs = card.get("common_errors") or []
-    # Ensure exactly 3 rows in UI
-    while len(errs) < 3:
-        errs.append({"error": "", "fix": ""})
-    errs = errs[:3]
 
-    ecols = st.columns(2)
-    new_errs = []
-    for i in range(3):
-        with ecols[0]:
-            e = st.text_input(f"Error #{i+1}", value=str(errs[i].get("error","")), key=f"{key_prefix}_err_{i}")
-        with ecols[1]:
-            f = st.text_input(f"Corrección #{i+1}", value=str(errs[i].get("fix","")), key=f"{key_prefix}_fix_{i}")
-        new_errs.append({"error": e.strip(), "fix": f.strip()})
+def _render_card_view(card: dict) -> None:
+    st.markdown(f"### {card.get('exercise_label','')}")
+    st.markdown("---")
 
-    updated = dict(card)
-    updated["setup"] = _split_lines(setup_txt)
-    updated["execution"] = _split_lines(exec_txt)
-    updated["quick_cues"] = _split_lines(cues_txt)
-    updated["common_errors"] = new_errs
-    updated["should_feel"] = _split_lines(feel_txt)
-    updated["should_not_feel"] = _split_lines(notfeel_txt)
-    return updated
+    st.markdown(f"**{SECTION_LABELS['setup']}**")
+    for x in card["setup"]:
+        st.markdown(f"- {x}")
+
+    st.markdown(f"**{SECTION_LABELS['execution']}**")
+    for x in card["execution"]:
+        st.markdown(f"- {x}")
+
+    st.markdown(f"**{SECTION_LABELS['quick_cues']}**")
+    for x in card["quick_cues"]:
+        st.markdown(f"- {x}")
+
+    st.markdown(f"**{SECTION_LABELS['common_errors']}**")
+    for ce in card["common_errors"]:
+        if isinstance(ce, dict):
+            st.markdown(f"- **Error:** {ce.get('error','')}  \n  ✅ **Corrección:** {ce.get('fix','')}")
+        else:
+            st.markdown(f"- {ce}")
+
+    st.markdown(f"**{SECTION_LABELS['should_feel']}**")
+    for x in card["should_feel"]:
+        st.markdown(f"- {x}")
+
+    st.markdown(f"**{SECTION_LABELS['should_not_feel']}**")
+    for x in card["should_not_feel"]:
+        st.markdown(f"- {x}")
 
 
 def render_technique_page() -> None:
     st.title("🎥 Técnica")
+    st.caption("Tarjeta técnica + mini-animación 3D (plantilla única, 2 ángulos).")
 
-    user = st.session_state.get("user")
-    if not user:
-        st.info("Inicia sesión para ver la técnica.")
-        return
+    lib = get_library()
+    exercise_label = st.selectbox("Ejercicio", list(lib.keys()), index=0, key="tech_exercise")
+    ex = lib[exercise_label]
 
-    exercises = list_all_exercises(user)
-    if not exercises:
-        st.warning("No hay ejercicios disponibles todavía.")
-        return
+    user = st.session_state.get("user", "anon")
 
-    ex = st.selectbox("Ejercicio", options=exercises, index=0)
+    tabs = st.tabs(["📄 Tarjeta técnica", "🧍 Mini-animación 3D"])
+    with tabs[0]:
+        card = get_card(user, ex.exercise_id, ex.label)
+        _render_card_view(card)
 
-    card = get_card(user, ex)
+        with st.expander("Editar ficha (opcional)", expanded=False):
+            st.write("Escribe 1 punto por línea (bullets).")
 
-    tab_card, tab_anim = st.tabs(["📄 Tarjeta técnica", "🧍 Mini-animación 3D"])
+            setup_t = st.text_area("Setup", value=list_to_textarea(card["setup"]), height=110)
+            exec_t = st.text_area("Ejecución", value=list_to_textarea(card["execution"]), height=110)
+            cues_t = st.text_area("Cues rápidos", value=list_to_textarea(card["quick_cues"]), height=90)
 
-    with tab_card:
-        st.markdown(card_to_markdown(card))
+            # Errores: formato simple "error => corrección"
+            default_err_lines = []
+            for e in card["common_errors"]:
+                if isinstance(e, dict):
+                    default_err_lines.append(f"{e.get('error','')} => {e.get('fix','')}")
+                else:
+                    default_err_lines.append(str(e))
+            err_t = st.text_area("Errores comunes (usa: error => corrección)", value="\n".join(default_err_lines), height=120)
 
-        with st.expander("✍️ Editar y guardar ficha", expanded=False):
-            updated = _edit_card_ui(card, key_prefix=f"tc_{ex}")
-            if st.button("💾 Guardar ficha", type="primary", use_container_width=True):
-                updated["exercise"] = ex
-                save_card(user, ex, updated)
-                st.success("Ficha guardada.")
-                st.rerun()
+            feel_t = st.text_area("Qué debería sentir", value=list_to_textarea(card["should_feel"]), height=80)
+            notfeel_t = st.text_area("Qué NO debería sentir", value=list_to_textarea(card["should_not_feel"]), height=80)
 
-    with tab_anim:
-        # Use cues from the card (2–3), fall back to a couple of defaults if empty
-        cues = card.get("quick_cues") or []
-        if not cues:
-            cues = ["Costillas abajo.", "Controla la trayectoria."]
+            if st.button("Guardar ficha", type="primary", use_container_width=True):
+                new_card = {
+                    "exercise_label": ex.label,
+                    "setup": textarea_to_list(setup_t),
+                    "execution": textarea_to_list(exec_t),
+                    "quick_cues": textarea_to_list(cues_t),
+                    "common_errors": [],
+                    "should_feel": textarea_to_list(feel_t),
+                    "should_not_feel": textarea_to_list(notfeel_t),
+                }
+                # parse errores
+                errs = []
+                for ln in textarea_to_list(err_t):
+                    if "=>" in ln:
+                        a, b = ln.split("=>", 1)
+                        errs.append({"error": a.strip(), "fix": b.strip()})
+                    else:
+                        errs.append({"error": ln.strip(), "fix": ""})
+                new_card["common_errors"] = errs
 
-        st.caption("Plantilla visual reutilizable (mismo estilo para todos). 2 ángulos fijos: frontal + lateral.")
-        render_minimal_3d_animation(ex, cues=cues, height=560)
+                save_card(user, ex.exercise_id, new_card)
+                st.success("Ficha guardada ✅ (por usuario)")
 
-        st.info("Si no se ve la animación: requiere internet para cargar Three.js (CDN).")
+    with tabs[1]:
+        st.markdown("### Cues en pantalla")
+        for c in ex.default_cues[:3]:
+            st.markdown(f"- {c}")
+
+        st.markdown("### Mini-animación 3D (frontal + lateral)")
+        render_mannequin_3d(ex.exercise_id, cues=ex.default_cues)
+
+        st.markdown("---")
+        st.caption(
+            "Atribución requerida (CC BY): "
+            "Manequin - Low Poly Model por Miarintsoa (Sketchfab), licencia CC Attribution."
+        )

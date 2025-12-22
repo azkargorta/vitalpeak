@@ -1,0 +1,2 @@
+Coloca aquí el archivo mannequin.glb descargado de Sketchfab.
+Ruta final: assets/3d/mannequin.glb
