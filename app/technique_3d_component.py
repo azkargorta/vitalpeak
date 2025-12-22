@@ -6,9 +6,7 @@ from typing import Dict, Any, List
 
 import streamlit as st
 import streamlit.components.v1 as components
-import html
-
-
+import html as html_lib
 def _assets_dir() -> Path:
     return Path("assets")
 
@@ -49,11 +47,11 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
     }
     cfg = ex_cfg.get(exercise_id, {"name": exercise_id, "mode": "generic"})
 
-    cues_html = "".join([f"<li>{html.escape(cue)}</li>" for cue in (cues or [])[:4]])  # type: ignore[attr-defined]
+    cues_html = "".join([f"<li>{html_lib.escape(str(cue))}</li>" for cue in (cues or [])[:4]])  # type: ignore[attr-defined]
     cues_block = f"<ul style='margin:6px 0 0 18px; padding:0; font-size:12px; opacity:.9'>{cues_html}</ul>" if cues else ""
 
     # Nota: usamos Three.js por CDN para simplicidad. Si quieres offline, se puede empaquetar.
-    html = f"""
+\1html_page = f\"\"\"
 <!doctype html>
 <html>
 <head>
@@ -349,4 +347,4 @@ requestAnimationFrame(animate);
 </body>
 </html>
 """
-    components.html(html, height=620, scrolling=False)
+    components.html(html_page, height=620, scrolling=False)
