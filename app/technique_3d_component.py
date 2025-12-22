@@ -7,6 +7,8 @@ from typing import Dict, Any, List
 import streamlit as st
 import streamlit.components.v1 as components
 import html as html_lib
+
+
 def _assets_dir() -> Path:
     return Path("assets")
 
@@ -47,11 +49,31 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
     }
     cfg = ex_cfg.get(exercise_id, {"name": exercise_id, "mode": "generic"})
 
-    cues_html = "".join([f"<li>{html_lib.escape(str(cue))}</li>" for cue in (cues or [])[:4]])  # type: ignore[attr-defined]
-    cues_block = f"<ul style='margin:6px 0 0 18px; padding:0; font-size:12px; opacity:.9'>{cues_html}</ul>" if cues else ""
+    # Cues: normalizamos para evitar fallos con truthiness/slicing de tipos raros
+    cues_list: List[str] = []
+    try:
+        if cues is None:
+            cues_list = []
+        elif isinstance(cues, (list, tuple)):
+            cues_list = [str(x) for x in cues]
+        elif isinstance(cues, str):
+            cues_list = [cues]
+        else:
+            # iterable cualquiera
+            cues_list = [str(x) for x in list(cues)]
+    except Exception:
+        cues_list = []
+
+    cues_list = [c.strip() for c in cues_list if c is not None and str(c).strip()][:4]
+    cues_html = "".join([f"<li>{html_lib.escape(c)}</li>" for c in cues_list])
+    cues_block = (
+        f"<ul style='margin:6px 0 0 18px; padding:0; font-size:12px; opacity:.9'>{cues_html}</ul>"
+        if len(cues_list) > 0 else ""
+    )
+
 
     # Nota: usamos Three.js por CDN para simplicidad. Si quieres offline, se puede empaquetar.
-\1html_page = f\"\"\"
+    page_html = f\"\"\"
 <!doctype html>
 <html>
 <head>
@@ -347,4 +369,4 @@ requestAnimationFrame(animate);
 </body>
 </html>
 """
-    components.html(html_page, height=620, scrolling=False)
+    components.html(page_html, height=620, scrolling=False)
