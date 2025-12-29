@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -23,8 +23,7 @@ def _cache_data(**kwargs):
 
 
 def _assets_dir() -> Path:
-    # Ruta absoluta robusta (funciona en local y Streamlit Cloud)
-    return Path(__file__).resolve().parents[1] / "assets"
+    return Path("assets")
 
 
 @_cache_data(show_spinner=False)
@@ -34,7 +33,7 @@ def _read_glb_base64(glb_path: str) -> str:
     return base64.b64encode(b).decode("ascii")
 
 
-def render_mannequin_3d(exercise_id: str, cues: Optional[List[str]] = None) -> None:
+def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None:
     """
     Renderiza una mini-animación 3D (frontal + lateral) usando un maniquí GLB.
 
@@ -42,17 +41,16 @@ def render_mannequin_3d(exercise_id: str, cues: Optional[List[str]] = None) -> N
       assets/3d/mannequin.glb
     """
     try:
-        cues = cues or []
-        glb_file = _assets_dir() / "3d" / "mannequin.glb"
+                glb_file = _assets_dir() / "3d" / "mannequin.glb"
         if not glb_file.exists():
-            st.text("Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
-            st.text(str(glb_file))
+            st.warning("Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
+            st.code(str(glb_file))
             return
         # Si es enorme, avisa (en móvil puede ir lento). Usamos os.path.getsize por compatibilidad.
         try:
             size_mb = os.path.getsize(glb_file) / (1024 * 1024)
             if size_mb > 15:
-                st.text(f"El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
+                st.warning(f"El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
         except Exception:
             # Si falla el size (entornos raros), no bloqueamos el render.
             pass
@@ -67,6 +65,26 @@ def render_mannequin_3d(exercise_id: str, cues: Optional[List[str]] = None) -> N
             "deadlift": {"name": "Peso muerto", "mode": "hinge"},
         }
         cfg = ex_cfg.get(exercise_id, {"name": exercise_id, "mode": "generic"})
+
+# Cues: normalizamos para evitar fallos con tipos raros
+cues_list: List[str] = []
+try:
+    if cues is None:
+        cues_list = []
+    elif isinstance(cues, (list, tuple)):
+        cues_list = [str(x) for x in cues]
+    elif isinstance(cues, str):
+        cues_list = [cues]
+    else:
+        cues_list = [str(x) for x in list(cues)]
+except Exception:
+    cues_list = []
+cues_list = [c.strip() for c in cues_list if c and str(c).strip()][:4]
+cues_html = "".join([f"<li>{html_lib.escape(c)}</li>" for c in cues_list])
+cues_block = (
+    f"<ul style='margin:6px 0 0 18px; padding:0; font-size:12px; opacity:.9'>{cues_html}</ul>"
+    if len(cues_list) > 0 else ""
+)
     
         # Cues: normalizamos para evitar fallos con truthiness/slicing de tipos raros
         cues_list: List[str] = []
@@ -84,15 +102,14 @@ def render_mannequin_3d(exercise_id: str, cues: Optional[List[str]] = None) -> N
             cues_list = []
     
         cues_list = [c.strip() for c in cues_list if c is not None and str(c).strip()][:4]
-        cues_html = "".join([f"<li>{html_lib.escape(c)}</li>" for c in cues_list])
-        cues_block = (
+
             f"<ul style='margin:6px 0 0 18px; padding:0; font-size:12px; opacity:.9'>{cues_html}</ul>"
             if len(cues_list) > 0 else ""
         )
     
     
         # Nota: usamos Three.js por CDN para simplicidad. Si quieres offline, se puede empaquetar.
-        page_html = f"""
+        page_html = f\"\"\"
 <!doctype html>
 <html>
 <head>
@@ -390,6 +407,6 @@ requestAnimationFrame(animate);
 """
         components.html(page_html, height=620, scrolling=False)
     except Exception as e:
-        st.text('Error cargando mini-animación 3D')
+        st.error('Error cargando mini-animación 3D')
         st.exception(e)
         return

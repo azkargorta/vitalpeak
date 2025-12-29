@@ -11,6 +11,20 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+# ---- Streamlit compat patch ----
+# Some deployments ship a Streamlit build missing streamlit._escape_markdown,
+# but internal Streamlit elements (e.g., st.warning/st.info/st.code) may expect it.
+# We provide a minimal implementation to avoid AttributeError crashes.
+if not hasattr(st, "_escape_markdown"):
+    def _escape_markdown(text) -> str:
+        s = "" if text is None else str(text)
+        # Basic escaping for common markdown special chars.
+        for ch in ["\\", "`", "*", "_", "{", "}", "[", "]", "(", ")", "#", "+", "-", ".", "!", "|", ">"]:
+            s = s.replace(ch, f"\\{ch}")
+        return s
+    st._escape_markdown = _escape_markdown  # type: ignore[attr-defined]
+# -------------------------------
 from dotenv import load_dotenv
 import os
 
