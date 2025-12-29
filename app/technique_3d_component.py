@@ -44,14 +44,14 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
         cues = cues or []
         glb_file = _assets_dir() / "3d" / "mannequin.glb"
         if not glb_file.exists():
-            st.write("⚠️ Falta el modelo 3D. Coloca `mannequin.glb` en `assets/3d/mannequin.glb`.")
+            st.text("⚠️ Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
             st.text(str(glb_file))
             return
         # Si es enorme, avisa (en móvil puede ir lento). Usamos os.path.getsize por compatibilidad.
         try:
             size_mb = os.path.getsize(glb_file) / (1024 * 1024)
             if size_mb > 15:
-                st.write(f"⚠️ El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
+                st.text(f"El GLB pesa ~{size_mb:.1f} MB. En móvil puede ir lento; intenta bajarlo a 2–10 MB.")
         except Exception:
             # Si falla el size (entornos raros), no bloqueamos el render.
             pass
@@ -91,7 +91,7 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
     
     
         # Nota: usamos Three.js por CDN para simplicidad. Si quieres offline, se puede empaquetar.
-        page_html = f\"\"\"
+        page_html = f"""
 <!doctype html>
 <html>
 <head>
