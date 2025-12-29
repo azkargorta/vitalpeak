@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -23,7 +23,8 @@ def _cache_data(**kwargs):
 
 
 def _assets_dir() -> Path:
-    return Path("assets")
+    # Ruta absoluta robusta (funciona en local y Streamlit Cloud)
+    return Path(__file__).resolve().parents[1] / "assets"
 
 
 @_cache_data(show_spinner=False)
@@ -33,7 +34,7 @@ def _read_glb_base64(glb_path: str) -> str:
     return base64.b64encode(b).decode("ascii")
 
 
-def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None:
+def render_mannequin_3d(exercise_id: str, cues: Optional[List[str]] = None) -> None:
     """
     Renderiza una mini-animación 3D (frontal + lateral) usando un maniquí GLB.
 
@@ -44,7 +45,7 @@ def render_mannequin_3d(exercise_id: str, cues: List[str] | None = None) -> None
         cues = cues or []
         glb_file = _assets_dir() / "3d" / "mannequin.glb"
         if not glb_file.exists():
-            st.text("⚠️ Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
+            st.text("Falta el modelo 3D. Coloca mannequin.glb en assets/3d/mannequin.glb")
             st.text(str(glb_file))
             return
         # Si es enorme, avisa (en móvil puede ir lento). Usamos os.path.getsize por compatibilidad.
@@ -389,6 +390,6 @@ requestAnimationFrame(animate);
 """
         components.html(page_html, height=620, scrolling=False)
     except Exception as e:
-        st.error('Error cargando mini-animación 3D')
+        st.text('Error cargando mini-animación 3D')
         st.exception(e)
         return
