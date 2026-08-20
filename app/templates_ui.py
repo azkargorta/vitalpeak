@@ -157,6 +157,23 @@ def render_templates_page(*, embedded: bool = True) -> None:
             st.session_state.pop("tpl_editor_id", None)
             st.rerun()
 
+    # PDF del plan completo (todos los días)
+    try:
+        from app.pdf_export import plan_days_to_pdf_bytes
+
+        pdf_bytes = plan_days_to_pdf_bytes(plan)
+        safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in str(plan.get("name") or "plan")).strip()
+        st.download_button(
+            "Descargar PDF completo",
+            data=pdf_bytes,
+            file_name=f"VitalPeak_{safe}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="tpl_pdf_dl",
+        )
+    except Exception:
+        pass
+
     days = plan.get("days") or []
     day_labels = [f"Día {i+1}: {d.get('name', '')}" for i, d in enumerate(days)]
     if "tpl_day_tab" not in st.session_state:

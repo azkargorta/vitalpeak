@@ -5,7 +5,6 @@ from __future__ import annotations
 import calendar as _cal
 import datetime as _dt
 from collections import Counter, defaultdict
-from io import BytesIO
 
 import pandas as pd
 import streamlit as st
@@ -373,49 +372,32 @@ def render_planner_page(user: str) -> None:
 
     # —— Más opciones ——
     with st.expander("Más opciones", expanded=False):
-        st.caption("Exportar PDF")
+        st.caption("Exportar PDF del entrenamiento completo (todos los días)")
         try:
-            from reportlab.lib import colors
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+            from app.pdf_export import group_routine_programs, routines_to_pdf_bytes
         except Exception:
             st.caption("Instala reportlab para exportar PDF.")
             return
 
-        export_sel = st.selectbox("Rutina", routine_names, key="pdf_rt")
-        if st.button("Generar PDF", use_container_width=True):
-            r = next(rr for rr in routines if rr["name"] == export_sel)
-            buf = BytesIO()
-            doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-            styles = getSampleStyleSheet()
-            story = [Paragraph(f"Rutina — {export_sel}", styles["Title"]), Spacer(1, 12)]
-            data = [["Ejercicio", "Series", "Reps", "Peso"]]
-            for it in r.get("items", []):
-                data.append(
-                    [
-                        str(it.get("exercise", "")),
-                        str(it.get("sets", "")),
-                        str(it.get("reps", "")),
-                        str(it.get("weight", "")),
-                    ]
-                )
-            table = Table(data, repeatRows=1)
-            table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ]
-                )
-            )
-            story.append(table)
-            doc.build(story)
-            st.download_button(
-                "Descargar PDF",
-                data=buf.getvalue(),
-                file_name=f"rutina_{export_sel}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
+        programs = group_routine_programs(routines)
+        labels = []
+        for title, rts in programs:
+            n = len(rts)
+            labels.append(f"{title}  ({n} {'día' if n == 1 else 'días'})")
+        pick = st.selectbox("Entrenamiento", labels, key="pdf_prog")
+        title, rts = programs[labels.index(pick)]
+        pdf = routines_to_pdf_bytes(
+            rts,
+            title=title,
+            subtitle=f"{len(rts)} sesiones · VitalPeak",
+        )
+        safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
+        st.download_button(
+            "Descargar PDF completo",
+            data=pdf,
+            file_name=f"VitalPeak_{safe}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary",
+            key="pdf_dl",
+        )
