@@ -6,8 +6,10 @@ def _asegurar_dias_minimos(datos_usuario: dict):
         datos_usuario["dias"] = ["Lunes", "Miércoles", "Viernes"]
 
 import matplotlib.pyplot as plt
+import sqlite3
 from datetime import date
 from pathlib import Path
+from typing import List, Optional
 
 import pandas as pd
 import streamlit as st

@@ -1,0 +1,16 @@
+{
+  "password": "pbkdf2$sha256$310000$y2wEHp9IemNxTSiGMycjcA==$ZJhx1n0vkuAccLZ2BvhrbDLrXoTgNEiuCY3G0W1xVcc=",
+  "email": "azkardurant@gmail.com",
+  "recovery_email": "azkardurant@gmail.com",
+  "profile": {},
+  "entrenamientos": [],
+  "rutinas": [],
+  "custom_exercises": [],
+  "exercise_meta": {},
+  "weights": [],
+  "objetivos": {
+    "dias_semana": 3,
+    "peso_objetivo": null,
+    "ejercicios": {}
+  }
+}
