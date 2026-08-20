@@ -136,5 +136,33 @@
     "dias_semana": 3,
     "peso_objetivo": null,
     "ejercicios": {}
+  },
+  "routine_plan": {
+    "2026-08-03": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-10": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-17": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-24": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-31": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-05": "Full Body 3 días · intermedio — Full Body B",
+    "2026-08-12": "Full Body 3 días · intermedio — Full Body B",
+    "2026-08-19": "Full Body 3 días · intermedio — Full Body B",
+    "2026-08-26": "Full Body 3 días · intermedio — Full Body B",
+    "2026-08-07": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-14": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-21": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-28": "Full Body 3 días · intermedio — Full Body C",
+    "2026-09-02": "Full Body 3 días · intermedio — Full Body B",
+    "2026-09-04": "Full Body 3 días · intermedio — Full Body C",
+    "2026-09-07": "Full Body 3 días · intermedio — Full Body A",
+    "2026-09-09": "Full Body 3 días · intermedio — Full Body B",
+    "2026-09-11": "Full Body 3 días · intermedio — Full Body C",
+    "2026-09-14": "Full Body 3 días · intermedio — Full Body A",
+    "2026-09-16": "Full Body 3 días · intermedio — Full Body B",
+    "2026-09-18": "Full Body 3 días · intermedio — Full Body C",
+    "2026-09-21": "Full Body 3 días · intermedio — Full Body A",
+    "2026-09-23": "Full Body 3 días · intermedio — Full Body B",
+    "2026-09-25": "Full Body 3 días · intermedio — Full Body C",
+    "2026-09-28": "Full Body 3 días · intermedio — Full Body A",
+    "2026-09-30": "Full Body 3 días · intermedio — Full Body B"
   }
 }

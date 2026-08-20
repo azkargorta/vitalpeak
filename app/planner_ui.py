@@ -31,20 +31,103 @@ def _set_plan(u: str, d_iso: str, routine_name: str | None) -> None:
     save_user(u, data)
 
 
-def _color_for(name: str) -> str:
-    palette = [
-        "#D6F0EC", "#D9E8F5", "#F5E6D9", "#E8F0D9",
-        "#EDE4F5", "#F5E0E6", "#E0F2F1", "#FFF3E0",
-    ]
-    if not name:
-        return "transparent"
-    return palette[abs(hash(name)) % len(palette)]
+_ROUTINE_PALETTE = [
+    "#B8E8E0",  # teal
+    "#BFD4F5",  # blue
+    "#F5C9A8",  # peach
+    "#C8E6A8",  # green
+    "#D4C2F0",  # lilac
+    "#F5B8C8",  # pink
+    "#FFE08A",  # yellow
+    "#A8D8F0",  # sky
+    "#E8C4A0",  # sand
+    "#B8F0C8",  # mint
+    "#F0B8A8",  # coral
+    "#C8C8F0",  # periwinkle
+]
+
+
+def _colors_for_names(names: list[str]) -> dict[str, str]:
+    """Asigna un color distinto a cada rutina (sin colisiones por hash)."""
+    unique = sorted({n for n in names if n})
+    n = len(_ROUTINE_PALETTE)
+    return {name: _ROUTINE_PALETTE[i % n] for i, name in enumerate(unique)}
+
+
+_MONTH_ES = [
+    "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+]
+
+
+def _month_label(year: int, month: int) -> str:
+    return f"{_MONTH_ES[month]} {year}"
+
+
+def _months_with_plan(plan: dict) -> list[tuple[int, int]]:
+    """Meses (año, mes) que tienen al menos una rutina asignada."""
+    seen: set[tuple[int, int]] = set()
+    for iso, name in plan.items():
+        if not name:
+            continue
+        try:
+            d = _dt.date.fromisoformat(iso)
+        except ValueError:
+            continue
+        seen.add((d.year, d.month))
+    return sorted(seen, reverse=True)
+
+
+def _copy_weekday_pattern(
+    user: str,
+    src_year: int,
+    src_month: int,
+    dst_year: int,
+    dst_month: int,
+    *,
+    wipe: bool,
+) -> int:
+    """Copia el patrón por día de la semana del mes origen al destino. Devuelve nº de días."""
+    plan_current = _get_plan(user)
+    freq: dict = defaultdict(Counter)
+    days_src = _cal.monthrange(src_year, src_month)[1]
+    for d in range(1, days_src + 1):
+        dd = _dt.date(src_year, src_month, d)
+        val = plan_current.get(dd.isoformat())
+        if val:
+            freq[dd.weekday()][val] += 1
+    weekday_map = {wd: counter.most_common(1)[0][0] for wd, counter in freq.items() if counter}
+    if not weekday_map:
+        return 0
+    days_dst = _cal.monthrange(dst_year, dst_month)[1]
+    if wipe:
+        for d in range(1, days_dst + 1):
+            _set_plan(user, _dt.date(dst_year, dst_month, d).isoformat(), None)
+    applied = 0
+    for d in range(1, days_dst + 1):
+        dd = _dt.date(dst_year, dst_month, d)
+        if dd.weekday() in weekday_map:
+            _set_plan(user, dd.isoformat(), weekday_map[dd.weekday()])
+            applied += 1
+    return applied
 
 
 def _render_month_calendar(plan: dict, year: int, month: int) -> None:
     cal = _cal.Calendar(firstweekday=0)
     weeks = cal.monthdayscalendar(year, month)
     weekdays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+
+    month_names: list[str] = []
+    for week in weeks:
+        for day in week:
+            if day == 0:
+                continue
+            n = plan.get(_dt.date(year, month, day).isoformat(), "")
+            if n:
+                month_names.append(n)
+    colors = _colors_for_names(month_names)
+    assigned = sorted(colors.keys())
+
     html = """
     <style>
     .vp-cal { width:100%; border-collapse:separate; border-spacing:6px; table-layout:fixed; }
@@ -67,7 +150,6 @@ def _render_month_calendar(plan: dict, year: int, month: int) -> None:
     <table class="vp-cal"><thead><tr>
     """
     html += "".join(f"<th>{d}</th>" for d in weekdays) + "</tr></thead><tbody>"
-    assigned = set()
     for week in weeks:
         html += "<tr>"
         for day in week:
@@ -76,10 +158,8 @@ def _render_month_calendar(plan: dict, year: int, month: int) -> None:
                 continue
             d = _dt.date(year, month, day)
             name = plan.get(d.isoformat(), "")
-            if name:
-                assigned.add(name)
             tag = (
-                f'<span class="tag" style="background:{_color_for(name)}">{name}</span>'
+                f'<span class="tag" style="background:{colors[name]}">{name}</span>'
                 if name
                 else '<span class="tag libre">Libre</span>'
             )
@@ -88,8 +168,8 @@ def _render_month_calendar(plan: dict, year: int, month: int) -> None:
     html += "</tbody></table>"
     if assigned:
         chips = " ".join(
-            f'<span class="tag" style="display:inline-block;margin:2px 4px;background:{_color_for(n)}">{n}</span>'
-            for n in sorted(assigned)
+            f'<span class="tag" style="display:inline-block;margin:2px 4px;background:{colors[n]}">{n}</span>'
+            for n in assigned
         )
         html += f'<div style="margin-top:8px">{chips}</div>'
     st.markdown(html, unsafe_allow_html=True)
@@ -146,6 +226,32 @@ def render_planner_page(user: str) -> None:
 
     ym = st.session_state["planner_month"]
     _render_month_calendar(plan, ym.year, ym.month)
+
+    # —— Copiar de otro mes (destino = mes visible) ——
+    with st.expander(f"Copiar entrenos a {_month_label(ym.year, ym.month)}", expanded=False):
+        st.caption("Replica el patrón semanal (lun/mar/…) de otro mes en el que estás viendo.")
+        months_avail = _months_with_plan(plan)
+        months_avail = [(y, m) for y, m in months_avail if (y, m) != (ym.year, ym.month)]
+        if not months_avail:
+            st.info("No hay otros meses con entrenos guardados. Asigna rutinas en un mes y vuelve aquí.")
+        else:
+            labels = [_month_label(y, m) for y, m in months_avail]
+            pick = st.selectbox("Copiar desde", labels, key="planner_copy_src")
+            src_y, src_m = months_avail[labels.index(pick)]
+            wipe = st.checkbox(
+                f"Vaciar antes {_month_label(ym.year, ym.month)}",
+                value=False,
+                key="planner_copy_wipe",
+            )
+            if st.button("Copiar al mes actual", type="primary", use_container_width=True, key="planner_copy_go"):
+                n = _copy_weekday_pattern(
+                    user, src_y, src_m, ym.year, ym.month, wipe=wipe
+                )
+                if n == 0:
+                    st.warning("El mes origen no tiene asignaciones útiles.")
+                else:
+                    st.success(f"Copiados {n} días desde {pick}.")
+                    st.rerun()
 
     st.markdown("---")
 
@@ -267,38 +373,6 @@ def render_planner_page(user: str) -> None:
 
     # —— Más opciones ——
     with st.expander("Más opciones", expanded=False):
-        st.caption("Copiar patrón de un mes a otro")
-        src = st.date_input("Mes origen", value=today, key="copy_src")
-        dst = st.date_input("Mes destino", value=today, key="copy_dst")
-        wipe = st.checkbox("Vaciar destino antes", value=False)
-        if st.button("Copiar patrón", use_container_width=True):
-            plan_current = _get_plan(user)
-            freq: dict = defaultdict(Counter)
-            days_src = _cal.monthrange(src.year, src.month)[1]
-            for d in range(1, days_src + 1):
-                dd = _dt.date(src.year, src.month, d)
-                val = plan_current.get(dd.isoformat())
-                if val:
-                    freq[dd.weekday()][val] += 1
-            weekday_map = {wd: counter.most_common(1)[0][0] for wd, counter in freq.items() if counter}
-            if not weekday_map:
-                st.info("El mes origen no tiene asignaciones.")
-            else:
-                if wipe:
-                    days_dst = _cal.monthrange(dst.year, dst.month)[1]
-                    for d in range(1, days_dst + 1):
-                        _set_plan(user, _dt.date(dst.year, dst.month, d).isoformat(), None)
-                applied = 0
-                days_dst = _cal.monthrange(dst.year, dst.month)[1]
-                for d in range(1, days_dst + 1):
-                    dd = _dt.date(dst.year, dst.month, d)
-                    if dd.weekday() in weekday_map:
-                        _set_plan(user, dd.isoformat(), weekday_map[dd.weekday()])
-                        applied += 1
-                st.success(f"Copiadas {applied} asignaciones.")
-                st.rerun()
-
-        st.markdown("---")
         st.caption("Exportar PDF")
         try:
             from reportlab.lib import colors
