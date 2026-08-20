@@ -21,7 +21,11 @@ import streamlit as st
 from app.config import load_env, get_openai_api_key
 from app.ai_generator import call_gpt, _get_model
 from app.rules_fallback import generate_fallback
-from app.pdf_export import rutina_a_pdf_bytes
+
+try:
+    from app.pdf_export import rutina_a_pdf_bytes
+except Exception:
+    rutina_a_pdf_bytes = None  # type: ignore
 
 st.set_page_config(page_title="Creador de Rutinas (IA)", page_icon="💪", layout="wide")
 load_env()
@@ -279,17 +283,20 @@ if plan:
             use_container_width=True,
         )
     with c2:
-        try:
-            pdf_bytes = rutina_a_pdf_bytes(plan)
-            st.download_button(
-                "📄 Descargar PDF",
-                data=pdf_bytes,
-                file_name="rutina_ia.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
-        except Exception as e:
-            st.error(f"No se pudo generar PDF: {e}")
+        if rutina_a_pdf_bytes is None:
+            st.caption("PDF no disponible (instala `reportlab`).")
+        else:
+            try:
+                pdf_bytes = rutina_a_pdf_bytes(plan)
+                st.download_button(
+                    "📄 Descargar PDF",
+                    data=pdf_bytes,
+                    file_name="rutina_ia.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"No se pudo generar PDF: {e}")
 
     with c3:
         user = st.session_state.get("user")
