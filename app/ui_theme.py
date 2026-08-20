@@ -342,6 +342,58 @@ def section_label(text: str) -> None:
     st.markdown(f'<div class="vp-section-label">{text}</div>', unsafe_allow_html=True)
 
 
+def render_mode_switch(options: list[str], current: str, *, key: str) -> str:
+    """Interruptor visual de 2+ modos (botones grandes)."""
+    if current not in options:
+        current = options[0]
+    st.markdown(
+        """
+<style>
+div[data-testid="column"] button[kind="primary"] {
+  min-height: 3rem;
+  font-size: 1.05rem !important;
+}
+div[data-testid="column"] button[kind="secondary"] {
+  min-height: 3rem;
+  font-size: 1.05rem !important;
+}
+.vp-switch-hint {
+  font-size: 0.78rem;
+  color: #6A7F88;
+  margin: -0.35rem 0 0.85rem 0;
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(len(options))
+    chosen = current
+    for i, opt in enumerate(options):
+        with cols[i]:
+            active = opt == current
+            if st.button(
+                opt,
+                key=f"{key}_{opt}",
+                use_container_width=True,
+                type="primary" if active else "secondary",
+            ):
+                chosen = opt
+                st.session_state[key] = opt
+                st.rerun()
+    hints = {
+        "Plantillas": "Elige un plan listo y personalízalo",
+        "Planificar": "Pon tus rutinas en el calendario",
+        "Ejercicios": "Catálogo y evolución",
+        "Historial": "Series registradas",
+        "Objetivos": "Metas semanales y por ejercicio",
+        "Peso": "Seguimiento corporal",
+    }
+    hint = hints.get(chosen, "")
+    if hint:
+        st.markdown(f'<p class="vp-switch-hint">{hint}</p>', unsafe_allow_html=True)
+    return st.session_state.get(key, chosen)
+
+
 # Menú compacto (sin iconos)
 NAV_META = [
     ("Hoy", "Hoy"),

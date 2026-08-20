@@ -35,8 +35,9 @@ st.set_page_config(page_title="VitalPeak", page_icon="VP", layout="wide")
 
 load_dotenv()
 
-from app.ui_theme import apply_theme, render_brand_hero, section_label, render_sidebar_nav, NAV_META
+from app.ui_theme import apply_theme, render_brand_hero, section_label, render_sidebar_nav, NAV_META, render_mode_switch
 from app.templates_ui import render_templates_page
+from app.planner_ui import render_planner_page
 
 apply_theme()
 
@@ -568,22 +569,13 @@ elif page == "Rutinas":
     require_auth()
     _rt = ["Plantillas", "Planificar"]
     _cur = st.session_state.get("rutinas_tab", "Plantillas")
-    if _cur not in _rt:
-        _cur = "Plantillas"
-    _sub = st.radio(
-        "rutinas_sub",
-        _rt,
-        index=_rt.index(_cur),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="rutinas_tab_radio",
-    )
-    st.session_state["rutinas_tab"] = _sub
+    _sub = render_mode_switch(_rt, _cur, key="rutinas_tab")
     if _sub == "Plantillas":
         render_templates_page(embedded=True)
-        page = None  # no seguir
+        page = None
     else:
-        page = "Planificar rutinas"
+        render_planner_page(st.session_state["user"])
+        page = None
 
 elif page == "Progreso":
     require_auth()
@@ -595,17 +587,7 @@ elif page == "Progreso":
         "Peso": "Peso corporal",
     }
     _curp = st.session_state.get("progreso_tab", "Ejercicios")
-    if _curp not in _pt:
-        _curp = "Ejercicios"
-    _subp = st.radio(
-        "progreso_sub",
-        _pt,
-        index=_pt.index(_curp),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="progreso_tab_radio",
-    )
-    st.session_state["progreso_tab"] = _subp
+    _subp = render_mode_switch(_pt, _curp, key="progreso_tab")
     page = _pmap[_subp]
 
 elif page == "Plantillas":
@@ -1226,309 +1208,7 @@ elif page == "Peso corporal":
 
 elif page == "Planificar rutinas":
     require_auth()
-    if st.session_state.get("nav_page") == "Rutinas":
-        st.markdown("### Planificar calendario")
-    else:
-        st.title("Planificar rutinas")
-    user = st.session_state["user"]
-
-    # ---------- Utilidades de plan ----------
-    def _get_plan(u: str):
-        data = load_user(u)
-        return dict(data.get("routine_plan", {}))
-
-    def _set_plan(u: str, d_iso: str, routine_name: str | None):
-        data = load_user(u)
-        plan = dict(data.get("routine_plan", {}))
-        if routine_name:
-            plan[d_iso] = routine_name
-        else:
-            if d_iso in plan:
-                del plan[d_iso]
-        data["routine_plan"] = plan
-        save_user(u, data)
-
-    routines = list_routines(user)
-    routine_names = [r["name"] for r in routines] if routines else []
-    plan = _get_plan(user)
-
-    # ---------- RUTINA DE HOY ----------
-    with st.expander("RUTINA DE HOY", expanded=False):
-        today = date.today()
-        today_iso = today.isoformat()
-        if plan.get(today_iso):
-            rt_name = plan[today_iso]
-            st.markdown(f"**{rt_name}**")
-            r = next((rr for rr in routines if rr["name"] == rt_name), None)
-            if r:
-                st.table(pd.DataFrame(r.get("items", [])))
-            else:
-                st.info("La rutina asignada ya no existe.")
-        else:
-            st.success("Día libre 🎉")
-
-    # ---------- Planificar por día (asignación puntual) ----------
-    with st.expander("Planificar por día (asignación puntual — solo ese día)", expanded=False):
-        colA, colB = st.columns(2)
-        with colA:
-            st.subheader("Asignar rutina por día")
-            sel_date = st.date_input("Día a asignar", value=date.today(), key="planner_assign_date")
-            if routine_names:
-                sel_routine = st.selectbox("Rutina a asignar", routine_names, key="planner_assign_rt")
-            else:
-                sel_routine = None
-                st.info("No tienes rutinas creadas aún.")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Asignar rutina (solo ese día)", use_container_width=True, disabled=sel_routine is None):
-                    _set_plan(user, sel_date.isoformat(), sel_routine)
-                    st.success(f"Asignada **{sel_routine}** al {sel_date.isoformat()}.")
-                    st.rerun()
-            with c2:
-                if st.button("Eliminar asignación de ese día", use_container_width=True):
-                    _set_plan(user, sel_date.isoformat(), None)
-                    st.success(f"Eliminada asignación del {sel_date.isoformat()}.")
-                    st.rerun()
-        with colB:
-            st.subheader("Ver rutina de un día")
-            view_date = st.date_input("Ir a día", value=date.today(), key="planner_view_date")
-            d_iso = view_date.isoformat()
-            rt = plan.get(d_iso)
-            if rt:
-                st.write(f"**Rutina asignada**: {rt}")
-                r = next((rr for rr in routines if rr["name"] == rt), None)
-                if r:
-                    st.table(pd.DataFrame(r.get("items", [])))
-                else:
-                    st.info("La rutina asignada ya no existe.")
-            else:
-                st.info("Día libre")
-
-    # ---------- Asignar/Desasignar por día de semana para todo el mes ----------
-    with st.expander("Asignar rutina a un día de la semana para todo el mes", expanded=False):
-        import datetime as _dt
-        import calendar as _cal
-        month_picker = st.date_input("Elegir mes (cualquier día dentro del mes)", value=date.today(), key="month_picker")
-        target_year, target_month = month_picker.year, month_picker.month
-        weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-        weekday_index = st.selectbox("Día de la semana", options=list(range(7)), format_func=lambda i: weekday_names[i], key="weekday_for_month")
-        if routine_names:
-            month_routine = st.selectbox("Rutina a asignar", routine_names, key="weekday_month_routine")
-        else:
-            month_routine = None
-            st.info("No tienes rutinas creadas aún. Crea una en el apartado de abajo.")
-        def _iter_month_dates(year: int, month: int):
-            days_in_month = _cal.monthrange(year, month)[1]
-            for d in range(1, days_in_month + 1):
-                yield _dt.date(year, month, d)
-        colm1, colm2 = st.columns(2)
-        with colm1:
-            if st.button("Asignar a todo el mes", use_container_width=True, disabled=month_routine is None):
-                count = 0
-                for d in _iter_month_dates(target_year, target_month):
-                    if d.weekday() == weekday_index:
-                        _set_plan(user, d.isoformat(), month_routine)
-                        count += 1
-                st.success(f"Asignada **{month_routine}** a todos los {weekday_names[weekday_index]} de {target_month:02d}/{target_year}. Total días: {count}.")
-                st.rerun()
-        with colm2:
-            if st.button("Desasignar todos ese día de la semana en el mes", use_container_width=True):
-                count = 0
-                for d in _iter_month_dates(target_year, target_month):
-                    if d.weekday() == weekday_index and d.isoformat() in plan:
-                        _set_plan(user, d.isoformat(), None)
-                        count += 1
-                st.success(f"Desasignadas {count} fechas de los {weekday_names[weekday_index]} de {target_month:02d}/{target_year}.")
-                st.rerun()
-
-    # ---------- Mini-calendario mensual coloreado ----------
-    with st.expander("Mini-calendario mensual (vista rápida)", expanded=False):
-        import calendar as _cal
-        import datetime as _dt
-        cal_month = st.date_input("Elegir mes", value=date.today(), key="mini_cal_month")
-        y, m = cal_month.year, cal_month.month
-        cal = _cal.Calendar(firstweekday=0)
-        weeks = cal.monthdayscalendar(y, m)
-        palette = ["#E3F2FD", "#FCE4EC", "#E8F5E9", "#FFF3E0", "#F3E5F5", "#E0F2F1", "#F9FBE7", "#ECEFF1", "#FBE9E7", "#EDE7F6"]
-        def color_for(name: str) -> str:
-            if not name: return "transparent"
-            return palette[abs(hash(name)) % len(palette)]
-        weekdays = ["L", "M", "X", "J", "V", "S", "D"]
-        html = "<style>.cal td{padding:6px 8px;border:1px solid #ddd;vertical-align:top;width:14%;} .cal th{padding:6px 8px;border:1px solid #ddd;background:#fafafa;} .tag{display:block;margin-top:4px;padding:2px 4px;border-radius:4px;font-size:11px;}</style>"
-        html += "<table class='cal' style='border-collapse:collapse;width:100%'>"
-        html += "<thead><tr>" + "".join(f"<th>{d}</th>" for d in weekdays) + "</tr></thead><tbody>"
-        for week in weeks:
-            html += "<tr>"
-            for day in week:
-                if day == 0:
-                    html += "<td></td>"
-                else:
-                    d = _dt.date(y, m, day)
-                    iso = d.isoformat()
-                    name = plan.get(iso, "")
-                    bg = color_for(name)
-                    tag = f"<span class='tag' style='background:{bg}'>{name}</span>" if name else "<span class='tag' style='opacity:0.4'>Libre</span>"
-                    html += f"<td><div><strong>{day}</strong></div>{tag}</td>"
-            html += "</tr>"
-        html += "</tbody></table>"
-        assigned_names = set()
-        for week in weeks:
-            for day in week:
-                if day != 0:
-                    iso_key = _dt.date(y, m, day).isoformat()
-                    val = plan.get(iso_key)
-                    if val: assigned_names.add(val)
-        if assigned_names:
-            html += "<div style='margin-top:8px'><strong>Leyenda:</strong> " + " ".join(f"<span class='tag' style='background:{color_for(n)}'>{n}</span>" for n in sorted(assigned_names)) + "</div>"
-        st.markdown(html, unsafe_allow_html=True)
-
-    # ---------- Copiar plan de un mes a otro (por día de la semana) ----------
-    with st.expander("Copiar plan de un mes a otro (por día de la semana)", expanded=False):
-        import datetime as _dt
-        import calendar as _cal
-        from collections import Counter, defaultdict
-        src_month = st.date_input("Mes origen", value=date.today(), key="copy_src_month")
-        dst_month = st.date_input("Mes destino", value=date.today(), key="copy_dst_month")
-        wipe = st.checkbox("Borrar asignaciones del mes destino antes de copiar", value=False, key="copy_wipe_dst")
-        def _iter_month_dates(y, m):
-            days = _cal.monthrange(y, m)[1]
-            for d in range(1, days+1):
-                yield _dt.date(y, m, d)
-        if st.button("Copiar plan (por día de la semana)", use_container_width=True):
-            plan_current = _get_plan(user)
-            weekday_map = {}
-            freq = defaultdict(Counter)
-            for d in _iter_month_dates(src_month.year, src_month.month):
-                val = plan_current.get(d.isoformat())
-                if val: freq[d.weekday()][val] += 1
-            for wd, counter in freq.items():
-                if counter: weekday_map[wd] = counter.most_common(1)[0][0]
-            if not weekday_map:
-                st.info("En el mes origen no hay asignaciones para derivar el patrón.")
-            else:
-                if wipe:
-                    for d in _iter_month_dates(dst_month.year, dst_month.month):
-                        iso = d.isoformat()
-                        if iso in plan_current:
-                            _set_plan(user, iso, None)
-                    plan_current = _get_plan(user)
-                applied = 0
-                for d in _iter_month_dates(dst_month.year, dst_month.month):
-                    wd = d.weekday()
-                    if wd in weekday_map:
-                        _set_plan(user, d.isoformat(), weekday_map[wd]); applied += 1
-                st.success(f"Copiadas {applied} asignaciones por patrón de día de semana de {src_month.strftime('%Y-%m')} a {dst_month.strftime('%Y-%m')}.")
-                st.rerun()
-
-    # ---------- Crear nueva rutina ----------
-    with st.expander("Crear nueva rutina", expanded=False):
-        exercises = list_all_exercises(user)
-        default_rows = [{"exercise": "", "sets": 3, "reps": 10, "weight": 0.0}]
-        with st.form("create_routine_form", clear_on_submit=False):
-            rt_name = st.text_input("Nombre de la rutina")
-            df_items = st.data_editor(
-                pd.DataFrame(default_rows),
-                num_rows="dynamic",
-                use_container_width=True,
-                column_config={
-                    "exercise": st.column_config.SelectboxColumn("Ejercicio", options=exercises, required=True),
-                    "sets": st.column_config.NumberColumn("Series", min_value=1, max_value=20, step=1),
-                    "reps": st.column_config.NumberColumn("Reps", min_value=1, max_value=100, step=1),
-                    "weight": st.column_config.NumberColumn("Peso (kg)", min_value=0.0, step=0.5),
-                },
-            )
-            save_btn = st.form_submit_button("Guardar rutina")
-            if save_btn:
-                rows = []
-                for _, row in df_items.dropna(subset=["exercise"]).iterrows():
-                    ex = str(row.get("exercise") or "").strip()
-                    if not ex: continue
-                    rows.append({"exercise": ex, "sets": int(row.get("sets") or 1), "reps": int(row.get("reps") or 10), "weight": float(row.get("weight") or 0.0)})
-                if not rt_name:
-                    st.warning("Ponle un nombre a la rutina.")
-                elif not rows:
-                    st.warning("Añade al menos un ejercicio.")
-                else:
-                    try:
-                        add_routine(user, rt_name, rows)
-                        st.success(f"Rutina **{rt_name}** guardada.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(str(e))
-
-    # ---------- Registro de rutinas ----------
-    with st.expander("Registro de rutinas", expanded=False):
-        routines = list_routines(user)
-        st.write(f"Total: **{len(routines)}**")
-        if routines:
-            names = [r["name"] for r in routines]
-            sel = st.selectbox("Ver rutina", names, key="registry_view_sel")
-            if sel:
-                r = next(r for r in routines if r["name"] == sel)
-                st.table(pd.DataFrame(r.get("items", [])))
-                colx, coly = st.columns([2,1])
-                with colx:
-                    new_name = st.text_input("Renombrar a:", value=sel, key="registry_rename_to")
-                    if st.button("Renombrar", use_container_width=True):
-                        if new_name and new_name != sel:
-                            try:
-                                rename_routine(user, sel, new_name)
-                                st.success(f"Renombrada a **{new_name}**."); st.rerun()
-                            except Exception as e:
-                                st.error(str(e))
-                with coly:
-                    if st.button("Eliminar rutina", use_container_width=True):
-                        delete_routine(user, sel); st.success(f"Eliminada **{sel}**."); st.rerun()
-        else:
-            st.info("No hay rutinas todavía. Crea una en el formulario de arriba.")
-
-    with st.expander("Exportar rutina (PDF)", expanded=False):
-        from io import BytesIO
-        try:
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        except Exception as _e:
-            st.error("Falta la dependencia 'reportlab'. Instálala con: pip install reportlab"); st.stop()
-
-        def _build_pdf(title: str, items: list, fecha: str | None = None) -> bytes:
-            buf = BytesIO()
-            doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-            styles = getSampleStyleSheet(); story=[]
-            story.append(Paragraph(title, styles["Title"]))
-            if fecha: story.append(Paragraph(f"Fecha: {fecha}", styles["Normal"]))
-            story.append(Spacer(1, 12))
-            data = [["Ejercicio","Series","Reps","Peso (kg)"]]
-            for it in items:
-                data.append([str(it.get("exercise","")), str(it.get("sets","")), str(it.get("reps","")), str(it.get("weight",""))])
-            table = Table(data, repeatRows=1)
-            table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("ALIGN",(1,1),(-1,-1),"CENTER"),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("FONTSIZE",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,0),6),("TOPPADDING",(0,0),(-1,0),6)]))
-            story.append(table); doc.build(story); pdf=buf.getvalue(); buf.close(); return pdf
-
-        mode = st.radio("¿Qué quieres exportar?", ["Rutina de hoy", "Elegir rutina"], horizontal=True)
-        if mode == "Rutina de hoy":
-            today = date.today(); today_iso = today.isoformat()
-            rt_name = _get_plan(user).get(today_iso)
-            if not rt_name: st.info("Hoy no hay rutina asignada.")
-            else:
-                r = next((rr for rr in list_routines(user) if rr["name"] == rt_name), None)
-                if not r: st.warning("La rutina asignada ya no existe.")
-                else:
-                    pdf_bytes = _build_pdf(f"Rutina de hoy — {rt_name}", r.get("items", []), fecha=today_iso)
-                    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{today_iso}_{rt_name}.pdf", mime="application/pdf", use_container_width=True)
-        else:
-            routines = list_routines(user)
-            if not routines: st.info("No tienes rutinas creadas aún.")
-            else:
-                names = [r["name"] for r in routines]
-                sel = st.selectbox("Rutina a exportar", names, key="export_sel_routine")
-                if sel:
-                    r = next(rr for rr in routines if rr["name"] == sel)
-                    pdf_bytes = _build_pdf(f"Rutina — {sel}", r.get("items", []))
-                    st.download_button("Descargar PDF", data=pdf_bytes, file_name=f"rutina_{sel}.pdf", mime="application/pdf", use_container_width=True)
-
-
+    render_planner_page(st.session_state["user"])
 
 
 elif page in ("Cuenta", "Mi cuenta"):
