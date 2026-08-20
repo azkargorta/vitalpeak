@@ -1,4 +1,4 @@
-"""UI de plantillas de rutinas (editable + 3 alternativas)."""
+"""UI de plantillas — compacta, días bien separados, poco texto."""
 
 from __future__ import annotations
 
@@ -13,36 +13,94 @@ from app.routine_templates import (
     list_templates,
 )
 from app.routines import add_routine, list_routines
-from app.ui_theme import section_label
+
+_DAY_COLORS = ["#3AA899", "#4A7C9B", "#C47A4A", "#6B8F71", "#8B6BAE", "#B85C6E"]
 
 
 def render_templates_page(*, embedded: bool = True) -> None:
+    st.markdown(
+        """
+<style>
+.vp-tpl-card {
+  background: #fff;
+  border: 1px solid rgba(20,40,48,0.10);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+  box-shadow: 0 4px 14px rgba(20,40,48,0.04);
+  cursor: default;
+}
+.vp-tpl-card h4 {
+  margin: 0 0 0.25rem 0 !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 1.15rem !important;
+}
+.vp-tpl-meta {
+  font-size: 0.78rem;
+  color: #6A7F88;
+  margin: 0;
+}
+.vp-day-card {
+  background: #fff;
+  border: 1px solid rgba(20,40,48,0.10);
+  border-radius: 14px;
+  padding: 1rem 1.1rem 0.85rem;
+  margin: 0 0 1.15rem 0;
+  box-shadow: 0 6px 20px rgba(20,40,48,0.05);
+  border-left: 5px solid #3AA899;
+}
+.vp-day-card .vp-day-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #142830;
+  margin: 0 0 0.15rem 0;
+}
+.vp-day-card .vp-day-focus {
+  font-size: 0.8rem;
+  color: #6A7F88;
+  margin: 0 0 0.75rem 0;
+}
+.vp-ex-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(20,40,48,0.06);
+  font-size: 0.92rem;
+}
+.vp-ex-row:last-child { border-bottom: none; }
+.vp-ex-sets {
+  color: #3AA899;
+  font-weight: 700;
+  white-space: nowrap;
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if embedded:
         st.markdown("## Plantillas")
     else:
-        st.title("Plantillas de rutinas")
-
-    st.caption(
-        "Elige un plan listo, ajústalo y guárdalo. "
-        "Al sustituir un ejercicio te ofrecemos 3 opciones del mismo grupo."
-    )
+        st.title("Plantillas")
 
     user = st.session_state.get("user")
-    if not user:
-        st.warning("Inicia sesión para guardar rutinas en tu cuenta. Puedes explorar igual.")
-    else:
-        st.caption(f"Sesión: {user}")
-
     pool = list_all_exercises(user) if user else load_base_exercises()
 
     def _ensure_editor(tpl: dict) -> None:
         st.session_state["tpl_editor"] = tpl
         st.session_state["tpl_editor_id"] = tpl.get("id")
+        st.session_state["tpl_day_tab"] = 0
 
     def _editor():
         return st.session_state.get("tpl_editor")
 
-    section_label("Explorar")
+    # Filtros compactos
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
         cat = st.selectbox("Categoría", ["Todas"] + TEMPLATE_CATEGORIES, key="tpl_cat")
@@ -60,64 +118,72 @@ def render_templates_page(*, embedded: bool = True) -> None:
         level=None if level == "Todos" else level,
         goal=None if goal == "Todos" else goal,
     )
-
     if not templates:
         st.info("No hay plantillas con esos filtros.")
         return
 
-    labels = {
-        t["id"]: f"{t['name']} · {t['days_per_week']}d · {t['level']} · {t['goal']}"
-        for t in templates
-    }
-    sel_id = st.selectbox(
-        "Elige plantilla",
-        options=list(labels.keys()),
-        format_func=lambda i: labels[i],
-        key="tpl_select",
-    )
-    selected = next(t for t in templates if t["id"] == sel_id)
+    # Selector visual en rejilla (botones)
+    st.caption(f"{len(templates)} planes disponibles")
+    cols = st.columns(2)
+    for i, t in enumerate(templates):
+        with cols[i % 2]:
+            label = f"{t['name']}"
+            sub = f"{t['days_per_week']} días · {t['duration_min']} min · {t['goal']}"
+            if st.button(
+                f"{label}\n{sub}",
+                key=f"pick_tpl_{t['id']}",
+                use_container_width=True,
+                type="primary" if st.session_state.get("tpl_editor_id") == t["id"] else "secondary",
+            ):
+                _ensure_editor(instantiate_template(t["id"]))
+                st.rerun()
 
-    st.markdown(f"### {selected['name']}")
-    st.write(selected.get("description") or "")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Días/semana", selected.get("days_per_week"))
-    m2.metric("Duración", f"{selected.get('duration_min')} min")
-    m3.metric("Nivel", selected.get("level"))
-    m4.metric("Objetivo", selected.get("goal"))
+    plan = _editor()
+    if not plan:
+        st.info("Pulsa un plan para cargarlo y personalizarlo.")
+        return
 
-    with st.expander("Vista previa", expanded=False):
-        for day in selected.get("days") or []:
-            st.markdown(f"**{day.get('name')}** — _{day.get('focus', '')}_")
-            for it in day.get("items") or []:
-                st.write(f"- {it['exercise']} · {it['sets']}×{it['reps']}")
-
-    c_load, c_reset = st.columns(2)
-    with c_load:
-        if st.button("Cargar en editor", type="primary", use_container_width=True):
-            _ensure_editor(instantiate_template(sel_id))
-            st.rerun()
-    with c_reset:
-        if st.button("Vaciar editor", use_container_width=True):
+    st.markdown("---")
+    top1, top2 = st.columns([3, 1])
+    with top1:
+        st.markdown(f"### {plan.get('name')}")
+        st.caption(
+            f"{plan.get('level')} · {plan.get('goal')} · "
+            f"{plan.get('days_per_week')} días · {plan.get('duration_min')} min"
+        )
+    with top2:
+        if st.button("Quitar del editor", use_container_width=True):
             st.session_state.pop("tpl_editor", None)
             st.session_state.pop("tpl_editor_id", None)
             st.rerun()
 
-    st.markdown("---")
-    plan = _editor()
-    if not plan:
-        st.info("Selecciona una plantilla y pulsa **Cargar en editor**.")
-        return
+    days = plan.get("days") or []
+    day_labels = [f"Día {i+1}: {d.get('name', '')}" for i, d in enumerate(days)]
+    if "tpl_day_tab" not in st.session_state:
+        st.session_state["tpl_day_tab"] = 0
+    # Tabs visuales por día = separación clara
+    tabs = st.tabs(day_labels if day_labels else ["Día"])
 
-    section_label("Personalizar")
-    st.subheader(f"Editor: {plan.get('name')}")
-    st.caption("Series, reps y sustitución con alternativas del mismo grupo muscular.")
-
-    for d_idx, day in enumerate(plan.get("days") or []):
-        with st.expander(f"{day.get('name')} — {day.get('focus', '')}", expanded=True):
-            new_name = st.text_input(
-                "Nombre del día", value=day.get("name", ""), key=f"day_name_{d_idx}"
+    for d_idx, (tab, day) in enumerate(zip(tabs, days)):
+        color = _DAY_COLORS[d_idx % len(_DAY_COLORS)]
+        with tab:
+            st.markdown(
+                f"""
+                <div class="vp-day-card" style="border-left-color:{color}">
+                  <div class="vp-day-title">{day.get('name', '')}</div>
+                  <div class="vp-day-focus">{day.get('focus', '')}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            day["name"] = new_name
+
+            new_name = st.text_input(
+                "Nombre",
+                value=day.get("name", ""),
+                key=f"day_name_{d_idx}",
+                label_visibility="collapsed",
+            )
+            day["name"] = new_name or day.get("name", "")
 
             items = day.get("items") or []
             remove_idx = None
@@ -125,95 +191,81 @@ def render_templates_page(*, embedded: bool = True) -> None:
             for i_idx, it in enumerate(items):
                 ex = it.get("exercise", "")
                 grupo = get_grupo(ex, user)
-                st.markdown(f"**{i_idx + 1}. {ex}**")
-                st.caption(f"Grupo: {grupo}")
 
-                if user:
-                    meta = get_exercise_meta(user, ex)
-                    if meta.get("imagen"):
-                        try:
-                            st.image(meta["imagen"], width=180)
-                        except Exception:
-                            pass
-
-                r1, r2, r3, r4 = st.columns([1, 1, 2.2, 0.8])
-                with r1:
+                c1, c2, c3, c4 = st.columns([3.2, 0.9, 0.9, 1.2])
+                with c1:
+                    st.markdown(f"**{ex}**")
+                    st.caption(grupo)
+                    if user:
+                        meta = get_exercise_meta(user, ex)
+                        img = meta.get("imagen")
+                        if img:
+                            try:
+                                st.image(img, width=120)
+                            except Exception:
+                                pass
+                with c2:
                     it["sets"] = st.number_input(
-                        "Series",
-                        min_value=1,
-                        max_value=10,
-                        value=int(it.get("sets") or 3),
+                        "Ser.",
+                        1,
+                        10,
+                        int(it.get("sets") or 3),
                         key=f"sets_{d_idx}_{i_idx}",
                     )
-                with r2:
+                with c3:
                     it["reps"] = st.number_input(
-                        "Reps",
-                        min_value=1,
-                        max_value=50,
-                        value=int(it.get("reps") or 10),
+                        "Rep.",
+                        1,
+                        50,
+                        int(it.get("reps") or 10),
                         key=f"reps_{d_idx}_{i_idx}",
                     )
-                with r3:
-                    alts = suggest_alternatives(
-                        ex,
-                        n=3,
-                        username=user,
-                        exclude={x.get("exercise") for x in items if x.get("exercise")},
-                        pool=pool,
-                    )
-                    swap_choice = st.selectbox(
-                        "3 alternativas",
-                        options=alts if alts else ["(sin alternativas)"],
-                        key=f"swap_{d_idx}_{i_idx}",
-                        disabled=not alts,
-                    )
-                    if alts and st.button("Sustituir", key=f"swap_btn_{d_idx}_{i_idx}"):
-                        it["exercise"] = swap_choice
-                        st.rerun()
-                with r4:
+                with c4:
                     if st.button("Quitar", key=f"del_{d_idx}_{i_idx}"):
                         remove_idx = i_idx
 
-                with st.expander("Elegir otro de la lista", expanded=False):
+                alts = suggest_alternatives(
+                    ex,
+                    n=3,
+                    username=user,
+                    exclude={x.get("exercise") for x in items if x.get("exercise")},
+                    pool=pool,
+                )
+                with st.expander("Cambiar ejercicio", expanded=False):
+                    if alts:
+                        pick = st.radio(
+                            "3 alternativas",
+                            alts,
+                            key=f"alt_{d_idx}_{i_idx}",
+                            horizontal=False,
+                        )
+                        if st.button("Usar alternativa", key=f"use_alt_{d_idx}_{i_idx}"):
+                            it["exercise"] = pick
+                            st.rerun()
                     same_group = [n for n in pool if get_grupo(n, user) == grupo]
-                    mode = st.radio(
-                        "Mostrar",
-                        ["Mismo grupo", "Toda la lista"],
-                        horizontal=True,
-                        key=f"mode_{d_idx}_{i_idx}",
+                    other = st.selectbox(
+                        "O elige de la lista",
+                        same_group or list(pool),
+                        key=f"pick_{d_idx}_{i_idx}",
                     )
-                    options = same_group if mode == "Mismo grupo" else list(pool)
-                    if ex in options:
-                        idx0 = options.index(ex)
-                    else:
-                        idx0 = 0
-                        options = [ex] + options
-                    picked = st.selectbox(
-                        "Ejercicio", options, index=idx0, key=f"pick_{d_idx}_{i_idx}"
-                    )
-                    if st.button("Aplicar", key=f"apply_{d_idx}_{i_idx}"):
-                        it["exercise"] = picked
+                    if st.button("Aplicar de lista", key=f"apply_{d_idx}_{i_idx}"):
+                        it["exercise"] = other
                         st.rerun()
-
-                if alts:
-                    st.caption("Recomendadas: " + " · ".join(alts))
-                st.markdown("---")
 
             if remove_idx is not None:
                 items.pop(remove_idx)
                 day["items"] = items
                 st.rerun()
 
-            st.markdown("**Añadir ejercicio**")
-            a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
-            with a1:
-                add_ex = st.selectbox("Ejercicio", pool, key=f"add_ex_{d_idx}")
-            with a2:
-                add_sets = st.number_input("Series", 1, 10, 3, key=f"add_sets_{d_idx}")
-            with a3:
-                add_reps = st.number_input("Reps", 1, 50, 10, key=f"add_reps_{d_idx}")
-            with a4:
-                if st.button("Añadir", key=f"add_btn_{d_idx}", use_container_width=True):
+            ac1, ac2, ac3, ac4 = st.columns([2.5, 0.8, 0.8, 1])
+            with ac1:
+                add_ex = st.selectbox("Añadir", pool, key=f"add_ex_{d_idx}", label_visibility="collapsed")
+            with ac2:
+                add_sets = st.number_input("S", 1, 10, 3, key=f"add_sets_{d_idx}", label_visibility="collapsed")
+            with ac3:
+                add_reps = st.number_input("R", 1, 50, 10, key=f"add_reps_{d_idx}", label_visibility="collapsed")
+            with ac4:
+                if st.button("＋ Añadir", key=f"add_btn_{d_idx}", use_container_width=True):
                     items.append(
                         {
                             "exercise": add_ex,
@@ -229,25 +281,16 @@ def render_templates_page(*, embedded: bool = True) -> None:
     st.session_state["tpl_editor"] = plan
 
     st.markdown("---")
-    section_label("Guardar")
-    st.subheader("Guardar en mis rutinas")
-    prefix = st.text_input(
-        "Prefijo del nombre (opcional)",
-        value=plan.get("name", "Plantilla"),
-        key="tpl_save_prefix",
-    )
-
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        save_days = st.button(
-            "Guardar cada día como rutina", type="primary", use_container_width=True
-        )
-    with col_s2:
-        save_one = st.button("Guardar todo en una rutina", use_container_width=True)
+    prefix = st.text_input("Nombre al guardar", value=plan.get("name", "Plantilla"), key="tpl_save_prefix")
+    s1, s2 = st.columns(2)
+    with s1:
+        save_days = st.button("Guardar cada día", type="primary", use_container_width=True)
+    with s2:
+        save_one = st.button("Guardar todo junto", use_container_width=True)
 
     if save_days or save_one:
         if not user:
-            st.error("Necesitas iniciar sesión para guardar.")
+            st.error("Inicia sesión para guardar.")
             return
         existing = {r.get("name") for r in list_routines(user)}
         try:
@@ -256,19 +299,17 @@ def render_templates_page(*, embedded: bool = True) -> None:
                 for day in plan.get("days") or []:
                     all_items.extend(day_to_routine_items(day))
                 name = (prefix or plan.get("name") or "Plantilla").strip()
-                base = name
-                n = 2
+                base, n = name, 2
                 while name in existing:
                     name = f"{base} ({n})"
                     n += 1
                 add_routine(user, name, all_items)
-                st.success(f"Guardada rutina **{name}** con {len(all_items)} ejercicios.")
+                st.success(f"Guardada: **{name}**")
             else:
                 saved = 0
                 for day in plan.get("days") or []:
                     day_name = f"{prefix} — {day.get('name')}".strip(" —")
-                    base = day_name
-                    n = 2
+                    base, n = day_name, 2
                     while day_name in existing:
                         day_name = f"{base} ({n})"
                         n += 1
@@ -278,6 +319,6 @@ def render_templates_page(*, embedded: bool = True) -> None:
                     add_routine(user, day_name, items)
                     existing.add(day_name)
                     saved += 1
-                st.success(f"Se guardaron **{saved}** rutina(s). Véalas en Planificar rutinas.")
+                st.success(f"Guardadas {saved} rutinas. Ve a Planificar rutinas.")
         except Exception as e:
             st.error(str(e))

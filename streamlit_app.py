@@ -35,7 +35,7 @@ st.set_page_config(page_title="VitalPeak", page_icon="VP", layout="wide")
 
 load_dotenv()
 
-from app.ui_theme import apply_theme, render_brand_hero, section_label
+from app.ui_theme import apply_theme, render_brand_hero, section_label, render_sidebar_nav, NAV_META
 from app.templates_ui import render_templates_page
 
 apply_theme()
@@ -304,42 +304,25 @@ def _goto(page_name: str) -> None:
     st.session_state["nav_page"] = page_name
     st.rerun()
 
-NAV_ITEMS = [
-    "Hoy",
-    "Registrar entrenamiento",
-    "Plantillas",
-    "Planificar rutinas",
-    "Ejercicios y progreso",
-    "Historial",
-    "Objetivos",
-    "Peso corporal",
-    "Técnica",
-    "Mi cuenta",
-]
+NAV_ITEMS = [k for k, _, _ in NAV_META]
 
 logged_in = bool(st.session_state.get("user"))
 
 with st.sidebar:
     st.markdown("## VitalPeak")
-    st.caption("Entrena con claridad")
     if logged_in:
-        st.markdown(f"**{st.session_state['user']}**")
-        if st.button("Cerrar sesión", use_container_width=True):
+        st.markdown(
+            f'<div class="vp-nav-user">{st.session_state["user"]}</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Cerrar sesión", use_container_width=True, key="btn_logout"):
             logout()
         st.markdown("---")
-        default_idx = 0
-        if st.session_state.get("nav_page") in NAV_ITEMS:
-            default_idx = NAV_ITEMS.index(st.session_state["nav_page"])
-        page = st.radio(
-            "Menú",
-            NAV_ITEMS,
-            index=default_idx,
-            label_visibility="collapsed",
-        )
-        st.session_state["nav_page"] = page
+        if st.session_state.get("nav_page") not in NAV_ITEMS:
+            st.session_state["nav_page"] = "Hoy"
+        page = render_sidebar_nav(st.session_state.get("nav_page"))
     else:
-        st.markdown("---")
-        st.caption("Entra para ver tu plan de hoy, registrar series y seguir tu progreso.")
+        st.caption("Entra para ver tu plan y registrar series.")
         page = "Entrar"
 
 # ---------- Pantalla de acceso (marca primero) ----------

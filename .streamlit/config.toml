@@ -3,8 +3,8 @@ headless = true
 
 [theme]
 base = "light"
-primaryColor = "#4DB8A8"
-backgroundColor = "#F3F6F4"
-secondaryBackgroundColor = "#E7EEE9"
-textColor = "#0B1F2A"
+primaryColor = "#3AA899"
+backgroundColor = "#FAFCFB"
+secondaryBackgroundColor = "#F0F5F3"
+textColor = "#142830"
 font = "sans serif"
