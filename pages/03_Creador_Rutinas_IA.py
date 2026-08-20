@@ -27,8 +27,14 @@ try:
 except Exception:
     rutina_a_pdf_bytes = None  # type: ignore
 
-st.set_page_config(page_title="Creador de Rutinas (IA)", page_icon="💪", layout="wide")
+st.set_page_config(page_title="Creador IA | VitalPeak", page_icon="VP", layout="wide")
 load_env()
+
+try:
+    from app.ui_theme import apply_theme
+    apply_theme()
+except Exception:
+    pass
 
 # Propagar secrets de Streamlit a env (por si se usa en Cloud)
 try:

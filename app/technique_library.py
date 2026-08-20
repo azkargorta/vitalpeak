@@ -89,8 +89,8 @@ def _render_card_view(card: dict) -> None:
 
 
 def render_technique_page() -> None:
-    st.title("🎥 Técnica")
-    st.caption("Tarjeta técnica + mini-animación 3D (plantilla única, 2 ángulos).")
+    st.title("Técnica")
+    st.caption("Ficha clara + mini-animación 3D (frontal y lateral).")
 
     lib = get_library()
     exercise_label = st.selectbox("Ejercicio", list(lib.keys()), index=0, key="tech_exercise")
@@ -98,7 +98,7 @@ def render_technique_page() -> None:
 
     user = st.session_state.get("user", "anon")
 
-    tabs = st.tabs(["📄 Tarjeta técnica", "🧍 Mini-animación 3D"])
+    tabs = st.tabs(["Ficha técnica", "Animación 3D"])
     with tabs[0]:
         card = get_card(user, ex.exercise_id, ex.label)
         _render_card_view(card)

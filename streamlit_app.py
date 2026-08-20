@@ -31,9 +31,14 @@ from dotenv import load_dotenv
 import os
 
 # Config (debe ir antes de usar componentes de Streamlit)
-st.set_page_config(page_title="VitalPeak", page_icon="💪", layout="wide")
+st.set_page_config(page_title="VitalPeak", page_icon="VP", layout="wide")
 
 load_dotenv()
+
+from app.ui_theme import apply_theme, render_brand_hero, section_label
+from app.templates_ui import render_templates_page
+
+apply_theme()
 
 # En Streamlit Cloud, la API key se configura en Settings → Secrets.
 # Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
@@ -295,39 +300,61 @@ def logout():
     st.session_state.clear()
     st.rerun()
 
+def _goto(page_name: str) -> None:
+    st.session_state["nav_page"] = page_name
+    st.rerun()
+
+NAV_ITEMS = [
+    "Hoy",
+    "Registrar entrenamiento",
+    "Plantillas",
+    "Planificar rutinas",
+    "Ejercicios y progreso",
+    "Historial",
+    "Objetivos",
+    "Peso corporal",
+    "Técnica",
+    "Mi cuenta",
+]
+
+logged_in = bool(st.session_state.get("user"))
+
 with st.sidebar:
-    if "user" in st.session_state and st.session_state["user"]:
-        st.success(f"Conectado como **{st.session_state['user']}**")
+    st.markdown("## VitalPeak")
+    st.caption("Entrena con claridad")
+    if logged_in:
+        st.markdown(f"**{st.session_state['user']}**")
         if st.button("Cerrar sesión", use_container_width=True):
             logout()
-    st.markdown("---")
-    page = st.radio(
-        "Secciones",
-        [
-            "🔐 Login / Registro",
-            "🏠 Inicio",
-            "🎥 Técnica",
-            "🏋️ Añadir entrenamiento",
-            "📚 Gestor de ejercicios",
-            "📈 Tabla de entrenamientos",
-            "🎯 Objetivos",
-            "🩺 Salud (Peso)",
-            "📘 Rutinas",
-            "👤 Perfil",
-        ],
-        index=0 if "user" not in st.session_state else 1,
+        st.markdown("---")
+        default_idx = 0
+        if st.session_state.get("nav_page") in NAV_ITEMS:
+            default_idx = NAV_ITEMS.index(st.session_state["nav_page"])
+        page = st.radio(
+            "Menú",
+            NAV_ITEMS,
+            index=default_idx,
+            label_visibility="collapsed",
+        )
+        st.session_state["nav_page"] = page
+    else:
+        st.markdown("---")
+        st.caption("Entra para ver tu plan de hoy, registrar series y seguir tu progreso.")
+        page = "Entrar"
+
+# ---------- Pantalla de acceso (marca primero) ----------
+if not logged_in or page == "Entrar":
+    render_brand_hero(
+        title="VitalPeak",
+        kicker="Gimnasio · Salud · Progreso",
+        lead="Tu entrenamiento organizado: qué toca hoy, cómo ejecutarlo y cómo mejoras.",
+        panel_title="Empieza en 30 segundos",
+        panel_body="Entra con tu cuenta o crea una. Demo: admin / admin",
     )
 
-if page == "🔐 Login / Registro":
-    st.title("Acceso")
+    tab_login, tab_reg = st.tabs(["Entrar", "Crear cuenta"])
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Iniciar sesión")
-        u = st.text_input("Usuario")
-        p = st.text_input("Contraseña", type="password")
-
+    with tab_login:
         # Reseteo por token desde URL (?user=&reset_token=)
         if st.session_state.get("_pending_user") and st.session_state.get("_pending_token"):
             u_tok = st.session_state.pop("_pending_user")
@@ -349,20 +376,34 @@ if page == "🔐 Login / Registro":
             else:
                 st.error("El enlace/código de recuperación no es válido o ha caducado.")
 
+        with st.form("login_form"):
+            u = st.text_input("Usuario")
+            p = st.text_input("Contraseña", type="password")
+            submit_login = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+        if submit_login:
+            if not u or not p:
+                st.warning("Completa usuario y contraseña.")
+            elif authenticate(u, p):
+                st.session_state["user"] = u
+                st.session_state["nav_page"] = "Hoy"
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
+
         with st.expander("Olvidé mi contraseña"):
             rec_id = st.text_input("Tu usuario o email de recuperación", key="forgot_id")
             if st.button("Enviar enlace de recuperación", key="forgot_btn"):
                 target_user = None
                 if rec_id:
                     try:
-                        _ = load_user(rec_id)  # como usuario
+                        _ = load_user(rec_id)
                         target_user = rec_id
                     except Exception:
                         pass
                 if not target_user:
                     import glob, json
                     from pathlib import Path as _P
-                    for pth in glob.glob(str((_P(".")/"usuarios_data"/"*.json").resolve())):
+                    for pth in glob.glob(str((_P(".") / "usuarios_data" / "*.json").resolve())):
                         try:
                             d = json.load(open(pth, "r", encoding="utf-8"))
                             if d.get("recovery_email") == rec_id or d.get("email") == rec_id:
@@ -379,32 +420,23 @@ if page == "🔐 Login / Registro":
                     link = f"{base_url}?user={target_user}&reset_token={token}" if base_url else f"(Configura APP_BASE_URL) token: {token}"
                     acc, rec = get_emails_for_user(target_user)
                     to_email = rec or acc
-                    ok, msg = send_email(to_email, "Recuperación de contraseña",
+                    ok, msg = send_email(
+                        to_email,
+                        "Recuperación de contraseña",
                         f"<p>Hola {target_user},</p><p>Enlace para restablecer (1h): <a href='{link}'>{link}</a></p><p>Código: <b>{token}</b></p>",
-                        text=f"Enlace: {link}\nCódigo: {token}")
+                        text=f"Enlace: {link}\nCódigo: {token}",
+                    )
                     if ok:
                         st.info("Si existe, te llegará un correo con instrucciones.")
                     else:
                         st.warning("No se pudo enviar email. Usa este código en la app: " + token)
 
-        if st.button("Iniciar sesión"):
-            if not u or not p:
-                st.warning("Completa usuario y contraseña.")
-            else:
-                if authenticate(u, p):
-                    st.session_state["user"] = u
-                    st.success("Sesión iniciada.")
-                    st.rerun()
-                else:
-                    st.error("Usuario o contraseña incorrectos.")
-
-    with col2:
-        st.subheader("Crear cuenta")
+    with tab_reg:
         with st.form("register_form"):
             u2 = st.text_input("Nuevo usuario", key="reg_user")
             e2 = st.text_input("Email", key="reg_email")
             p2 = st.text_input("Nueva contraseña", type="password", key="reg_pass")
-            submit_reg = st.form_submit_button("Registrarme")
+            submit_reg = st.form_submit_button("Crear cuenta", type="primary", use_container_width=True)
         if submit_reg:
             if not u2 or not e2 or not p2:
                 st.warning("Completa usuario, email y contraseña.")
@@ -419,27 +451,56 @@ if page == "🔐 Login / Registro":
                     data["recovery_email"] = e2
                     save_user(u2, data)
                 if created:
-                    st.success("Usuario creado. Ahora inicia sesión.")
+                    st.success("Cuenta creada. Ahora inicia sesión.")
                 else:
                     st.error("Ese usuario ya existe.")
 
-elif page == "🏠 Inicio":
-    require_auth()
-    st.title("Inicio")
+    st.stop()
 
+# ---------- App autenticada ----------
+if page == "Hoy":
+    require_auth()
     user = st.session_state["user"]
-    data_u = load_user(user)
+    data_u = load_user(user) or {}
     plan = dict(data_u.get("routine_plan", {}))
     routines = list_routines(user)
     routines_by_name = {r.get("name"): r for r in (routines or [])}
-
-    # ---------------- HOY TOCA ----------------
-    st.subheader("🔥 HOY TOCA")
     today = date.today()
     today_iso = today.isoformat()
     rt_name = plan.get(today_iso)
 
-    topA, topB = st.columns([2, 1])
+    panel_title = rt_name if rt_name else "Día libre"
+    panel_body = (
+        "Tu sesión de hoy está lista. Regístrala cuando termines."
+        if rt_name
+        else "No hay rutina asignada. Elige una plantilla o planifica la semana."
+    )
+    render_brand_hero(
+        title="VitalPeak",
+        kicker=today.strftime("%A %d · %B").capitalize(),
+        lead="Un vistazo a lo que toca hoy y atajos a lo que más usas.",
+        panel_title=panel_title,
+        panel_body=panel_body,
+    )
+
+    section_label("Atajos")
+    a1, a2, a3, a4 = st.columns(4)
+    with a1:
+        if st.button("Registrar sesión", type="primary", use_container_width=True):
+            _goto("Registrar entrenamiento")
+    with a2:
+        if st.button("Plantillas", use_container_width=True):
+            _goto("Plantillas")
+    with a3:
+        if st.button("Planificar", use_container_width=True):
+            _goto("Planificar rutinas")
+    with a4:
+        if st.button("Técnica", use_container_width=True):
+            _goto("Técnica")
+
+    section_label("Hoy")
+    st.markdown('<div class="vp-today">', unsafe_allow_html=True)
+    topA, topB = st.columns([2.2, 1])
     with topA:
         if rt_name:
             st.markdown(f"### {rt_name}")
@@ -447,61 +508,58 @@ elif page == "🏠 Inicio":
             if r and r.get("items"):
                 st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
             else:
-                st.info("La rutina asignada no existe (o está vacía). Ve a **📘 Rutinas** para revisarla.")
+                st.info("La rutina asignada no existe o está vacía. Revísala en Planificar rutinas.")
         else:
-            st.markdown("### Día libre 🎉")
-            st.caption("No hay rutina asignada para hoy en el planificador.")
+            st.markdown("### Sin sesión asignada")
+            st.caption("Ve a Plantillas para crear un plan, o a Planificar rutinas para asignar el día.")
     with topB:
         st.metric("Fecha", today.strftime("%d/%m/%Y"))
         st.metric("Semana", today.isocalendar().week)
+        st.metric("Rutinas guardadas", len(routines or []))
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-
-    # ---------------- ESTA SEMANA (IMAGEN) ----------------
-    st.subheader("🗓️ Esta semana")
-    st.caption("Vista rápida (lunes a domingo) de lo que toca entrenar.")
+    section_label("Esta semana")
+    st.caption("Lunes a domingo — lo que tienes planificado.")
 
     import datetime as _dt
     from io import BytesIO as _BytesIO
 
-    monday = today - _dt.timedelta(days=today.weekday())  # lunes
+    monday = today - _dt.timedelta(days=today.weekday())
     week_dates = [monday + _dt.timedelta(days=i) for i in range(7)]
     dias_abrev = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
     dias_full = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     labels = [f"{dias_abrev[i]}\n{week_dates[i].strftime('%d/%m')}" for i in range(7)]
     values = [plan.get(d.isoformat(), "") or "—" for d in week_dates]
 
-    # Generar una imagen tipo calendario (tabla) con matplotlib
     fig, ax = plt.subplots(figsize=(12, 2.6))
     ax.axis("off")
-    tbl = ax.table(
-        cellText=[values],
-        colLabels=labels,
-        cellLoc="center",
-        loc="center",
-    )
+    tbl = ax.table(cellText=[values], colLabels=labels, cellLoc="center", loc="center")
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(10)
     tbl.scale(1, 2.0)
     fig.tight_layout()
-
     buf = _BytesIO()
-    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight", facecolor="#F3F6F4")
     plt.close(fig)
     st.image(buf.getvalue(), use_container_width=True)
 
-    # Extra: tabla (útil para copiar/leer en móvil)
-    df_week = pd.DataFrame({"Día": dias_full, "Fecha": [d.isoformat() for d in week_dates], "Rutina": values})
+    df_week = pd.DataFrame(
+        {"Día": dias_full, "Fecha": [d.isoformat() for d in week_dates], "Rutina": values}
+    )
     st.dataframe(df_week, use_container_width=True, hide_index=True)
 
-
-elif page == "🎥 Técnica":
+elif page == "Técnica":
     require_auth()
     render_technique_page()
 
-elif page == "🏋️ Añadir entrenamiento":
+elif page == "Plantillas":
     require_auth()
-    st.title("Añadir entrenamiento")
+    render_templates_page(embedded=True)
+
+elif page == "Registrar entrenamiento":
+    require_auth()
+    st.title("Registrar entrenamiento")
     user = st.session_state["user"]
     d = st.date_input("Fecha", value=date.today())
     exercises = list_all_exercises(user)
@@ -518,7 +576,7 @@ elif page == "🏋️ Añadir entrenamiento":
             weight = st.number_input("Peso (kg)", min_value=0.0, step=0.5, value=float(suggestion[1]) if suggestion else 0.0)
         if suggestion:
             st.caption(f"Sugerencia última serie de **{ex}**: {suggestion[0]} reps @ {suggestion[1]} kg")
-        submit_add = st.form_submit_button("Añadir serie")
+        submit_add = st.form_submit_button("Añadir serie", type="primary")
     if submit_add:
         add_training_set(user, d.isoformat(), ex, int(set_idx), int(reps), float(weight))
         st.success("Serie guardada.")
@@ -566,7 +624,7 @@ elif page == "🏋️ Añadir entrenamiento":
                 cA, cB, cC = st.columns(3)
                 target = cA.text_input("Ejercicio objetivo", placeholder="ej. press banca")
                 add_series = cB.form_submit_button("+ Añadir serie", disabled=not target)
-                del_series = cC.form_submit_button("🗑️ Eliminar última serie", disabled=not target)
+                del_series = cC.form_submit_button("Eliminar última serie", disabled=not target)
 
                 # Aplicar acciones de serie
                 if add_series:
@@ -590,7 +648,7 @@ elif page == "🏋️ Añadir entrenamiento":
                         edited = edited.drop(index=drop_idx)
 
                 # Guardar
-                save_edited = st.form_submit_button("💾 Guardar entrenamiento desde rutina")
+                save_edited = st.form_submit_button("Guardar entrenamiento desde rutina", type="primary")
             # Fuera del form: sincroniza y guarda si procede
             st.session_state['routine_rows'] = edited.to_dict(orient="records")
             if save_edited:
@@ -604,11 +662,11 @@ elif page == "🏋️ Añadir entrenamiento":
                 st.success(f"Se guardaron {count} series en {d.isoformat()}.")
                 st.session_state.pop('routine_rows', None)
     else:
-        st.info("Primero crea una rutina en la sección 📘 Rutinas.")
+        st.info("Primero crea una rutina en Plantillas o Planificar rutinas.")
 
-elif page == "📚 Gestor de ejercicios":
+elif page == "Ejercicios y progreso":
     require_auth()
-    st.title("Gestor de ejercicios")
+    st.title("Ejercicios y progreso")
     user = st.session_state["user"]
 
     tabs = st.tabs(["Listado", "📈 Progreso de ejercicios"])
@@ -790,9 +848,9 @@ elif page == "📚 Gestor de ejercicios":
         pagina_progreso()
 
 
-elif page == "📈 Tabla de entrenamientos":
+elif page == "Historial":
     require_auth()
-    st.title("Tabla de entrenamientos")
+    st.title("Historial de entrenamientos")
     user = st.session_state["user"]
     rows = list_training(user)
     if not rows:
@@ -855,9 +913,9 @@ elif page == "📈 Tabla de entrenamientos":
                 st.error(str(e))
 
 
-elif page == "🎯 Objetivos":
+elif page == "Objetivos":
     require_auth()
-    st.title("🎯 Objetivos")
+    st.title("Objetivos")
     user = st.session_state["user"]
 
     goals = get_goals(user)
@@ -1036,9 +1094,9 @@ elif page == "🎯 Objetivos":
             st.rerun()
 
 
-elif page == "🩺 Salud (Peso)":
+elif page == "Peso corporal":
     require_auth()
-    st.title("Salud — Peso")
+    st.title("Peso corporal")
     user = st.session_state["user"]
     col1, col2 = st.columns(2)
     with col1:
@@ -1110,9 +1168,9 @@ elif page == "🩺 Salud (Peso)":
         else:
             st.info("No hay datos de peso para mostrar.")
 
-elif page == "📘 Rutinas":
+elif page == "Planificar rutinas":
     require_auth()
-    st.title("Planificador de rutinas")
+    st.title("Planificar rutinas")
     user = st.session_state["user"]
 
     # ---------- Utilidades de plan ----------
@@ -1414,9 +1472,9 @@ elif page == "📘 Rutinas":
 
 
 
-elif page == "👤 Perfil":
+elif page == "Mi cuenta":
     require_auth()
-    st.title("👤 Mi perfil")
+    st.title("Mi cuenta")
     user = st.session_state["user"]
     data = load_user(user)
     profile = data.get("profile", {})
