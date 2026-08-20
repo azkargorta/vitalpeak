@@ -377,7 +377,13 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
         data["dias"] = fixed_dias
 
     return data
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+def _get_model() -> str:
+    """Modelo actual (OpenAI o Ollama). Se lee en cada llamada para respetar .env/secrets."""
+    return (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+
+
+# Compat: algunos sitios importan MODEL; se recalcula al cargar el módulo.
+MODEL = _get_model()
 
 RULES_TEXT = (
     "- Estructura por día: 6–7 ejercicios (1 principal fuerza, 1 secundario, 3–4 accesorios, 1 core/finisher).\n"
@@ -769,17 +775,33 @@ ESQUEMA JSON (obligatorio):
     )
 
     return prompt
-def _client() -> OpenAI:
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _client():
+    """Cliente compatible con OpenAI Cloud y Ollama local (API /v1)."""
+    api_key = os.getenv("OPENAI_API_KEY") or "ollama"
+    base_url = (os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE") or "").strip() or None
+    if OpenAI is not None:
+        if base_url:
+            return OpenAI(api_key=api_key, base_url=base_url)
+        return OpenAI(api_key=api_key)
+    import openai as _openai
+    _openai.api_key = api_key
+    if base_url:
+        try:
+            _openai.base_url = base_url
+        except Exception:
+            pass
+    return _openai
 
-def _chat(client: OpenAI, prompt: str, *, temperature: float = 0.1) -> str:
+
+def _chat(client, prompt: str, *, temperature: float = 0.1) -> str:
+    model = _get_model()
     resp = client.chat.completions.create(
-        model=MODEL,
+        model=model,
         temperature=temperature,
         messages=[
-            {"role":"system","content": build_system()},
-            {"role":"user","content": prompt}
-        ]
+            {"role": "system", "content": build_system()},
+            {"role": "user", "content": prompt},
+        ],
     )
     return resp.choices[0].message.content
 
@@ -792,8 +814,11 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
         # Intento directo
         return json.loads(text)
     except Exception:
-        # Intento robusto: extraer bloque JSON o primer objeto balanceado
-        return _extract_json(text)
+        # Intento robusto: extraer bloque JSON y parsearlo
+        extracted = _extract_json(text)
+        if isinstance(extracted, dict):
+            return extracted
+        return json.loads(extracted)
 
 
 # === Reglas adicionales derivadas de 'comentarios' del usuario ===
@@ -1296,10 +1321,26 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
     })
     datos["__analysis"] = A
 
-    client = _client()
+    try:
+        client = _client()
+    except Exception as e:
+        return {"ok": False, "error": f"No se pudo crear el cliente IA: {e}"}
+
     _system = build_system()
     _prompt = build_prompt(datos)
-    raw = _chat(client, _prompt, temperature=0.1)
+    try:
+        raw = _chat(client, _prompt, temperature=0.1)
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": (
+                f"Error llamando al modelo '{_get_model()}': {e}. "
+                "Si usas Ollama, comprueba que esté en marcha (`ollama serve`) "
+                "y que OPENAI_BASE_URL=http://localhost:11434/v1."
+            ),
+            "prompt": _prompt,
+            "system": _system,
+        }
 
     # Primer intento de parseo
     try:
@@ -1348,7 +1389,16 @@ def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
             "PROMPT ORIGINAL (para referencia):\n" + _prompt + "\n\n"
             "JSON ORIGINAL:\n" + json.dumps(coerced if fixed is None else fixed, ensure_ascii=False)
         )
-        fixed_raw = _chat(client, fix_prompt, temperature=0.0)
+        try:
+            fixed_raw = _chat(client, fix_prompt, temperature=0.0)
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"Error en refinado IA: {e}",
+                "raw": last_raw,
+                "prompt": _prompt,
+                "system": _system,
+            }
         last_raw = fixed_raw
         try:
             fixed = _try_parse_json(fixed_raw)
@@ -1729,32 +1779,6 @@ def _extract_json(text: str) -> str:
     if start != -1 and end != -1 and end > start:
         return text[start:end+1]
     raise ValueError("No se encontró bloque JSON")
-
-
-
-def _client():
-    """Return an OpenAI client for both SDK v1+ and legacy v0.28.
-
-    If the modern class is not available, fall back to the legacy 'openai' module.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
-    if OpenAI is not None:
-        # New SDK
-        if base_url:
-            return OpenAI(api_key=api_key, base_url=base_url)
-        return OpenAI(api_key=api_key)
-    else:
-        # Legacy SDK
-        import openai as _openai
-        _openai.api_key = api_key
-        if base_url:
-            try:
-                _openai.base_url = base_url
-            except Exception:
-                pass
-        return _openai
-
 
 
 def _compute_primary_blocks(datos: dict) -> list[str]:

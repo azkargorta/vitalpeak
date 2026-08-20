@@ -37,10 +37,12 @@ load_dotenv()
 # Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
 try:
     if hasattr(st, 'secrets'):
-        if 'OPENAI_API_KEY' in st.secrets and not os.getenv('OPENAI_API_KEY'):
-            os.environ['OPENAI_API_KEY'] = str(st.secrets['OPENAI_API_KEY']).strip()
-        if 'OPENAI_MODEL' in st.secrets and str(st.secrets['OPENAI_MODEL']).strip():
-            os.environ['OPENAI_MODEL'] = str(st.secrets['OPENAI_MODEL']).strip()
+        for _k in ("OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL", "OPENAI_API_BASE"):
+            if _k in st.secrets and str(st.secrets[_k]).strip():
+                # MODEL/BASE_URL: permitir override desde secrets; API_KEY solo si no existe en env
+                if _k == "OPENAI_API_KEY" and os.getenv("OPENAI_API_KEY"):
+                    continue
+                os.environ[_k] = str(st.secrets[_k]).strip()
 except Exception:
     pass
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
