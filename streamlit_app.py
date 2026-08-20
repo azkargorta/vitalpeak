@@ -304,7 +304,7 @@ def _goto(page_name: str) -> None:
     st.session_state["nav_page"] = page_name
     st.rerun()
 
-NAV_ITEMS = [k for k, _, _ in NAV_META]
+NAV_ITEMS = [k for k, _ in NAV_META]
 
 logged_in = bool(st.session_state.get("user"))
 
@@ -315,12 +315,38 @@ with st.sidebar:
             f'<div class="vp-nav-user">{st.session_state["user"]}</div>',
             unsafe_allow_html=True,
         )
-        if st.button("Cerrar sesión", use_container_width=True, key="btn_logout"):
-            logout()
         st.markdown("---")
         if st.session_state.get("nav_page") not in NAV_ITEMS:
-            st.session_state["nav_page"] = "Hoy"
+            # Migrar nombres antiguos del menú
+            legacy = {
+                "Registrar entrenamiento": "Entrenar",
+                "Plantillas": "Rutinas",
+                "Planificar rutinas": "Rutinas",
+                "Ejercicios y progreso": "Progreso",
+                "Historial": "Progreso",
+                "Objetivos": "Progreso",
+                "Peso corporal": "Progreso",
+                "Mi cuenta": "Cuenta",
+            }
+            cur = st.session_state.get("nav_page")
+            st.session_state["nav_page"] = legacy.get(cur, "Hoy")
+            if cur in ("Plantillas",):
+                st.session_state["rutinas_tab"] = "Plantillas"
+            elif cur in ("Planificar rutinas",):
+                st.session_state["rutinas_tab"] = "Planificar"
+            elif cur in ("Ejercicios y progreso",):
+                st.session_state["progreso_tab"] = "Ejercicios"
+            elif cur == "Historial":
+                st.session_state["progreso_tab"] = "Historial"
+            elif cur == "Objetivos":
+                st.session_state["progreso_tab"] = "Objetivos"
+            elif cur == "Peso corporal":
+                st.session_state["progreso_tab"] = "Peso"
         page = render_sidebar_nav(st.session_state.get("nav_page"))
+        st.markdown("---")
+        st.markdown('<span class="vp-logout-mark"></span>', unsafe_allow_html=True)
+        if st.button("Cerrar sesión", use_container_width=True, key="btn_logout"):
+            logout()
     else:
         st.caption("Entra para ver tu plan y registrar series.")
         page = "Entrar"
@@ -470,13 +496,15 @@ if page == "Hoy":
     a1, a2, a3, a4 = st.columns(4)
     with a1:
         if st.button("Registrar sesión", type="primary", use_container_width=True):
-            _goto("Registrar entrenamiento")
+            _goto("Entrenar")
     with a2:
         if st.button("Plantillas", use_container_width=True):
-            _goto("Plantillas")
+            st.session_state["rutinas_tab"] = "Plantillas"
+            _goto("Rutinas")
     with a3:
         if st.button("Planificar", use_container_width=True):
-            _goto("Planificar rutinas")
+            st.session_state["rutinas_tab"] = "Planificar"
+            _goto("Rutinas")
     with a4:
         if st.button("Técnica", use_container_width=True):
             _goto("Técnica")
@@ -536,13 +564,58 @@ elif page == "Técnica":
     require_auth()
     render_technique_page()
 
+elif page == "Rutinas":
+    require_auth()
+    _rt = ["Plantillas", "Planificar"]
+    _cur = st.session_state.get("rutinas_tab", "Plantillas")
+    if _cur not in _rt:
+        _cur = "Plantillas"
+    _sub = st.radio(
+        "rutinas_sub",
+        _rt,
+        index=_rt.index(_cur),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="rutinas_tab_radio",
+    )
+    st.session_state["rutinas_tab"] = _sub
+    if _sub == "Plantillas":
+        render_templates_page(embedded=True)
+        page = None  # no seguir
+    else:
+        page = "Planificar rutinas"
+
+elif page == "Progreso":
+    require_auth()
+    _pt = ["Ejercicios", "Historial", "Objetivos", "Peso"]
+    _pmap = {
+        "Ejercicios": "Ejercicios y progreso",
+        "Historial": "Historial",
+        "Objetivos": "Objetivos",
+        "Peso": "Peso corporal",
+    }
+    _curp = st.session_state.get("progreso_tab", "Ejercicios")
+    if _curp not in _pt:
+        _curp = "Ejercicios"
+    _subp = st.radio(
+        "progreso_sub",
+        _pt,
+        index=_pt.index(_curp),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="progreso_tab_radio",
+    )
+    st.session_state["progreso_tab"] = _subp
+    page = _pmap[_subp]
+
 elif page == "Plantillas":
     require_auth()
     render_templates_page(embedded=True)
+    page = None
 
-elif page == "Registrar entrenamiento":
+if page == "Entrenar":
     require_auth()
-    st.title("Registrar entrenamiento")
+    st.title("Entrenar")
     user = st.session_state["user"]
     d = st.date_input("Fecha", value=date.today())
     exercises = list_all_exercises(user)
@@ -1153,7 +1226,10 @@ elif page == "Peso corporal":
 
 elif page == "Planificar rutinas":
     require_auth()
-    st.title("Planificar rutinas")
+    if st.session_state.get("nav_page") == "Rutinas":
+        st.markdown("### Planificar calendario")
+    else:
+        st.title("Planificar rutinas")
     user = st.session_state["user"]
 
     # ---------- Utilidades de plan ----------
@@ -1455,9 +1531,9 @@ elif page == "Planificar rutinas":
 
 
 
-elif page == "Mi cuenta":
+elif page in ("Cuenta", "Mi cuenta"):
     require_auth()
-    st.title("Mi cuenta")
+    st.title("Cuenta")
     user = st.session_state["user"]
     data = load_user(user)
     profile = data.get("profile", {})

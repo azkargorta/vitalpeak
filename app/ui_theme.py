@@ -90,31 +90,6 @@ section[data-testid="stSidebar"] [data-baseweb="radio"] > div:first-child {{
   border-color: var(--vp-accent) !important;
 }}
 
-/* Botón Cerrar sesión — siempre visible */
-section[data-testid="stSidebar"] div.stButton > button,
-section[data-testid="stSidebar"] div.stButton > button[kind="secondary"],
-section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"],
-section[data-testid="stSidebar"] button[kind="secondary"] {{
-  background: var(--vp-accent) !important;
-  background-color: var(--vp-accent) !important;
-  color: #FFFFFF !important;
-  border: none !important;
-  border-radius: 8px !important;
-  font-family: 'Manrope', sans-serif !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.02em;
-  box-shadow: 0 2px 8px rgba(58, 168, 153, 0.28);
-}}
-section[data-testid="stSidebar"] div.stButton > button:hover {{
-  background: #2F8F82 !important;
-  background-color: #2F8F82 !important;
-  color: #FFFFFF !important;
-}}
-section[data-testid="stSidebar"] div.stButton > button p,
-section[data-testid="stSidebar"] div.stButton > button span {{
-  color: #FFFFFF !important;
-}}
-
 /* Tipografía */
 h1, h2, h3, .vp-brand, .vp-display {{
   font-family: 'Barlow Condensed', Impact, sans-serif !important;
@@ -223,7 +198,7 @@ h3 {{ font-weight: 700 !important; }}
   margin-top: 0 !important;
 }}
 
-/* Botones principales (contenido) */
+/* Botones principales (contenido) — no forzar el sidebar */
 div.stButton > button[kind="primary"],
 div.stButton > button[data-testid="baseButton-primary"] {{
   background: var(--vp-accent) !important;
@@ -239,6 +214,27 @@ div.stButton > button[data-testid="baseButton-primary"]:hover {{
   background: #2F8F82 !important;
   color: #FFFFFF !important;
 }}
+/* Sidebar: anular el primary global (menú activo) */
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"],
+section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {{
+  background: #E6F6F3 !important;
+  color: #142830 !important;
+  border: 1px solid #3AA899 !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"] p,
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"] span,
+section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] p,
+section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] span {{
+  color: #142830 !important;
+}}
+/* Logout (último botón del sidebar) */
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] div.stButton:last-of-type > button,
+section[data-testid="stSidebar"] .stButton:has(button#btn_logout) > button {{
+  background: #3AA899 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+}}
 div.stButton > button {{
   border-radius: 8px !important;
   font-family: 'Manrope', sans-serif;
@@ -250,6 +246,24 @@ div.stButton > button {{
 div.stButton > button:hover {{
   border-color: var(--vp-accent) !important;
   color: var(--vp-accent) !important;
+}}
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {{
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #142830 !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover {{
+  background: #F0F5F3 !important;
+  border-color: rgba(20,40,48,0.08) !important;
+  color: #142830 !important;
+}}
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] p,
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] span {{
+  color: #142830 !important;
+}}
+/* Logout forzado */
+section[data-testid="stSidebar"] button[kind="secondary"][data-testid="baseButton-secondary"] {{
 }}
 
 [data-testid="stMetric"] {{
@@ -328,47 +342,47 @@ def section_label(text: str) -> None:
     st.markdown(f'<div class="vp-section-label">{text}</div>', unsafe_allow_html=True)
 
 
-# Iconos cortos para menú visual (sin radio)
+# Menú compacto (sin iconos)
 NAV_META = [
-    ("Hoy", "Hoy", "◆"),
-    ("Registrar entrenamiento", "Entrenar", "●"),
-    ("Plantillas", "Plantillas", "▣"),
-    ("Planificar rutinas", "Planificar", "▦"),
-    ("Ejercicios y progreso", "Ejercicios", "▲"),
-    ("Historial", "Historial", "☰"),
-    ("Objetivos", "Objetivos", "◎"),
-    ("Peso corporal", "Peso", "○"),
-    ("Técnica", "Técnica", "◇"),
-    ("Mi cuenta", "Cuenta", "▣"),
+    ("Hoy", "Hoy"),
+    ("Entrenar", "Entrenar"),
+    ("Rutinas", "Rutinas"),
+    ("Progreso", "Progreso"),
+    ("Técnica", "Técnica"),
+    ("Cuenta", "Cuenta"),
 ]
 
 
 def render_sidebar_nav(current: str | None) -> str:
-    """Menú lateral con botones (más visual que el radio)."""
+    """Menú lateral corto, solo texto."""
     st.markdown(
         """
 <style>
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div:has(button[kind="secondary"]),
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div:has(button[kind="primary"]) {
-  margin-bottom: -0.35rem;
-}
-section[data-testid="stSidebar"] button[kind="secondary"] {
+/* Botones de navegación: claros; activo resaltado */
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {
   background: transparent !important;
+  background-color: transparent !important;
   border: 1px solid transparent !important;
   color: #142830 !important;
   text-align: left !important;
   justify-content: flex-start !important;
   font-weight: 600 !important;
   border-radius: 10px !important;
-  padding: 0.55rem 0.75rem !important;
+  padding: 0.6rem 0.85rem !important;
+  box-shadow: none !important;
 }
-section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-  background: #E6F6F3 !important;
-  border-color: rgba(58,168,153,0.25) !important;
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover {
+  background: #F0F5F3 !important;
+  border-color: rgba(20,40,48,0.08) !important;
   color: #142830 !important;
 }
-section[data-testid="stSidebar"] button[kind="primary"] {
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] p,
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] span {
+  color: #142830 !important;
+}
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {
   background: #E6F6F3 !important;
+  background-color: #E6F6F3 !important;
   border: 1px solid #3AA899 !important;
   color: #142830 !important;
   text-align: left !important;
@@ -377,30 +391,54 @@ section[data-testid="stSidebar"] button[kind="primary"] {
   border-radius: 10px !important;
   box-shadow: none !important;
 }
-section[data-testid="stSidebar"] button[kind="primary"] p,
-section[data-testid="stSidebar"] button[kind="primary"] span {
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"] p,
+section[data-testid="stSidebar"] div.stButton > button[kind="primary"] span {
   color: #142830 !important;
+}
+/* Cerrar sesión: sólido y visible */
+section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]#btn_logout,
+section[data-testid="stSidebar"] div.stButton:has(button[kind="secondary"]) {
+  /* fallback abajo */
 }
 .vp-nav-user {
   font-size: 0.85rem;
   color: #6A7F88;
   margin: 0.2rem 0 0.6rem;
 }
+/* Cerrar sesión: botón junto al marcador */
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]:has(.vp-logout-mark) {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+section[data-testid="stSidebar"] [data-testid="element-container"]:has(.vp-logout-mark) + [data-testid="element-container"] button {
+  background: #3AA899 !important;
+  background-color: #3AA899 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(58, 168, 153, 0.28) !important;
+}
+section[data-testid="stSidebar"] [data-testid="element-container"]:has(.vp-logout-mark) + [data-testid="element-container"] button p,
+section[data-testid="stSidebar"] [data-testid="element-container"]:has(.vp-logout-mark) + [data-testid="element-container"] button span {
+  color: #FFFFFF !important;
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
 
-    chosen = current if current in {k for k, _, _ in NAV_META} else "Hoy"
-    for key, label, icon in NAV_META:
+    valid = {k for k, _ in NAV_META}
+    chosen = current if current in valid else "Hoy"
+    for key, label in NAV_META:
         active = key == chosen
         if st.button(
-            f"{icon}  {label}",
+            label,
             key=f"nav_{key}",
             use_container_width=True,
             type="primary" if active else "secondary",
         ):
-            chosen = key
             st.session_state["nav_page"] = key
             st.rerun()
     return st.session_state.get("nav_page", chosen)
