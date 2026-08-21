@@ -1,0 +1,20 @@
+{
+  "label": "Jalón vertical con polea alta y agarre cerrado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "De frente a la máquina, agarre V.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Tirón",
+      "tip": "Barra al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

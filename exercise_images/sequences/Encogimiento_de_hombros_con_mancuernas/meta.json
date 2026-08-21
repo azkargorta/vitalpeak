@@ -1,0 +1,20 @@
+{
+  "label": "Encogimiento de hombros con mancuernas",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Mancuernas a los lados, hombros bajos.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Encogimiento",
+      "tip": "Sube los hombros hacia las orejas.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

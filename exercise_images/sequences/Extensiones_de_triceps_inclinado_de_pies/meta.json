@@ -1,0 +1,20 @@
+{
+  "label": "Extensiones de triceps inclinado de pies",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Torso paralelo, codos a 90°.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Extensión",
+      "tip": "Extiende los brazos atrás.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Flexiona con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

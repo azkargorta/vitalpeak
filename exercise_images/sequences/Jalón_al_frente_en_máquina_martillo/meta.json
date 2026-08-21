@@ -1,0 +1,20 @@
+{
+  "label": "Jalón al frente en máquina martillo",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazos extendidos arriba.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Tirón",
+      "tip": "Lleva las asas al pecho alto.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende de nuevo con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

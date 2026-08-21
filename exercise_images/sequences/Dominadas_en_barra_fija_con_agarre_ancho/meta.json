@@ -1,0 +1,20 @@
+{
+  "label": "Dominadas en barra fija con agarre ancho",
+  "steps": [
+    {
+      "title": "1 · Colgado",
+      "tip": "Brazos extendidos, agarre ancho.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Subida",
+      "tip": "Barbilla por encima de la barra.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Vuelve al colgado con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "label": "Jalón de triceps en polea alta con cuerda",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Una mano en cada extremo de la cuerda.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Jalón",
+      "tip": "Extiende abajo abriendo los extremos.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Vuelve con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

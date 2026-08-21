@@ -1,0 +1,20 @@
+{
+  "label": "Elevación de pantorrilla sentado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Ambos talones abajo a la vez.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Subida",
+      "tip": "Eleva ambos talones juntos; los discos suben.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Baja ambos talones con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

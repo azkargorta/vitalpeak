@@ -1,0 +1,20 @@
+{
+  "label": "Press de hombro en máquina Smith",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Barra con discos a hombros (en guías).",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Press",
+      "tip": "Empuja arriba por las guías.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

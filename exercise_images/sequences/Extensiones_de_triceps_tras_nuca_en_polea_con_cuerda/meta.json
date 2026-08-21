@@ -1,0 +1,20 @@
+{
+  "label": "Extensiones de triceps, tras nuca, en polea con cuerda",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Polea alta; una mano a cada lado de la cabeza.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Extensión",
+      "tip": "Extiende los brazos adelante; el stack sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Flexiona con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

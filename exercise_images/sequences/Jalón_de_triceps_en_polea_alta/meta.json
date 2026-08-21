@@ -1,0 +1,20 @@
+{
+  "label": "Jalón de triceps en polea alta",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Codos flexionados, barra al pecho.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Jalón",
+      "tip": "Extiende hacia abajo.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Vuelve con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

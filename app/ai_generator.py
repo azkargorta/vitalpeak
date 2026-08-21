@@ -230,6 +230,14 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
     """Intenta mapear salidas variadas de la IA al esquema esperado: {'meta','dias','progresion'}."""
     data = dict(raw) if isinstance(raw, dict) else {}
 
+    # Preferencia deload: si el usuario define semanas de ciclo, el deload por defecto se coloca al final del ciclo.
+    try:
+        semanas_ciclo = int(datos.get("semanas_ciclo") or 0)
+        if semanas_ciclo < 1:
+            semanas_ciclo = 0
+    except Exception:
+        semanas_ciclo = 0
+
     # --- META ---
     if "meta" not in data or not isinstance(data.get("meta"), dict):
         data["meta"] = {
@@ -249,19 +257,19 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
             data["progresion"] = {
                 "principales": "doble progresión en carga o repeticiones",
                 "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
-                "deload_semana": 5
+                "deload_semana": (semanas_ciclo or 6)
             }
         elif "lineal" in pref:
             data["progresion"] = {
                 "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
                 "accesorios": "mantén técnica y suma reps gradualmente",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
         else:
             data["progresion"] = {
                 "principales": "progresión simple: subir reps o carga cada semana si es posible",
                 "accesorios": "reps adicionales o pausas más cortas",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
 
     
@@ -273,19 +281,19 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
             data["progresion"] = {
                 "principales": "doble progresión en carga o repeticiones",
                 "accesorios": "añadir 1-2 repeticiones por semana hasta rango tope",
-                "deload_semana": 5
+                "deload_semana": (semanas_ciclo or 6)
             }
         elif "lineal" in pref:
             data["progresion"] = {
                 "principales": "aumenta carga 2.5–5% cuando completes el rango de reps",
                 "accesorios": "mantén técnica y suma reps gradualmente",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
         else:
             data["progresion"] = {
                 "principales": "progresión simple: subir reps o carga cada semana si es posible",
                 "accesorios": "reps adicionales o pausas más cortas",
-                "deload_semana": 6
+                "deload_semana": (semanas_ciclo or 6)
             }
 
 
@@ -369,7 +377,13 @@ def _coerce_to_schema(raw: Dict[str, Any], datos: Dict[str, Any]) -> Dict[str, A
         data["dias"] = fixed_dias
 
     return data
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+def _get_model() -> str:
+    """Modelo actual (OpenAI o Ollama). Se lee en cada llamada para respetar .env/secrets."""
+    return (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+
+
+# Compat: algunos sitios importan MODEL; se recalcula al cargar el módulo.
+MODEL = _get_model()
 
 RULES_TEXT = (
     "- Estructura por día: 6–7 ejercicios (1 principal fuerza, 1 secundario, 3–4 accesorios, 1 core/finisher).\n"
@@ -475,91 +489,319 @@ def validar_negocio(plan: Dict[str, Any]) -> List[str]:
 def build_system() -> str:
     return "Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional."
 
-def build_prompt(datos: Dict[str, Any]) -> str:
-    ia_detalles = (datos.get('ia_detalles') or '').strip()
-    """Construye el prompt para la IA respetando reglas y preferencias del usuario."""
-    agrup = datos.get("agrupacion", "Varios grupos principales por día")
-    material = datos.get("material", [])
-    notas = datos.get("comentarios", "")
-    objetivo = datos.get("objetivo", "mixto")
-    nivel = datos.get("nivel", "intermedio")
 
-    extra_notas = f"\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  {notas}" if notas else ""
-    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
-    reglas_estrictas = f"""
-REGLAS ESTRICTAS (debes cumplirlas sí o sí):
+
+
+
+def analyze_user_data(datos: Dict[str, Any]) -> Dict[str, Any]:
+    """Analiza y normaliza los datos del usuario.
+
+    Devuelve un dict con:
+    - valores normalizados para el esquema
+    - restricciones explícitas (para que el modelo las cumpla)
+    - reglas específicas por objetivo (hipertrofia vs fuerza)
+    """
+    objetivo_raw = str(datos.get("objetivo") or "").strip().lower()
+    nivel_raw = str(datos.get("nivel") or "intermedio").strip().lower()
+
+    # --- Objetivo -> schema ---
+    if "hiper" in objetivo_raw:
+        objetivo = "hipertrofia"
+    elif "fuer" in objetivo_raw:
+        objetivo = "fuerza"
+    elif any(k in objetivo_raw for k in ["resis", "cardio"]):
+        objetivo = "resistencia"
+    elif any(k in objetivo_raw for k in ["grasa", "perdida", "pérdida", "defini"]):
+        objetivo = "resistencia"
+    elif any(k in objetivo_raw for k in ["salud", "rendim"]):
+        objetivo = "mixto"
+    else:
+        objetivo = objetivo_raw if objetivo_raw in ("fuerza","hipertrofia","resistencia","mixto") else "mixto"
+
+    nivel = nivel_raw if nivel_raw in ("principiante","intermedio","avanzado") else "intermedio"
+
+    # --- Días/semana ---
+    dias_raw = datos.get("dias")
+    if isinstance(dias_raw, (list, tuple)):
+        dias = len(dias_raw)
+    else:
+        try:
+            dias = int(dias_raw or 4)
+        except Exception:
+            dias = 4
+    dias = max(1, min(6, dias))
+
+    # --- Duración ---
+    try:
+        duracion = int(datos.get("duracion") or datos.get("duracion_min") or 60)
+    except Exception:
+        duracion = 60
+    duracion = max(30, min(120, duracion))
+
+    # --- Disponibilidad ---
+    disp = datos.get("disponibilidad") or []
+    if isinstance(disp, str):
+        disp = [d.strip() for d in disp.split(",") if d.strip()]
+    disp = list(disp) if isinstance(disp, (list, tuple)) else []
+
+    dias_semana = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+    if disp:
+        disp_norm = []
+        for d in disp:
+            d0 = str(d).strip().capitalize()
+            if d0.lower() in ("miercoles","miércoles"):
+                d0 = "Miércoles"
+            if d0.lower() in ("sabado","sábado"):
+                d0 = "Sábado"
+            if d0 in dias_semana and d0 not in disp_norm:
+                disp_norm.append(d0)
+        disp = disp_norm
+
+    # Ajuste a número de días
+    if len(disp) != dias:
+        if disp:
+            disp = disp[:dias]
+            for d in dias_semana:
+                if len(disp) >= dias:
+                    break
+                if d not in disp:
+                    disp.append(d)
+        else:
+            defaults = ["Lunes","Martes","Jueves","Viernes","Miércoles","Sábado"]
+            disp = defaults[:dias]
+
+    # --- Material ---
+    material = datos.get("material") or datos.get("equipo") or []
+    if isinstance(material, str):
+        material = [m.strip() for m in material.split(",") if m.strip()]
+    material = [str(m).strip().lower() for m in material] if isinstance(material, (list, tuple)) else []
+    full_gym = ("todo" in material) or any("gimnasio completo" in m for m in material)
+
+    # Texto libre (para restricciones)
     ia_detalles = (datos.get("ia_detalles") or "").strip()
     comentarios = (datos.get("comentarios") or "").strip()
-    _txt = (ia_detalles + " " + comentarios).lower()
-    _single_leg = bool(re.search(r"(un\s*solo|solo\s*un|1)\s*d[ií]a\s*de\s*pierna", _txt))
-    detalles_usuario = f"\nDETALLES_USUARIO (usar tal cual):\n<<<\n{ia_detalles}\n>>>\n" if ia_detalles else ""
-    if _single_leg and "un solo día de pierna" not in detalles_usuario:
-        detalles_usuario += "\n- INDICACIONES DEL USUARIO (OBLIGATORIAS):\n  un solo día de pierna\n"
-    if _single_leg:
-        bloques = _compute_primary_blocks(datos)
-        labels = datos.get("disponibilidad") or [f"Día {i+1}" for i in range(len(bloques))]
-        asignaciones = [f"- {lbl}: {bloques[i]}" for i, lbl in enumerate(labels[:len(bloques)])]
-        bloques_line = "\nBloques principales por día (OBLIGATORIO):\n" + "\n".join(asignaciones) + "\n"
+    txt = (ia_detalles + " " + comentarios).lower()
+
+    # Restricciones explícitas por texto
+    no_machines = bool(re.search(r"(?:no\s+máquinas|no\s+maquinas|solo\s+peso\s+libre)", txt))
+    no_cables = bool(re.search(r"(?:no\s+poleas|sin\s+poleas|sin\s+cables|no\s+cables)", txt))
+    no_smith = bool(re.search(r"(?:no\s+smith|sin\s+smith)", txt))
+    no_bar = bool(re.search(r"(?:no\s+barra|sin\s+barra)", txt))
+    no_db = bool(re.search(r"(?:no\s+mancuernas|sin\s+mancuernas)", txt))
+
+    # --- Split preferido (normalización) ---
+    split_pref = str(datos.get("split_pref") or "").strip()
+    split_low = split_pref.lower()
+    split_template: List[str] | None = None
+    if "ppl" in split_low:
+        # Para 4 días: PPL + 1 extra de tren superior (Push B por defecto)
+        if dias == 4:
+            split_template = ["Push A", "Pull A", "Legs", "Push B"]
+        elif dias == 3:
+            split_template = ["Push", "Pull", "Legs"]
+        elif dias == 6:
+            split_template = ["Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B"]
+
+    # Evitar
+    evitar = datos.get("evitar") or []
+    if isinstance(evitar, str):
+        evitar = [s.strip() for s in evitar.split(",") if s.strip()]
+    evitar = [str(s).strip() for s in evitar] if isinstance(evitar, (list, tuple)) else []
+
+    limitaciones = (datos.get("limitaciones") or datos.get("lesiones") or "").strip()
+
+    # Intensidad
+    try:
+        rir_obj = int(datos.get("rir_obj") if datos.get("rir_obj") is not None else 2)
+    except Exception:
+        rir_obj = 2
+    rir_obj = max(0, min(4, rir_obj))
+
+    # --- Reglas por objetivo ---
+    if objetivo == "hipertrofia":
+        reglas_obj = """REGLAS ESPECÍFICAS (HIPERTROFIA):
+- Prioriza rangos 6-10 / 8-12 / 10-15 (aislados 12-20).
+- Limita el rango 3-6 a como máximo 1 ejercicio por sesión (si lo usas, que sea el principal).
+- Descansos orientativos: compuestos 90-150s, accesorios 45-90s.
+- RIR objetivo: usa ~{rir} como referencia (más cerca de 0-2 en aislados; 1-3 en compuestos).
+- Incluye semanalmente: tirón vertical, tirón horizontal, empuje horizontal, empuje vertical, bisagra, sentadilla/prensa, gemelos, core.
+- Incluye al menos 1 trabajo de bíceps, tríceps y deltoide lateral a la semana.
+- Ajusta el volumen para que la sesión quepa en {dur} min.
+""".format(rir=rir_obj, dur=duracion)
+    elif objetivo == "fuerza":
+        reglas_obj = """REGLAS ESPECÍFICAS (FUERZA):
+- Prioriza principales 3-6 reps con descansos 2-4 min.
+- Secundarios 5-8 reps; accesorios 8-12.
+- Menos ejercicios por día si hace falta para cumplir {dur} min.
+- RIR objetivo: ~{rir} (principales típicamente 1-3).
+""".format(rir=rir_obj, dur=duracion)
     else:
-        bloques_line = ""
-- Agrupación pedida: {agrup}
-- Si es "Un solo grupo principal por día":
-  * EXACTAMENTE 1 grupo principal por día.
-  * No mezclar dos grupos principales (p. ej., pecho y espalda) el mismo día.
-  * Accesorios subordinados al principal (bíceps con espalda, tríceps con pecho) permitidos.
-- Si es "Varios grupos principales por día":
-  * Máximo 2 principales salvo que el usuario pida 3 explícitamente.
-  * Evitar solapar el mismo grupo en días consecutivos si el volumen es alto.
-- Material:
-  * Si la lista incluye "todo": asume gimnasio comercial COMPLETO (barras, mancuernas, poleas, máquinas, rack, banco, discos, gomas, etc.).
-  * Si es personalizado, usa SOLO el material listado.
-- Respeta lesiones/limitaciones y el objetivo indicado.
-- Ajusta volumen y selección de ejercicios al objetivo ({objetivo}) y nivel ({nivel}).
-{extra_notas}
-    """.strip("\n")
+        reglas_obj = """REGLAS ESPECÍFICAS (GENERAL):
+- Combina compuestos y accesorios con rangos 6-12 y algún 12-15.
+- Ajusta volumen/descansos para cumplir {dur} min.
+""".format(dur=duracion)
 
-    prompt = f"""
-Eres un entrenador personal experto. Devuelve exclusivamente JSON válido, sin texto adicional.
+    # --- Restricciones (checklist) ---
+    restricciones: List[str] = []
+    restricciones.append(f"- NO INVENTAR: usa exactamente estos días: {disp} (y solo {dias} días).")
+    restricciones.append(f"- Duración por sesión: {duracion} min (ajusta descansos/series para cumplir).")
+    restricciones.append(f"- Nivel: {nivel}.")
+    restricciones.append(f"- Objetivo: {objetivo}.")
+    restricciones.append(f"- Material disponible: {material if material else ['(no especificado)']}" + (" (gimnasio completo)" if full_gym else ""))
+    if limitaciones:
+        restricciones.append(f"- Lesiones/limitaciones: {limitaciones} (respétalo estrictamente).")
+    if evitar:
+        restricciones.append(f"- Evitar: {evitar} (no los incluyas).")
+    if no_machines:
+        restricciones.append("- Restricción: SIN máquinas.")
+    if no_cables:
+        restricciones.append("- Restricción: SIN poleas/cables.")
+    if no_smith:
+        restricciones.append("- Restricción: SIN Smith.")
+    if no_bar:
+        restricciones.append("- Restricción: SIN barra.")
+    if no_db:
+        restricciones.append("- Restricción: SIN mancuernas.")
 
-Genera una rutina semanal siguiendo estas reglas base:
-{RULES_TEXT.format(dur=datos.get('duracion', 60))}
+    if split_pref:
+        restricciones.append(f"- Split preferido: {split_pref}. Respétalo y hazlo explícito en el nombre de cada día.")
+        if split_template:
+            restricciones.append(f"- Orden del split (obligatorio): {split_template}.")
+    if datos.get("enfasis_accesorios"):
+        restricciones.append(f"- Prioridades musculares: {datos.get('enfasis_accesorios')}. Aumenta volumen ahí sin romper el tiempo.")
+    if datos.get("basicos_objetivo"):
+        restricciones.append(f"- Básicos a mejorar (si objetivo fuerza): {datos.get('basicos_objetivo')}.")
 
-{reglas_estrictas}
+    return {
+        "objetivo": objetivo,
+        "nivel": nivel,
+        "dias": dias,
+        "duracion": duracion,
+        "disponibilidad": disp,
+        "material": material,
+        "full_gym": full_gym,
+        "limitaciones": limitaciones,
+        "evitar": evitar,
+        "rir_obj": rir_obj,
+        "split_pref": split_pref,
+        "split_template": split_template,
+        "reglas_objetivo": reglas_obj,
+        "restricciones": restricciones,
+    }
 
-ENTRADA DEL USUARIO (estructura):
-- Nivel: {nivel}
-- Días/semana: {datos.get('dias')}
-- Duración (min): {datos.get('duracion')}
-- Objetivo: {objetivo}
-- Material: {material}
-- Lesiones/limitaciones: {datos.get('limitaciones','')}
-- Disponibilidad: {datos.get('disponibilidad',[])}
-- Progresión preferida: {datos.get('progresion_preferida','')}
-- Tolerancia a volumen: {datos.get('volumen_tolerancia','')}
-- Semanas del ciclo: {datos.get('semanas_ciclo','')}
-- Superseries: {datos.get('superseries_ok')}
-- Unidades: {datos.get('unidades','kg')}
-- Idioma: {datos.get('idioma','es')}
-- PR recientes: {datos.get('pr_recientes',{})}
-- Énfasis accesorios: {datos.get('enfasis_accesorios',[])}
-- Evitar: {datos.get('evitar',[])}
-- Calentamiento: {datos.get('calentamiento','')}
-- Agrupación: {agrup}\n" + detalles_usuario + f"\n
-SALIDA (JSON): Sigue exactamente el esquema esperado por el validador; no incluyas texto fuera del JSON.
-"""
+
+
+
+
+def build_prompt(datos: Dict[str, Any]) -> str:
+    """Construye el prompt para la IA.
+
+    Importante: aquí solo ensamblamos texto. La lógica/derivaciones están en analyze_user_data().
+    """
+    A = analyze_user_data(datos)
+    nl = chr(10)
+
+    ia_detalles = (datos.get("ia_detalles") or "").strip()
+    notas = (datos.get("comentarios") or "").strip()
+
+    reglas_generales = (
+        "REGLAS GENERALES (siempre):" + nl +
+        "- Devuelve EXCLUSIVAMENTE JSON válido (sin markdown, sin explicación)." + nl +
+        "- Cada día debe tener 5-8 ejercicios (ideal 6-7)." + nl +
+        "- Estructura por día: 1 principal (3-6 o 4-6), 1 secundario (6-10), 3-4 accesorios (10-15/12-20), 1 core o finisher." + nl +
+        "- Incluye 'descanso' en TODOS los ejercicios." + nl +
+        "- El último ejercicio de cada día DEBE ser el core/finisher y su nombre debe empezar por 'Core:' o 'Finisher:' (para verificación)." + nl +
+        "- Upper (si aparece): balancea empuje y tirón." + nl +
+        "- Lower (si aparece): evita meter tríceps como parte principal." + nl +
+        "- Evita duplicar exactamente el mismo ejercicio en la misma semana." + nl +
+        "- Ajusta volumen/descansos para que la sesión quepa en el tiempo por sesión." + nl
+    )
+
+    split_rules = ""
+    if A.get("split_pref"):
+        split_rules += "REGLAS DE SPLIT (OBLIGATORIO):" + nl
+        if A.get("split_template"):
+            # Se exige el orden, y que se refleje en el nombre del día para que la app lo valide.
+            split_rules += f"- Usa este orden exacto de sesiones: {A['split_template']}." + nl
+            split_rules += "- El campo 'nombre' de cada día debe ser: '<DíaSemana> - <Sesión>' (ej: 'Lunes - Push A')." + nl
+        else:
+            split_rules += f"- Split preferido: {A['split_pref']}. Respétalo." + nl
+        split_rules += nl
+
+    restricciones_txt = nl.join(A["restricciones"])
+
+    detalles_usuario = ""
+    if ia_detalles:
+        detalles_usuario += (
+            nl + "DETALLES_USUARIO (usar tal cual):" + nl +
+            "<<<" + nl + ia_detalles + nl + ">>>" + nl
+        )
+    if notas:
+        detalles_usuario += (
+            nl + "NOTAS_ADICIONALES (usar tal cual):" + nl +
+            "<<<" + nl + notas + nl + ">>>" + nl
+        )
+
+    # Importante: el schema usa 'duracion_min' y 'objetivo' en {fuerza|hipertrofia|resistencia|mixto}
+    schema_hint = '''
+ESQUEMA JSON (obligatorio):
+{
+  "meta": {"nivel": "principiante|intermedio|avanzado", "dias": N, "duracion_min": N, "objetivo": "fuerza|hipertrofia|resistencia|mixto"},
+  "dias": [
+    {"nombre": "Lunes", "ejercicios": [
+      {"nombre": "...", "series": 3, "reps": "8-12", "intensidad": "RIR 1-2", "descanso": "60-90s"}
+    ], "notas": "..."}
+  ],
+  "progresion": {"principales": "...", "accesorios": "...", "deload_semana": N}
+}
+'''
+
+    prompt = (
+        "CONTEXTO:" + nl +
+        "Eres un entrenador personal experto. Diseña un plan que cumpla las restricciones del usuario y el objetivo." + nl + nl +
+        "DATOS NORMALIZADOS:" + nl +
+        f"- Objetivo: {A['objetivo']}" + nl +
+        f"- Nivel: {A['nivel']}" + nl +
+        f"- Días/semana: {A['dias']}" + nl +
+        f"- Duración: {A['duracion']} min" + nl +
+        f"- Días exactos: {A['disponibilidad']}" + nl + nl +
+        reglas_generales + nl +
+        split_rules +
+        "REGLAS POR OBJETIVO:" + nl + A['reglas_objetivo'] + nl +
+        "RESTRICCIONES Y CHECKLIST (OBLIGATORIO):" + nl + restricciones_txt + nl +
+        detalles_usuario + nl +
+        schema_hint + nl +
+        "SALIDA: devuelve SOLO JSON válido." + nl
+    )
+
     return prompt
+def _client():
+    """Cliente compatible con OpenAI Cloud y Ollama local (API /v1)."""
+    api_key = os.getenv("OPENAI_API_KEY") or "ollama"
+    base_url = (os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE") or "").strip() or None
+    if OpenAI is not None:
+        if base_url:
+            return OpenAI(api_key=api_key, base_url=base_url)
+        return OpenAI(api_key=api_key)
+    import openai as _openai
+    _openai.api_key = api_key
+    if base_url:
+        try:
+            _openai.base_url = base_url
+        except Exception:
+            pass
+    return _openai
 
-def _client() -> OpenAI:
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def _chat(client: OpenAI, prompt: str) -> str:
+def _chat(client, prompt: str, *, temperature: float = 0.1) -> str:
+    model = _get_model()
     resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0.4,
+        model=model,
+        temperature=temperature,
         messages=[
-            {"role":"system","content": build_system()},
-            {"role":"user","content": prompt}
-        ]
+            {"role": "system", "content": build_system()},
+            {"role": "user", "content": prompt},
+        ],
     )
     return resp.choices[0].message.content
 
@@ -572,8 +814,11 @@ def _try_parse_json(text: str) -> Dict[str, Any]:
         # Intento directo
         return json.loads(text)
     except Exception:
-        # Intento robusto: extraer bloque JSON o primer objeto balanceado
-        return _extract_json(text)
+        # Intento robusto: extraer bloque JSON y parsearlo
+        extracted = _extract_json(text)
+        if isinstance(extracted, dict):
+            return extracted
+        return json.loads(extracted)
 
 
 # === Reglas adicionales derivadas de 'comentarios' del usuario ===
@@ -707,7 +952,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         seen=set(); dup=set()
         for d in plan.get("dias", []):
             for ej in d.get("ejercicios", []):
-                n=_norm(e.get("nombre",""))
+                n=_norm(ej.get("nombre",""))
                 if not n: continue
                 if n in seen: dup.add(n)
                 seen.add(n)
@@ -719,7 +964,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         for i,d in enumerate(plan.get("dias", []), start=1):
             found=False
             for ej in d.get("ejercicios", []):
-                if "calentamiento" in _norm(e.get("nombre","")):
+                if "calentamiento" in _norm(ej.get("nombre","")):
                     mins=_exercise_minutes(ej)
                     if mins is None or mins<need: errs.append(f"Calentamiento de {need} min requerido en día {i}.")
                     found=True; break
@@ -769,7 +1014,7 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
     if any((no_machines,no_cables,no_smith,no_bar,no_db)):
         for i,d in enumerate(plan.get("dias", []), start=1):
             for ej in d.get("ejercicios", []):
-                name=_norm(e.get("nombre",""))
+                name=_norm(ej.get("nombre",""))
                 if no_machines and any(k in name for k in MACHINE_KEYWORDS): errs.append(f"Sin máquinas: '{ej.get('nombre','')}' en día {i}.")
                 if no_cables and any(k in name for k in CABLE_KEYWORDS): errs.append(f"Sin poleas/cables: '{ej.get('nombre','')}' en día {i}.")
                 if no_smith and "smith" in name: errs.append(f"Sin Smith: '{ej.get('nombre','')}' en día {i}.")
@@ -783,58 +1028,408 @@ def validar_comentarios(plan: dict, comentarios: str) -> list[str]:
         total_bi=0; bi_terms=("curl","predicador","martillo","hammer curl","inclinado con mancuernas")
         for d in plan.get("dias", []):
             for e in d.get("ejercicios", []):
-                name=_norm(e.get("nombre","")); gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo","")); sp=_norm(e.get("musculo_secundario",""))
+                name=_norm(e.get("nombre",""))
+                gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
+                sp=_norm(e.get("musculo_secundario",""))
                 if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name: total_bi+=1
                 elif any(t in name for t in bi_terms): total_bi+=1
                 elif "biceps" in gp or "bíceps" in gp or "biceps" in sp or "bíceps" in sp: total_bi+=1
         if total_bi<min_bi: errs.append(f"Pediste bíceps ≥ {min_bi} y solo se detectan {total_bi} ejercicios de bíceps en la semana.")
 
     return errs
+
+
+def validar_objetivo(plan: Dict[str, Any], A: Dict[str, Any]) -> List[str]:
+    """Validaciones extra para asegurar que la rutina respeta el objetivo y las consignas."""
+    errs: List[str] = []
+    if not isinstance(plan, dict):
+        return ['Plan inválido (no es dict).']
+
+    objetivo = (A.get('objetivo') or '').lower()
+    dias_user = A.get('disponibilidad') or []
+    # Días exactos
+    try:
+        dias_plan = plan.get('dias') or []
+        if isinstance(dias_plan, list) and dias_user and len(dias_plan) == len(dias_user):
+            nombres = [str(d.get('nombre','')).strip() for d in dias_plan if isinstance(d, dict)]
+            # si al menos 2 coinciden, exigimos que coincidan todos
+            if any(n in dias_user for n in nombres):
+                for i,(n_exp, n_got) in enumerate(zip(dias_user, nombres), start=1):
+                    # Permitimos sufijos tipo "Lunes - Push A" siempre que incluya el día.
+                    if n_got and (n_exp.lower() not in n_got.lower()):
+                        errs.append(f"Día {i}: el nombre debe incluir '{n_exp}' (según disponibilidad), pero llegó '{n_got}'.")
+    except Exception:
+        pass
+
+    # Heurística reps bajas
+    def is_low_rep(reps: str) -> bool:
+        try:
+            r = str(reps).strip().replace('–','-')
+            if '-' in r:
+                a,b=r.split('-',1)
+                a=int(a.strip()); b=int(b.strip())
+                return b <= 6
+            return int(r) <= 6
+        except Exception:
+            return False
+
+    if objetivo == 'hipertrofia':
+        # máximo 1 ejercicio "bajo" por día
+        for i,d in enumerate(plan.get('dias', []) or [], start=1):
+            lows = 0
+            for ej in (d.get('ejercicios') or []):
+                if is_low_rep(ej.get('reps','')):
+                    lows += 1
+            if lows > 1:
+                errs.append(f"Día {i}: demasiados ejercicios en rango <=6 reps para hipertrofia (hay {lows}).")
+
+        # cobertura básica brazos/hombro lateral (al menos 1/semana)
+        names = ' '.join([(ej.get('nombre','') or '').lower() for d in plan.get('dias', []) or [] for ej in (d.get('ejercicios') or [])])
+        if not any(k in names for k in ('curl', 'bíceps', 'biceps', 'martillo', 'predicador')):
+            errs.append("Hipertrofia: falta trabajo directo de bíceps en la semana.")
+        if not any(k in names for k in ('tríceps', 'triceps', 'jalón de tríceps', 'extensión de tríceps', 'fondos', 'pushdown', 'skull')):
+            errs.append("Hipertrofia: falta trabajo directo de tríceps en la semana.")
+        if not any(k in names for k in ('elevaciones laterales', 'lateral', 'deltoide lateral', 'laterales')):
+            errs.append("Hipertrofia: falta trabajo directo de deltoide lateral (elevaciones laterales o equivalente).")
+
+    elif objetivo == 'fuerza':
+        # al menos 1 ejercicio bajo por día (principal)
+        for i,d in enumerate(plan.get('dias', []) or [], start=1):
+            lows = 0
+            for ej in (d.get('ejercicios') or []):
+                if is_low_rep(ej.get('reps','')):
+                    lows += 1
+            if lows == 0:
+                errs.append(f"Fuerza: Día {i} debería incluir al menos 1 principal en 3-6 reps.")
+
+    return errs
+
+
+# --- Validaciones extra para evitar desvíos del prompt ---
+_CORE_PREFIX = ("core:", "finisher:")
+_CORE_KEYWORDS = ("plancha", "abdominal", "core", "hollow", "dead bug", "pallof", "crunch", "elevación de piernas", "elevacion de piernas", "farmer")
+_TRICEPS_KEYWORDS = ("tríceps", "triceps", "extensión tríceps", "extension triceps", "pushdown", "jalón de tríceps", "jalon de triceps", "fondos", "press francés", "press frances", "skull")
+
+
+def _nrm_name(s: str) -> str:
+    return (s or "").strip().lower()
+
+
+def _has_core_or_finisher(dia: dict) -> bool:
+    for ej in dia.get("ejercicios", []) or []:
+        nm = _nrm_name(ej.get("nombre", ""))
+        if nm.startswith(_CORE_PREFIX):
+            return True
+        if any(k in nm for k in _CORE_KEYWORDS):
+            return True
+    return False
+
+
+def _is_lower_day(dia: dict) -> bool:
+    nm = _nrm_name(dia.get("nombre", ""))
+    if any(k in nm for k in ("legs", "pierna", "lower")):
+        return True
+    # Heurística: si >=50% de ejercicios son de pierna, lo tratamos como lower
+    leg_terms = ("sentadilla", "prensa", "zancada", "femoral", "isquio", "gemelo", "cuádriceps", "cuadriceps", "glúteo", "gluteo", "hip thrust", "peso muerto rumano")
+    ej = dia.get("ejercicios", []) or []
+    if not ej:
+        return False
+    leg_like = sum(1 for e in ej if any(t in _nrm_name(e.get("nombre", "")) for t in leg_terms))
+    return leg_like >= max(1, round(len(ej) * 0.5))
+
+
+def _parse_rest_to_seconds(rest: str) -> float:
+    import re as _re
+    s = _nrm_name(rest).replace(" ", "")
+    if not s:
+        return 60.0
+    # 2-3m
+    m = _re.match(r"^(\d+(?:\.\d+)?)\-(\d+(?:\.\d+)?)(?:m|min)$", s)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        return ((a + b) / 2.0) * 60.0
+    # 120-180s
+    m = _re.match(r"^(\d+(?:\.\d+)?)\-(\d+(?:\.\d+)?)(?:s|seg)$", s)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        return (a + b) / 2.0
+    # 2m / 120s
+    m = _re.match(r"^(\d+(?:\.\d+)?)(?:m|min)$", s)
+    if m:
+        return float(m.group(1)) * 60.0
+    m = _re.match(r"^(\d+(?:\.\d+)?)(?:s|seg)$", s)
+    if m:
+        return float(m.group(1))
+    return 60.0
+
+
+def _estimate_day_minutes(dia: dict) -> float:
+    """Estimación simple de duración basada en series + descanso.
+
+    No es perfecta, pero sirve para detectar desviaciones grandes (>60 min) y forzar refino.
+    """
+    total_sec = 0.0
+    for ej in dia.get("ejercicios", []) or []:
+        try:
+            sets = int(ej.get("series", 3) or 3)
+        except Exception:
+            sets = 3
+        reps = _nrm_name(str(ej.get("reps", "10")))
+        # trabajo por serie aproximado
+        work = 45.0 if any(ch.isdigit() for ch in reps) and ("-" in reps or reps.isdigit()) and (int(reps.split("-")[-1]) if reps.split("-")[-1].isdigit() else 10) <= 10 else 35.0
+        rest = _parse_rest_to_seconds(str(ej.get("descanso", "60s")))
+        # tiempo de la serie + descanso (no contamos el descanso del final del ejercicio)
+        total_sec += sets * work
+        if sets > 1:
+            total_sec += (sets - 1) * rest
+        # pequeñas transiciones / setup
+        total_sec += sets * 12.0
+    # transiciones entre ejercicios
+    total_sec += max(0, (len(dia.get("ejercicios", []) or []) - 1)) * 25.0
+    return total_sec / 60.0
+
+
+def _postprocess_plan(plan: dict, A: dict) -> dict:
+    """Ajustes deterministas para reducir desvíos típicos.
+
+    - Fuerza nombres de días a '<DíaSemana> - <Sesión>' si hay template.
+    - Asegura que existe core/finisher diario (añadiéndolo si hay hueco).
+    """
+    try:
+        dias = plan.get("dias") or []
+        disp = A.get("disponibilidad") or []
+        template = A.get("split_template")
+        for i, d in enumerate(dias):
+            if not isinstance(d, dict):
+                continue
+            # Nombres según disponibilidad + template
+            if i < len(disp):
+                if template and i < len(template):
+                    d["nombre"] = f"{disp[i]} - {template[i]}"
+                else:
+                    d["nombre"] = disp[i]
+            # Core/finisher
+            ej = d.get("ejercicios") or []
+            if isinstance(ej, list):
+                if not _has_core_or_finisher(d):
+                    core_name = "Core: Plancha" if i % 2 == 0 else "Core: Pallof press"
+                    core_ej = {"nombre": core_name, "series": 3, "reps": "30-45", "descanso": "45-60s", "rir": "1-3", "notas": "core/finisher"}
+                    if len(ej) < 8:
+                        ej.append(core_ej)
+                    elif ej:
+                        ej[-1] = core_ej
+                    d["ejercicios"] = ej
+    except Exception:
+        return plan
+    return plan
+
+
+def validar_estructura_split(plan: Dict[str, Any], A: Dict[str, Any], datos: Dict[str, Any]) -> List[str]:
+    """Validación estricta para minimizar el desvío entre prompt y salida."""
+    errs: List[str] = []
+    dias = plan.get("dias") or []
+    if not isinstance(dias, list):
+        return ["Campo 'dias' inválido (no es lista)."]
+
+    # 5-8 ejercicios y core/finisher diario
+    for i, d in enumerate(dias, start=1):
+        if not isinstance(d, dict):
+            continue
+        ej = d.get("ejercicios") or []
+        if isinstance(ej, list):
+            if len(ej) < 5 or len(ej) > 8:
+                errs.append(f"Día {i}: debe tener 5-8 ejercicios (tiene {len(ej)}).")
+        if not _has_core_or_finisher(d):
+            errs.append(f"Día {i}: falta core/finisher (último ejercicio debe empezar por 'Core:' o 'Finisher:').")
+
+    # Días exactos + split en nombre
+    disp = A.get("disponibilidad") or []
+    template = A.get("split_template")
+    if disp and isinstance(template, list) and len(template) == len(disp) == len(dias):
+        for i, (d_exp, s_exp) in enumerate(zip(disp, template), start=1):
+            got = _nrm_name((dias[i-1].get("nombre") or ""))
+            if _nrm_name(d_exp) not in got or _nrm_name(s_exp) not in got:
+                errs.append(f"Día {i}: nombre debe ser '{d_exp} - {s_exp}'.")
+
+    # No duplicar ejercicio exacto en la semana (salvo core/finisher)
+    seen = set()
+    dup = set()
+    for d in dias:
+        for ej in d.get("ejercicios", []) or []:
+            nm = _nrm_name(ej.get("nombre", ""))
+            if not nm:
+                continue
+            if nm.startswith(_CORE_PREFIX):
+                continue
+            if nm in seen:
+                dup.add(nm)
+            seen.add(nm)
+    for n in sorted(dup):
+        errs.append(f"No repetir ejercicio exacto en la semana: '{n}'.")
+
+    # Lower: evitar tríceps
+    for i, d in enumerate(dias, start=1):
+        if _is_lower_day(d):
+            for ej in d.get("ejercicios", []) or []:
+                nm = _nrm_name(ej.get("nombre", ""))
+                if any(k in nm for k in _TRICEPS_KEYWORDS):
+                    errs.append(f"Día {i} (Lower): contiene tríceps '{ej.get('nombre','')}'.")
+
+    # Duración estimada
+    try:
+        dur = int(A.get("duracion") or datos.get("duracion") or 60)
+    except Exception:
+        dur = 60
+    for i, d in enumerate(dias, start=1):
+        mins = _estimate_day_minutes(d)
+        # tolerancia pequeña
+        if mins > (dur + 5):
+            errs.append(f"Día {i}: estimación de tiempo ~{mins:.0f} min (objetivo {dur} min). Reduce series/descansos o usa superseries solo en accesorios.")
+
+    # Deload alineado con semanas de ciclo si existe
+    try:
+        semanas = int(datos.get("semanas_ciclo") or 0)
+    except Exception:
+        semanas = 0
+    if semanas:
+        try:
+            dld = int((plan.get("progresion") or {}).get("deload_semana") or 0)
+        except Exception:
+            dld = 0
+        if dld and dld != semanas:
+            errs.append(f"Deload: debe ser en la semana {semanas} (se recibió {dld}).")
+
+    return errs
 def call_gpt(datos: Dict[str, Any]) -> Dict[str, Any]:
-    client = _client()
+
+    # --- Pre-análisis y normalización (cumplir consignas) ---
+    A = analyze_user_data(datos)
+    datos = dict(datos)
+    # Forzamos que el prompt y el schema reflejen exactamente las consignas normalizadas
+    datos.update({
+        "objetivo": A["objetivo"],
+        "nivel": A["nivel"],
+        "dias": A["dias"],
+        "duracion": A["duracion"],
+        "duracion_min": A["duracion"],
+        "disponibilidad": A["disponibilidad"],
+        "material": A["material"],
+        "limitaciones": A.get("limitaciones") or "",
+        "lesiones": A.get("limitaciones") or "",
+        "evitar": A.get("evitar") or [],
+        "rir_obj": A.get("rir_obj", 2),
+    })
+    datos["__analysis"] = A
+
+    try:
+        client = _client()
+    except Exception as e:
+        return {"ok": False, "error": f"No se pudo crear el cliente IA: {e}"}
+
     _system = build_system()
     _prompt = build_prompt(datos)
-    raw = _chat(client, _prompt)
+    try:
+        raw = _chat(client, _prompt, temperature=0.1)
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": (
+                f"Error llamando al modelo '{_get_model()}': {e}. "
+                "Si usas Ollama, comprueba que esté en marcha (`ollama serve`) "
+                "y que OPENAI_BASE_URL=http://localhost:11434/v1."
+            ),
+            "prompt": _prompt,
+            "system": _system,
+        }
 
     # Primer intento de parseo
     try:
         data = _try_parse_json(raw)
     except Exception as e:
-        return {"ok": False, "error": f"JSON no válido: {e}", "raw": raw}
+        return {"ok": False, "error": f"JSON no válido: {e}", "raw": raw, "prompt": _prompt, "system": _system}
 
-    # Validación de negocio
+    # Validación + coerción
     coerced = _coerce_to_schema(data, datos)
     coerced = _sanitize_plan_reps(coerced)
-    errs = validar_negocio(coerced)
+    coerced = _postprocess_plan(coerced, A)
+    errs = []
+    errs += validar_negocio(coerced)
     try:
-        errs += validar_comentarios(coerced, datos.get("comentarios",""))
+        errs += validar_comentarios(coerced, (datos.get("comentarios") or ""))
     except Exception:
         pass
+    try:
+        errs += validar_objetivo(coerced, A)
+    except Exception:
+        pass
+    try:
+        errs += validar_estructura_split(coerced, A, datos)
+    except Exception:
+        pass
+
     if not errs:
         return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
 
-    # Intento de REFINADO: devolver al modelo el JSON + errores para que lo corrija
-    fix_prompt = f"""
-Corrige el siguiente JSON de rutina para cumplir las reglas. Devuelve solo JSON válido.
-ERRORES:
-{json.dumps(errs, ensure_ascii=False, indent=2)}
-JSON ORIGINAL:
-{json.dumps(data, ensure_ascii=False)}
-"""
-    fixed_raw = _chat(client, fix_prompt)
+    # Intento de REFINADO: bucle de corrección (máx 3) con temperatura baja.
+    nl = chr(10)
+    fixed = None
+    last_raw = raw
+    last_errs = errs
+    for _attempt in range(3):
+        fix_prompt = (
+            "Corrige el JSON de rutina para que cumpla EXACTAMENTE todas las reglas.\n"
+            "IMPORTANTE: Devuelve EXCLUSIVAMENTE JSON válido. Sin texto extra.\n\n"
+            "REGLAS (resumen):\n"
+            "- 5-8 ejercicios por día.\n"
+            "- Último ejercicio de cada día: Core/Finisher y debe empezar por 'Core:' o 'Finisher:'.\n"
+            "- Respetar el split y el nombre del día '<DíaSemana> - <Sesión>' si se especifica.\n"
+            "- No repetir exactamente el mismo ejercicio en la semana (salvo core/finisher).\n"
+            "- Ajustar volumen/descansos para cumplir el tiempo.\n\n"
+            "ERRORES A CORREGIR (no ignores ninguno):\n" + json.dumps(last_errs, ensure_ascii=False, indent=2) + "\n\n"
+            "PROMPT ORIGINAL (para referencia):\n" + _prompt + "\n\n"
+            "JSON ORIGINAL:\n" + json.dumps(coerced if fixed is None else fixed, ensure_ascii=False)
+        )
+        try:
+            fixed_raw = _chat(client, fix_prompt, temperature=0.0)
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"Error en refinado IA: {e}",
+                "raw": last_raw,
+                "prompt": _prompt,
+                "system": _system,
+            }
+        last_raw = fixed_raw
+        try:
+            fixed = _try_parse_json(fixed_raw)
+        except Exception:
+            fixed = None
+            continue
 
-    try:
-        fixed = _try_parse_json(fixed_raw)
-    except Exception as e:
-        return {"ok": False, "error": f"Refinado fallido: JSON no válido ({e})", "raw": fixed_raw, "prompt": _prompt, "system": _system}
+        fixed = _coerce_to_schema(fixed, datos)
+        fixed = _sanitize_plan_reps(fixed)
+        fixed = _postprocess_plan(fixed, A)
 
-    errs2 = validar_negocio(fixed)
-    if errs2:
-        return {"ok": False, "error": f"Refinado aún con errores: {errs2}", "raw": fixed, "prompt": _prompt, "system": _system}
+        errs2 = []
+        errs2 += validar_negocio(fixed)
+        try:
+            errs2 += validar_comentarios(fixed, (datos.get("comentarios") or ""))
+        except Exception:
+            pass
+        try:
+            errs2 += validar_objetivo(fixed, A)
+        except Exception:
+            pass
+        try:
+            errs2 += validar_estructura_split(fixed, A, datos)
+        except Exception:
+            pass
 
-    return {"ok": True, "data": coerced, "prompt": _prompt, "system": _system}
-
-
+        if not errs2:
+            return {"ok": True, "data": fixed, "prompt": _prompt, "system": _system}
+        last_errs = errs2
+    # Si no pudo corregirse, devolvemos el último estado para depurar.
+    return {"ok": False, "error": f"Refinado aún con errores: {last_errs}", "raw": last_raw, "prompt": _prompt, "system": _system}
 import re as _re2
 
 def _sanitize_reps_value(val) -> str:
@@ -1140,7 +1735,7 @@ def enforce_simple_constraints(plan, C):
             c=0
             for d in p.get("dias", []):
                 for e in d.get("ejercicios", []):
-                    name=_norm(e.get("nombre",""))
+                    name=_norm(ej.get("nombre",""))
                     gp=_norm(e.get("musculo_principal","")) or _norm(e.get("grupo",""))
                     sp=_norm(e.get("musculo_secundario",""))
                     if "biceps" in name or "bíceps" in name or "bicep" in name or "bícep" in name:
@@ -1184,32 +1779,6 @@ def _extract_json(text: str) -> str:
     if start != -1 and end != -1 and end > start:
         return text[start:end+1]
     raise ValueError("No se encontró bloque JSON")
-
-
-
-def _client():
-    """Return an OpenAI client for both SDK v1+ and legacy v0.28.
-
-    If the modern class is not available, fall back to the legacy 'openai' module.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
-    if OpenAI is not None:
-        # New SDK
-        if base_url:
-            return OpenAI(api_key=api_key, base_url=base_url)
-        return OpenAI(api_key=api_key)
-    else:
-        # Legacy SDK
-        import openai as _openai
-        _openai.api_key = api_key
-        if base_url:
-            try:
-                _openai.base_url = base_url
-            except Exception:
-                pass
-        return _openai
-
 
 
 def _compute_primary_blocks(datos: dict) -> list[str]:

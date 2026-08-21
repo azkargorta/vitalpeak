@@ -60,6 +60,12 @@ def remove_custom_exercise(username: str, name: str) -> None:
     if name in meta:
         del meta[name]
         data["exercise_meta"] = meta
+    # También eliminar objetivo asociado (si existe)
+    try:
+        from .goals import delete_exercise_goal
+        delete_exercise_goal(username, name)
+    except Exception:
+        pass
     save_user(username, data)
 
 
@@ -76,13 +82,20 @@ def rename_custom_exercise(username: str, old: str, new: str) -> None:
     for e in data.get("entrenamientos", []):
         if e.get("exercise") == old:
             e["exercise"] = new
+    # Renombrar objetivo asociado (si existe)
+    try:
+        from .goals import rename_exercise_goal
+        rename_exercise_goal(username, old, new)
+    except Exception:
+        pass
     save_user(username, data)
 
 
 def save_exercise_meta(username: str, name: str, grupo: str, imagen_rel: Optional[str]) -> None:
     data = load_user(username)
     meta = data.get("exercise_meta", {})
-    meta[name] = {"grupo": grupo, "imagen": imagen_rel}
+    # None / vacío se guarda como "" para no volver al default del catálogo
+    meta[name] = {"grupo": grupo, "imagen": imagen_rel if imagen_rel else ""}
     data["exercise_meta"] = meta
     save_user(username, data)
 
@@ -90,14 +103,77 @@ def save_exercise_meta(username: str, name: str, grupo: str, imagen_rel: Optiona
 def get_exercise_meta(username: str, name: str) -> Dict:
     data = load_user(username)
     meta = data.get("exercise_meta", {})
-    return meta.get(name, {"grupo": "Otro", "imagen": None})
+    stored = meta.get(name) or {}
+    grupo = stored.get("grupo")
+    if not grupo or grupo == "Otro":
+        try:
+            from .exercise_catalog import infer_grupo
+
+            inferred = infer_grupo(name)
+            if inferred and inferred != "Otro":
+                grupo = inferred
+        except Exception:
+            pass
+
+    if "imagen" in stored:
+        raw = stored.get("imagen")
+        if raw is None:
+            # null legado → usar catálogo
+            try:
+                from .catalog_images import default_catalog_image
+
+                imagen = default_catalog_image(name)
+            except Exception:
+                imagen = None
+        elif raw == "":
+            imagen = None  # quitada a propósito
+        else:
+            imagen = raw
+    else:
+        try:
+            from .catalog_images import default_catalog_image
+
+            imagen = default_catalog_image(name)
+        except Exception:
+            imagen = None
+    return {"grupo": grupo or "Otro", "imagen": imagen}
 
 
-def store_exercise_image(username: str, filename: str, content: bytes) -> str:
+def resolve_exercise_image_path(imagen_rel: Optional[str]) -> Optional[Path]:
+    if not imagen_rel:
+        return None
+    p = Path(imagen_rel)
+    if p.is_file():
+        return p
+    alt = Path(".") / imagen_rel
+    if alt.is_file():
+        return alt
+    return None
+
+
+def store_exercise_image(
+    username: str,
+    filename: str,
+    content: bytes,
+    *,
+    exercise_name: Optional[str] = None,
+) -> str:
     d = exercise_image_dir(username)
-    safe = "".join(ch for ch in filename if ch.isalnum() or ch in (".", "_", "-", " ")).strip()
-    if not safe:
-        safe = "image.png"
+    ext = Path(filename).suffix.lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        ext = ".png"
+    if exercise_name:
+        stem = "".join(ch if ch.isalnum() else "_" for ch in exercise_name).strip("_")[:72]
+        if not stem:
+            stem = "ejercicio"
+        safe = f"{stem}{ext}"
+    else:
+        safe = "".join(ch for ch in filename if ch.isalnum() or ch in (".", "_", "-", " ")).strip()
+        if not safe:
+            safe = f"image{ext}"
     path = d / safe
     path.write_bytes(content)
-    return str(path.relative_to("."))
+    try:
+        return path.relative_to(Path(".").resolve()).as_posix()
+    except Exception:
+        return path.as_posix()

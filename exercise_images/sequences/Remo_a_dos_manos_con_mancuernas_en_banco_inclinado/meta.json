@@ -1,0 +1,20 @@
+{
+  "label": "Remo a dos manos con mancuernas en banco inclinado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Mancuernas colgando.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Remo",
+      "tip": "Lleva las mancuernas al torso.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

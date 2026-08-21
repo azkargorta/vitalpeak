@@ -1,0 +1,20 @@
+{
+  "label": "Press inclinado de pecho en máquina",
+  "steps": [
+    {
+      "title": "1 · Empuje",
+      "tip": "Asas arriba-adelante.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Retorno",
+      "tip": "Acerca las asas al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje otra vez",
+      "tip": "Vuelve a empujar.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

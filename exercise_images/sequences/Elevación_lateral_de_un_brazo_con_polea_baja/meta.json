@@ -1,0 +1,20 @@
+{
+  "label": "Elevación lateral de un brazo con polea baja",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazo abajo en polea baja.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Elevación",
+      "tip": "Abre el brazo a la altura del hombro.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

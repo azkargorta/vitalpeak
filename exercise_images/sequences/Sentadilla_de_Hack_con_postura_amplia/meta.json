@@ -1,0 +1,20 @@
+{
+  "label": "Sentadilla de Hack con postura amplia",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "De pie en la Hack; discos arriba.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Baja; el trineo y los discos bajan.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Sube empujando.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

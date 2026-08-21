@@ -1,0 +1,20 @@
+{
+  "label": "Fondo de pecho en barra paralela",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Brazos extendidos sobre las barras.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Codos flexionan; pecho hacia delante.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Extiende hasta el bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

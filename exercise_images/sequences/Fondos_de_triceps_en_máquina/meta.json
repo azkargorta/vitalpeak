@@ -1,0 +1,20 @@
+{
+  "label": "Fondos de triceps en máquina",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Codos flexionados; asas arriba; stack abajo.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Empuje",
+      "tip": "Empuja asas abajo; el stack sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Flexiona con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "label": "Extensión de triceps acostado con barra",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazos extendidos arriba.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Flexiona codos; barra cerca de la frente.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Extensión",
+      "tip": "Extiende los codos.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

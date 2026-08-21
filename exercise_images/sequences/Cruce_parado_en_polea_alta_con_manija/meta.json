@@ -1,0 +1,20 @@
+{
+  "label": "Cruce parado en polea alta con manija",
+  "steps": [
+    {
+      "title": "1 · Apertura",
+      "tip": "Brazos abiertos en alto.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Cruce",
+      "tip": "Manijas al frente del pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Abre de nuevo con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "label": "Prensa de piernas en posición ancha",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Postura ancha, rodillas blandas.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Baja con control rodillas al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Extiende sin bloquear.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

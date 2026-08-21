@@ -1,0 +1,20 @@
+{
+  "label": "Curl de biceps con máquina",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazos extendidos en la máquina.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Curl",
+      "tip": "Flexiona; el stack sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

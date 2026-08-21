@@ -1,0 +1,20 @@
+{
+  "label": "Press con barra en banco inclinado",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Brazos extendidos en banco inclinado.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Barra al pecho alto con control.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Empuja hasta el bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

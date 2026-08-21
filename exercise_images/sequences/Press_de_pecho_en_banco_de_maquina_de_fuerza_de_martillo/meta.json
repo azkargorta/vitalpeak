@@ -1,0 +1,20 @@
+{
+  "label": "Press de pecho en banco de maquina de fuerza de martillo",
+  "steps": [
+    {
+      "title": "1 · Empuje completo",
+      "tip": "Asas adelante, brazos casi extendidos.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Asas junto al pecho, codos flexionados.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Vuelve a empujar hasta el bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

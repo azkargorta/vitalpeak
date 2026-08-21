@@ -1,0 +1,20 @@
+{
+  "label": "Press banca",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Brazos extendidos, escápulas atrás y pecho arriba.",
+      "file": "01_bloqueo.png"
+    },
+    {
+      "title": "2 · Bajada al pecho",
+      "tip": "Baja con control; codos ~45°; muñecas firmes.",
+      "file": "02_pecho.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Empuja arriba y ligeramente atrás hasta el bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}
