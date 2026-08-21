@@ -1,0 +1,20 @@
+{
+  "label": "Curl parado a una mano con polea",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazo extendido en polea baja.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Curl",
+      "tip": "Flexiona hacia el hombro; el stack sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

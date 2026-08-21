@@ -1,0 +1,20 @@
+{
+  "label": "Extensiones de triceps de pie, tras nuca, con polea",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Codos flexionados tras la nuca.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Extensión",
+      "tip": "Extiende los brazos arriba.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Flexiona con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

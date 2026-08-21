@@ -1,0 +1,20 @@
+{
+  "label": "Curl del predicador de un brazo con mancuernas",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazo extendido en el predicador.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Curl",
+      "tip": "Flexiona la mancuerna.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

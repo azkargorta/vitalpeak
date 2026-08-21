@@ -1,0 +1,20 @@
+{
+  "label": "Press de banco con barra y agarre estrecho",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Barra arriba, agarre estrecho.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Baja al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Empuja arriba.",
+      "file": "03_empuje.png"
+    }
+  ]
+}
