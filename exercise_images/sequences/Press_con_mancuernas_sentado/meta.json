@@ -1,0 +1,20 @@
+{
+  "label": "Press con mancuernas sentado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Mancuernas a la altura de hombros.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Press",
+      "tip": "Extiende arriba.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Baja a hombros.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

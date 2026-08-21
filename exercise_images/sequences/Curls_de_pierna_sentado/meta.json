@@ -3,17 +3,17 @@
   "steps": [
     {
       "title": "1 · Inicio",
-      "tip": "Piernas extendidas, rodillo y muslera fijados.",
+      "tip": "Piernas extendidas; asiento fijo.",
       "file": "01_inicio.png"
     },
     {
       "title": "2 · Curl",
-      "tip": "Talones al asiento; el rodillo baja en arco.",
+      "tip": "Talones al asiento; solo se mueve el rodillo.",
       "file": "02_fondo.png"
     },
     {
       "title": "3 · Retorno",
-      "tip": "Extiende; el stack baja.",
+      "tip": "Extiende con control.",
       "file": "03_empuje.png"
     }
   ]

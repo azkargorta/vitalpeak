@@ -1,0 +1,20 @@
+{
+  "label": "Press de hombro en máquina",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Asas a la altura de hombros.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Press",
+      "tip": "Empuja arriba; el stack sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Bajada",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "label": "Vuelo posterior sentado en máquina",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Pecho al pad, brazos adelante.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Apertura",
+      "tip": "Abre a los lados (deltoides posterior).",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Cierra con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}
