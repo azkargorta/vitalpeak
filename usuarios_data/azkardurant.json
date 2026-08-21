@@ -127,6 +127,119 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "name": "Full Body 3 días · intermedio",
+      "items": [
+        {
+          "exercise": "Sentadillas en máquina Smith",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Press con barra en banco horizontal",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Remo con polea de agarre cerrado",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Press de hombro en máquina",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Curl alterno de biceps con mancuerna",
+          "sets": 2,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Jalón de triceps en polea alta",
+          "sets": 2,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Peso muerto con barra",
+          "sets": 3,
+          "reps": 8,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Jalón vertical con polea alta y agarre cerrado",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Press de banco con mancuernas, 30º de inclinación",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Elevaciones laterales con mancuernas de pies",
+          "sets": 3,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Estocada con paso adelante con pesos",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Extensiones de triceps acostado con mancuernas",
+          "sets": 2,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Prensa de piernas en posición ancha",
+          "sets": 3,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Remo de un brazo con mancuerna",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Press inclinado de pecho en máquina",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Press con mancuernas sentado",
+          "sets": 3,
+          "reps": 10,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Curl de biceps estilo martillo con mancuernas",
+          "sets": 2,
+          "reps": 12,
+          "weight": 0.0
+        },
+        {
+          "exercise": "Elevaciones de pantorrilla en máquina",
+          "sets": 3,
+          "reps": 12,
+          "weight": 0.0
+        }
+      ]
     }
   ],
   "custom_exercises": [],
@@ -139,30 +252,17 @@
   },
   "routine_plan": {
     "2026-08-03": "Full Body 3 días · intermedio — Full Body A",
-    "2026-08-10": "Full Body 3 días · intermedio — Full Body A",
-    "2026-08-17": "Full Body 3 días · intermedio — Full Body A",
-    "2026-08-24": "Full Body 3 días · intermedio — Full Body A",
-    "2026-08-31": "Full Body 3 días · intermedio — Full Body A",
     "2026-08-05": "Full Body 3 días · intermedio — Full Body B",
-    "2026-08-12": "Full Body 3 días · intermedio — Full Body B",
-    "2026-08-19": "Full Body 3 días · intermedio — Full Body B",
-    "2026-08-26": "Full Body 3 días · intermedio — Full Body B",
     "2026-08-07": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-10": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-12": "Full Body 3 días · intermedio — Full Body B",
     "2026-08-14": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-17": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-19": "Full Body 3 días · intermedio — Full Body B",
     "2026-08-21": "Full Body 3 días · intermedio — Full Body C",
+    "2026-08-24": "Full Body 3 días · intermedio — Full Body A",
+    "2026-08-26": "Full Body 3 días · intermedio — Full Body B",
     "2026-08-28": "Full Body 3 días · intermedio — Full Body C",
-    "2026-09-02": "Full Body 3 días · intermedio — Full Body B",
-    "2026-09-04": "Full Body 3 días · intermedio — Full Body C",
-    "2026-09-07": "Full Body 3 días · intermedio — Full Body A",
-    "2026-09-09": "Full Body 3 días · intermedio — Full Body B",
-    "2026-09-11": "Full Body 3 días · intermedio — Full Body C",
-    "2026-09-14": "Full Body 3 días · intermedio — Full Body A",
-    "2026-09-16": "Full Body 3 días · intermedio — Full Body B",
-    "2026-09-18": "Full Body 3 días · intermedio — Full Body C",
-    "2026-09-21": "Full Body 3 días · intermedio — Full Body A",
-    "2026-09-23": "Full Body 3 días · intermedio — Full Body B",
-    "2026-09-25": "Full Body 3 días · intermedio — Full Body C",
-    "2026-09-28": "Full Body 3 días · intermedio — Full Body A",
-    "2026-09-30": "Full Body 3 días · intermedio — Full Body B"
+    "2026-08-31": "Full Body 3 días · intermedio — Full Body A"
   }
 }

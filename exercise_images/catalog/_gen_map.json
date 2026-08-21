@@ -1,0 +1,356 @@
+[
+  {
+    "i": 0,
+    "name": "Extensión de triceps acostado con barra",
+    "slug": "Extensión_de_triceps_acostado_con_barra",
+    "prompt": "athlete lying on flat bench performing skull crusher triceps extension with EZ barbell, elbows fixed, gym"
+  },
+  {
+    "i": 1,
+    "name": "Fondos de triceps en barras paralelas",
+    "slug": "Fondos_de_triceps_en_barras_paralelas",
+    "prompt": "athlete doing parallel bar triceps dips, torso upright, gym parallel bars"
+  },
+  {
+    "i": 2,
+    "name": "Fondos de triceps en máquina",
+    "slug": "Fondos_de_triceps_en_máquina",
+    "prompt": "athlete using seated triceps dip machine, pushing down on handles, modern gym"
+  },
+  {
+    "i": 3,
+    "name": "Jalón de triceps en polea alta",
+    "slug": "Jalón_de_triceps_en_polea_alta",
+    "prompt": "athlete standing performing cable triceps pushdown with straight bar, elbows tucked, cable machine"
+  },
+  {
+    "i": 4,
+    "name": "Jalón de triceps en polea alta con cuerda",
+    "slug": "Jalón_de_triceps_en_polea_alta_con_cuerda",
+    "prompt": "athlete standing cable triceps pushdown with rope attachment, ropes split at bottom, gym"
+  },
+  {
+    "i": 5,
+    "name": "Press de banco con barra y agarre estrecho",
+    "slug": "Press_de_banco_con_barra_y_agarre_estrecho",
+    "prompt": "athlete on flat bench close-grip barbell bench press, hands close together, gym"
+  },
+  {
+    "i": 6,
+    "name": "Extensiones de triceps acostado con mancuernas",
+    "slug": "Extensiones_de_triceps_acostado_con_mancuernas",
+    "prompt": "athlete lying on bench doing dumbbell skull crushers, two dumbbells, gym"
+  },
+  {
+    "i": 7,
+    "name": "Extensiones de triceps de pie, tras nuca, con polea",
+    "slug": "Extensiones_de_triceps_de_pie_tras_nuca_con_polea",
+    "prompt": "athlete standing overhead cable triceps extension behind head, single cable, gym"
+  },
+  {
+    "i": 8,
+    "name": "Extensiones de triceps inclinado de pies",
+    "slug": "Extensiones_de_triceps_inclinado_de_pies",
+    "prompt": "athlete standing leaning forward doing overhead dumbbell triceps extension, gym"
+  },
+  {
+    "i": 9,
+    "name": "Extensiones de triceps, tras nuca, en polea con cuerda",
+    "slug": "Extensiones_de_triceps_tras_nuca_en_polea_con_cuerda",
+    "prompt": "athlete standing overhead rope cable triceps extension behind neck, gym"
+  },
+  {
+    "i": 10,
+    "name": "Apertura de pecho sentado",
+    "slug": "Apertura_de_pecho_sentado",
+    "prompt": "athlete seated on pec deck machine doing chest fly, arms open then squeeze, gym"
+  },
+  {
+    "i": 11,
+    "name": "Cruce parado en polea alta con manija",
+    "slug": "Cruce_parado_en_polea_alta_con_manija",
+    "prompt": "athlete standing cable crossover high to low with D-handles, chest fly motion, gym"
+  },
+  {
+    "i": 12,
+    "name": "Fondo de pecho en barra paralela",
+    "slug": "Fondo_de_pecho_en_barra_paralela",
+    "prompt": "athlete doing chest dips on parallel bars, torso leaned forward, gym"
+  },
+  {
+    "i": 13,
+    "name": "Press con barra en banco horizontal",
+    "slug": "Press_con_barra_en_banco_horizontal",
+    "prompt": "athlete performing flat barbell bench press on horizontal bench, full gym view"
+  },
+  {
+    "i": 14,
+    "name": "Press con barra en banco inclinado",
+    "slug": "Press_con_barra_en_banco_inclinado",
+    "prompt": "athlete performing incline barbell bench press, bench at 30-45 degrees, gym"
+  },
+  {
+    "i": 15,
+    "name": "Press de banca con maquina Smith",
+    "slug": "Press_de_banca_con_maquina_Smith",
+    "prompt": "athlete bench pressing on Smith machine, bar guided on rails, flat bench, gym"
+  },
+  {
+    "i": 16,
+    "name": "Press de banco con mancuernas, 30º de inclinación",
+    "slug": "Press_de_banco_con_mancuernas_30º_de_inclinación",
+    "prompt": "athlete incline dumbbell bench press at about 30 degrees, two dumbbells, gym"
+  },
+  {
+    "i": 17,
+    "name": "Press de pecho en banco de maquina de fuerza de martillo",
+    "slug": "Press_de_pecho_en_banco_de_maquina_de_fuerza_de_martillo",
+    "prompt": "athlete using plate-loaded hammer strength chest press machine, seated, gym"
+  },
+  {
+    "i": 18,
+    "name": "Press inclinado en máquina Smith",
+    "slug": "Press_inclinado_en_máquina_Smith",
+    "prompt": "athlete incline bench press on Smith machine, gym"
+  },
+  {
+    "i": 19,
+    "name": "Press inclinado de pecho en máquina",
+    "slug": "Press_inclinado_de_pecho_en_máquina",
+    "prompt": "athlete seated on incline chest press machine, pushing handles forward-up, gym"
+  },
+  {
+    "i": 20,
+    "name": "Press de pecho con mancuernas en banco horizontal",
+    "slug": "Press_de_pecho_con_mancuernas_en_banco_horizontal",
+    "prompt": "athlete flat dumbbell bench press on horizontal bench, gym"
+  },
+  {
+    "i": 21,
+    "name": "Dominadas en barra fija con agarre ancho",
+    "slug": "Dominadas_en_barra_fija_con_agarre_ancho",
+    "prompt": "athlete doing wide-grip pull-ups on fixed pull-up bar, chin above bar, gym"
+  },
+  {
+    "i": 22,
+    "name": "Encogimiento de hombros con mancuernas",
+    "slug": "Encogimiento_de_hombros_con_mancuernas",
+    "prompt": "athlete standing dumbbell shrugs, shoulders elevated, gym"
+  },
+  {
+    "i": 23,
+    "name": "Jalón al frente en máquina martillo",
+    "slug": "Jalón_al_frente_en_máquina_martillo",
+    "prompt": "athlete on hammer strength lat pulldown machine pulling handles to chest, gym"
+  },
+  {
+    "i": 24,
+    "name": "Jalón vertical con polea alta y agarre cerrado",
+    "slug": "Jalón_vertical_con_polea_alta_y_agarre_cerrado",
+    "prompt": "athlete seated lat pulldown with close grip attachment, pulling to upper chest, gym"
+  },
+  {
+    "i": 25,
+    "name": "Remo a un brazo en máquina sentado",
+    "slug": "Remo_a_un_brazo_en_máquina_sentado",
+    "prompt": "athlete seated single-arm machine row, pulling handle to torso, gym"
+  },
+  {
+    "i": 26,
+    "name": "Remo a dos manos con mancuernas en banco inclinado",
+    "slug": "Remo_a_dos_manos_con_mancuernas_en_banco_inclinado",
+    "prompt": "athlete chest-supported incline dumbbell row, face down on incline bench, gym"
+  },
+  {
+    "i": 27,
+    "name": "Remo con polea de agarre cerrado",
+    "slug": "Remo_con_polea_de_agarre_cerrado",
+    "prompt": "athlete seated cable row with close V-grip, pulling to abdomen, gym"
+  },
+  {
+    "i": 28,
+    "name": "Remo de un brazo con mancuerna",
+    "slug": "Remo_de_un_brazo_con_mancuerna",
+    "prompt": "athlete one-arm dumbbell row with knee on bench, gym"
+  },
+  {
+    "i": 29,
+    "name": "Remo en máquina Smith con agarre prono",
+    "slug": "Remo_en_máquina_Smith_con_agarre_prono",
+    "prompt": "athlete bent-over Smith machine row, pronated grip, gym"
+  },
+  {
+    "i": 30,
+    "name": "Remo inclinado con barra T agarre ancho",
+    "slug": "Remo_inclinado_con_barra_T_agarre_ancho",
+    "prompt": "athlete T-bar row with wide grip, bent over, gym"
+  },
+  {
+    "i": 31,
+    "name": "Elevaciones laterales con mancuernas de pies",
+    "slug": "Elevaciones_laterales_con_mancuernas_de_pies",
+    "prompt": "athlete standing lateral raises with dumbbells, arms to sides at shoulder height, gym"
+  },
+  {
+    "i": 32,
+    "name": "Elevación lateral de un brazo con polea baja",
+    "slug": "Elevación_lateral_de_un_brazo_con_polea_baja",
+    "prompt": "athlete single-arm cable lateral raise from low pulley, gym"
+  },
+  {
+    "i": 33,
+    "name": "Elevación lateral en máquina",
+    "slug": "Elevación_lateral_en_máquina",
+    "prompt": "athlete seated lateral raise machine, raising arms to sides, gym"
+  },
+  {
+    "i": 34,
+    "name": "Press con mancuernas sentado",
+    "slug": "Press_con_mancuernas_sentado",
+    "prompt": "athlete seated dumbbell shoulder press overhead, gym"
+  },
+  {
+    "i": 35,
+    "name": "Press de hombro en máquina",
+    "slug": "Press_de_hombro_en_máquina",
+    "prompt": "athlete seated shoulder press machine, pressing handles overhead, gym"
+  },
+  {
+    "i": 36,
+    "name": "Press de hombro en máquina Smith",
+    "slug": "Press_de_hombro_en_máquina_Smith",
+    "prompt": "athlete seated or standing Smith machine overhead shoulder press, gym"
+  },
+  {
+    "i": 37,
+    "name": "Vuelo posterior sentado en máquina",
+    "slug": "Vuelo_posterior_sentado_en_máquina",
+    "prompt": "athlete seated reverse pec deck rear delt fly, gym"
+  },
+  {
+    "i": 38,
+    "name": "Curl de pierna parado con polea",
+    "slug": "Curl_de_pierna_parado_con_polea",
+    "prompt": "athlete standing cable leg curl, ankle cuff, curling heel up, gym"
+  },
+  {
+    "i": 39,
+    "name": "Curl de piernas en pronación",
+    "slug": "Curl_de_piernas_en_pronación",
+    "prompt": "athlete lying prone hamstring curl machine, curling heels to glutes, gym"
+  },
+  {
+    "i": 40,
+    "name": "Curls de pierna sentado",
+    "slug": "Curls_de_pierna_sentado",
+    "prompt": "athlete seated leg curl machine, curling lower legs down, gym"
+  },
+  {
+    "i": 41,
+    "name": "Elevaciones de pantorrilla en máquina",
+    "slug": "Elevaciones_de_pantorrilla_en_máquina",
+    "prompt": "athlete standing calf raise machine, rising on toes, gym"
+  },
+  {
+    "i": 42,
+    "name": "Elevación de pantorrilla sentado",
+    "slug": "Elevación_de_pantorrilla_sentado",
+    "prompt": "athlete seated calf raise machine, knees under pad, gym"
+  },
+  {
+    "i": 43,
+    "name": "Entrenamiento de aductores",
+    "slug": "Entrenamiento_de_aductores",
+    "prompt": "athlete seated hip adductor machine bringing thighs together, gym"
+  },
+  {
+    "i": 44,
+    "name": "Estocada con paso adelante con pesos",
+    "slug": "Estocada_con_paso_adelante_con_pesos",
+    "prompt": "athlete forward walking lunge holding dumbbells, gym floor"
+  },
+  {
+    "i": 45,
+    "name": "Extensiones de piernas sentado",
+    "slug": "Extensiones_de_piernas_sentado",
+    "prompt": "athlete seated leg extension machine kicking legs forward, gym"
+  },
+  {
+    "i": 46,
+    "name": "Peso muerto con barra",
+    "slug": "Peso_muerto_con_barra",
+    "prompt": "athlete conventional barbell deadlift from floor, neutral spine, gym"
+  },
+  {
+    "i": 47,
+    "name": "Peso muerto de sumo",
+    "slug": "Peso_muerto_de_sumo",
+    "prompt": "athlete sumo stance barbell deadlift, wide feet, gym"
+  },
+  {
+    "i": 48,
+    "name": "Prensa de piernas en posición ancha",
+    "slug": "Prensa_de_piernas_en_posición_ancha",
+    "prompt": "athlete on leg press machine with wide foot stance, gym"
+  },
+  {
+    "i": 49,
+    "name": "Sentadilla de Hack con postura amplia",
+    "slug": "Sentadilla_de_Hack_con_postura_amplia",
+    "prompt": "athlete hack squat machine, wide stance, gym"
+  },
+  {
+    "i": 50,
+    "name": "Sentadillas en máquina Smith",
+    "slug": "Sentadillas_en_máquina_Smith",
+    "prompt": "athlete Smith machine squat, bar on shoulders, gym"
+  },
+  {
+    "i": 51,
+    "name": "Sentadillas con barra con las piernas separadas",
+    "slug": "Sentadillas_con_barra_con_las_piernas_separadas",
+    "prompt": "athlete barbell back squat with feet apart, gym rack"
+  },
+  {
+    "i": 52,
+    "name": "Curl alterno de biceps con mancuerna",
+    "slug": "Curl_alterno_de_biceps_con_mancuerna",
+    "prompt": "athlete standing alternating dumbbell biceps curls, gym"
+  },
+  {
+    "i": 53,
+    "name": "Curl con giro con mancuernas",
+    "slug": "Curl_con_giro_con_mancuernas",
+    "prompt": "athlete standing dumbbell curls with wrist supination twist, gym"
+  },
+  {
+    "i": 54,
+    "name": "Curl de biceps con máquina",
+    "slug": "Curl_de_biceps_con_máquina",
+    "prompt": "athlete seated preacher or machine biceps curl, gym"
+  },
+  {
+    "i": 55,
+    "name": "Curl de biceps estilo martillo con mancuernas",
+    "slug": "Curl_de_biceps_estilo_martillo_con_mancuernas",
+    "prompt": "athlete standing hammer curls with dumbbells, neutral grip, gym"
+  },
+  {
+    "i": 56,
+    "name": "Curl del predicador de un brazo con mancuernas",
+    "slug": "Curl_del_predicador_de_un_brazo_con_mancuernas",
+    "prompt": "athlete one-arm preacher curl with dumbbell on preacher bench, gym"
+  },
+  {
+    "i": 57,
+    "name": "Curl predicador con barra Z",
+    "slug": "Curl_predicador_con_barra_Z",
+    "prompt": "athlete preacher curl with EZ bar on preacher bench, gym"
+  },
+  {
+    "i": 58,
+    "name": "Curl parado a una mano con polea",
+    "slug": "Curl_parado_a_una_mano_con_polea",
+    "prompt": "athlete standing single-arm cable biceps curl, gym"
+  }
+]

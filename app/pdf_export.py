@@ -336,20 +336,39 @@ def routines_to_pdf_bytes(
 
 
 def group_routine_programs(routines: Sequence[Dict[str, Any]]) -> List[Tuple[str, List[Dict[str, Any]]]]:
-    """Agrupa rutinas 'Prefijo — Día' en programas. Devuelve [(título, [rutinas]), ...]."""
+    """Agrupa rutinas 'Prefijo — Día' y planes (kind=program). Devuelve [(título, [rutinas]), ...]."""
+    from app.routines import is_program, program_sessions
+
+    out: List[Tuple[str, List[Dict[str, Any]]]] = []
+    claimed: set[str] = set()
+
+    for r in routines:
+        if not is_program(r):
+            continue
+        sessions = program_sessions(r)
+        as_routines = [{"name": s["name"], "items": s["items"]} for s in sessions]
+        if len(as_routines) >= 2:
+            out.append((str(r["name"]), as_routines))
+            claimed.add(str(r["name"]))
+            for s in sessions:
+                claimed.add(s["name"])
+        else:
+            out.append((str(r["name"]), [r]))
+            claimed.add(str(r["name"]))
+
     groups: dict[str, List[Dict[str, Any]]] = defaultdict(list)
     singles: List[Dict[str, Any]] = []
     for r in routines:
         name = str(r.get("name") or "")
+        if name in claimed or is_program(r):
+            continue
         if " — " in name:
             prefix = name.split(" — ", 1)[0].strip()
             groups[prefix].append(r)
         else:
             singles.append(r)
 
-    out: List[Tuple[str, List[Dict[str, Any]]]] = []
     for prefix, items in sorted(groups.items()):
-        # Orden natural por nombre (A, B, C…)
         items_sorted = sorted(items, key=lambda x: str(x.get("name") or ""))
         if len(items_sorted) >= 2:
             out.append((prefix, items_sorted))

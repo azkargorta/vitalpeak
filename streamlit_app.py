@@ -157,7 +157,11 @@ def pagina_progreso():
 
     if meta.get("imagen"):
         try:
-            st.image(meta["imagen"], caption=selected, use_container_width=True)
+            from app.exercises import resolve_exercise_image_path
+
+            p = resolve_exercise_image_path(meta["imagen"])
+            if p:
+                st.image(str(p), caption=selected, use_container_width=True)
         except Exception:
             pass
 
@@ -814,73 +818,18 @@ elif page == "Ejercicios y progreso":
 
             meta = get_exercise_meta(user, seleccionado)
             grupo_actual = meta.get("grupo", "Otro")
-            if grupo_actual not in GRUPOS:
-                grupo_actual = "Otro"
             imagen_rel = meta.get("imagen")
 
             st.markdown("---")
-            st.markdown(f"## {seleccionado}")
+            from app.exercises_ui import render_exercise_detail
 
-            colA, colB = st.columns([1, 1])
-
-            # ---- Columna A: editar grupo ----
-            with colA:
-                st.markdown("### Datos")
-                key_safe = "".join(ch if ch.isalnum() else "_" for ch in seleccionado)
-
-                grupo_nuevo = st.selectbox(
-                    "Grupo muscular",
-                    GRUPOS,
-                    index=GRUPOS.index(grupo_actual),
-                    key=f"ex_group_edit_{key_safe}",
-                )
-
-                if st.button("💾 Guardar grupo", key=f"ex_save_group_{key_safe}"):
-                    save_exercise_meta(user, seleccionado, grupo_nuevo, imagen_rel)
-                    st.success("Grupo actualizado.")
-                    st.rerun()
-
-                st.markdown("### Estadísticas")
-                st.write({
-                    "sesiones": stats.get(seleccionado, {}).get("sesiones", 0),
-                    "series": stats.get(seleccionado, {}).get("series", 0),
-                    "reps_totales": stats.get(seleccionado, {}).get("reps_totales", 0),
-                    "ultimo": stats.get(seleccionado, {}).get("ultimo", None),
-                    "ultimo_peso": stats.get(seleccionado, {}).get("ultimo_peso", None),
-                    "ultimas_reps": stats.get(seleccionado, {}).get("ultimas_reps", None),
-                    "mejor_peso": stats.get(seleccionado, {}).get("mejor_peso", 0.0),
-                    "mejor_1rm": round(stats.get(seleccionado, {}).get("mejor_1rm", 0.0), 2),
-                })
-
-            # ---- Columna B: imagen ----
-            with colB:
-                st.markdown("### Imagen")
-                img_path = None
-                if imagen_rel:
-                    # imagen_rel suele ser ruta relativa (ej: exercise_images/user/xxx.png)
-                    if os.path.exists(imagen_rel):
-                        img_path = imagen_rel
-
-                if img_path:
-                    st.image(img_path, use_container_width=True)
-                    if st.button("🧹 Quitar imagen", key=f"ex_remove_img_{key_safe}"):
-                        save_exercise_meta(user, seleccionado, grupo_actual, None)
-                        st.success("Imagen eliminada.")
-                        st.rerun()
-                else:
-                    st.info("Este ejercicio no tiene imagen todavía.")
-
-                up = st.file_uploader(
-                    "Subir/actualizar imagen (png/jpg/jpeg/webp)",
-                    type=["png", "jpg", "jpeg", "webp"],
-                    key=f"ex_img_upload_{key_safe}",
-                )
-                if up is not None:
-                    rel = store_exercise_image(user, up.name, up.getvalue())
-                    # Guardamos meta con el grupo que esté seleccionado ahora mismo
-                    save_exercise_meta(user, seleccionado, grupo_nuevo, rel)
-                    st.success("Imagen guardada.")
-                    st.rerun()
+            render_exercise_detail(
+                user,
+                seleccionado,
+                stats.get(seleccionado, {}),
+                grupo_actual=grupo_actual,
+                imagen_rel=imagen_rel,
+            )
 
     with tabs[-1]:
         pagina_progreso()

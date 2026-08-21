@@ -215,10 +215,12 @@ def render_templates_page(*, embedded: bool = True) -> None:
                     st.caption(grupo)
                     if user:
                         meta = get_exercise_meta(user, ex)
-                        img = meta.get("imagen")
+                        from app.exercises import resolve_exercise_image_path
+
+                        img = resolve_exercise_image_path(meta.get("imagen"))
                         if img:
                             try:
-                                st.image(img, width=120)
+                                st.image(str(img), width=120)
                             except Exception:
                                 pass
                 with c2:
@@ -303,7 +305,11 @@ def render_templates_page(*, embedded: bool = True) -> None:
     with s1:
         save_days = st.button("Guardar cada día", type="primary", use_container_width=True)
     with s2:
-        save_one = st.button("Guardar todo junto", use_container_width=True)
+        save_one = st.button("Guardar plan completo", use_container_width=True)
+    st.caption(
+        "Plan completo: se guarda junto pero mantiene los días por separado "
+        "para asignarlos en el calendario."
+    )
 
     if save_days or save_one:
         if not user:
@@ -312,16 +318,31 @@ def render_templates_page(*, embedded: bool = True) -> None:
         existing = {r.get("name") for r in list_routines(user)}
         try:
             if save_one:
-                all_items = []
+                days_payload = []
                 for day in plan.get("days") or []:
-                    all_items.extend(day_to_routine_items(day))
+                    items = day_to_routine_items(day)
+                    if not items:
+                        continue
+                    days_payload.append(
+                        {
+                            "name": day.get("name") or "Día",
+                            "focus": day.get("focus") or "",
+                            "items": items,
+                        }
+                    )
                 name = (prefix or plan.get("name") or "Plantilla").strip()
                 base, n = name, 2
                 while name in existing:
                     name = f"{base} ({n})"
                     n += 1
-                add_routine(user, name, all_items)
-                st.success(f"Guardada: **{name}**")
+                if not days_payload:
+                    st.warning("No hay ejercicios para guardar.")
+                else:
+                    add_routine(user, name, [], days=days_payload)
+                    st.success(
+                        f"Guardado el plan **{name}** con {len(days_payload)} días. "
+                        "En Planificar puedes asignar cada día al calendario."
+                    )
             else:
                 saved = 0
                 for day in plan.get("days") or []:
@@ -336,6 +357,6 @@ def render_templates_page(*, embedded: bool = True) -> None:
                     add_routine(user, day_name, items)
                     existing.add(day_name)
                     saved += 1
-                st.success(f"Guardadas {saved} rutinas. Ve a Planificar rutinas.")
+                st.success(f"Guardadas {saved} rutinas. Ve a Planificar.")
         except Exception as e:
             st.error(str(e))

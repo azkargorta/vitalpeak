@@ -11,7 +11,15 @@ import streamlit as st
 
 from app.datastore import load_user, save_user
 from app.exercises import list_all_exercises
-from app.routines import add_routine, delete_routine, list_routines, rename_routine
+from app.routines import (
+    add_routine,
+    delete_routine,
+    is_program,
+    list_routines,
+    materialize_program_days,
+    program_sessions,
+    rename_routine,
+)
 
 
 def _get_plan(u: str) -> dict:
@@ -20,14 +28,78 @@ def _get_plan(u: str) -> dict:
 
 
 def _set_plan(u: str, d_iso: str, routine_name: str | None) -> None:
+    _bulk_set_plan(u, {d_iso: routine_name})
+
+
+def _bulk_set_plan(u: str, updates: dict[str, str | None]) -> None:
+    """Aplica varias asignaciones/borrados en un solo guardado."""
+    if not updates:
+        return
     data = load_user(u) or {}
     plan = dict(data.get("routine_plan", {}))
-    if routine_name:
-        plan[d_iso] = routine_name
-    elif d_iso in plan:
-        del plan[d_iso]
+    for d_iso, routine_name in updates.items():
+        if routine_name:
+            plan[d_iso] = routine_name
+        else:
+            plan.pop(d_iso, None)
     data["routine_plan"] = plan
     save_user(u, data)
+
+
+def _clear_month(u: str, year: int, month: int) -> int:
+    """Borra todas las asignaciones del mes. Devuelve cuántas quitó."""
+    data = load_user(u) or {}
+    plan = dict(data.get("routine_plan", {}))
+    to_del = []
+    for iso in list(plan.keys()):
+        try:
+            d = _dt.date.fromisoformat(iso)
+        except ValueError:
+            continue
+        if d.year == year and d.month == month:
+            to_del.append(iso)
+    for iso in to_del:
+        del plan[iso]
+    data["routine_plan"] = plan
+    save_user(u, data)
+    return len(to_del)
+
+
+def _copy_weekday_pattern(
+    user: str,
+    src_year: int,
+    src_month: int,
+    dst_year: int,
+    dst_month: int,
+    *,
+    wipe: bool,
+) -> int:
+    """Copia el patrón por día de la semana del mes origen al destino. Devuelve nº de días."""
+    plan_current = _get_plan(user)
+    freq: dict = defaultdict(Counter)
+    days_src = _cal.monthrange(src_year, src_month)[1]
+    for d in range(1, days_src + 1):
+        dd = _dt.date(src_year, src_month, d)
+        val = plan_current.get(dd.isoformat())
+        if val:
+            freq[dd.weekday()][val] += 1
+    weekday_map = {wd: counter.most_common(1)[0][0] for wd, counter in freq.items() if counter}
+    if not weekday_map:
+        return 0
+
+    days_dst = _cal.monthrange(dst_year, dst_month)[1]
+    updates: dict[str, str | None] = {}
+    if wipe:
+        for d in range(1, days_dst + 1):
+            updates[_dt.date(dst_year, dst_month, d).isoformat()] = None
+    applied = 0
+    for d in range(1, days_dst + 1):
+        dd = _dt.date(dst_year, dst_month, d)
+        if dd.weekday() in weekday_map:
+            updates[dd.isoformat()] = weekday_map[dd.weekday()]
+            applied += 1
+    _bulk_set_plan(user, updates)
+    return applied
 
 
 _ROUTINE_PALETTE = [
@@ -77,38 +149,89 @@ def _months_with_plan(plan: dict) -> list[tuple[int, int]]:
     return sorted(seen, reverse=True)
 
 
-def _copy_weekday_pattern(
-    user: str,
-    src_year: int,
-    src_month: int,
-    dst_year: int,
-    dst_month: int,
-    *,
-    wipe: bool,
-) -> int:
-    """Copia el patrón por día de la semana del mes origen al destino. Devuelve nº de días."""
-    plan_current = _get_plan(user)
-    freq: dict = defaultdict(Counter)
-    days_src = _cal.monthrange(src_year, src_month)[1]
-    for d in range(1, days_src + 1):
-        dd = _dt.date(src_year, src_month, d)
-        val = plan_current.get(dd.isoformat())
-        if val:
-            freq[dd.weekday()][val] += 1
-    weekday_map = {wd: counter.most_common(1)[0][0] for wd, counter in freq.items() if counter}
-    if not weekday_map:
-        return 0
-    days_dst = _cal.monthrange(dst_year, dst_month)[1]
-    if wipe:
-        for d in range(1, days_dst + 1):
-            _set_plan(user, _dt.date(dst_year, dst_month, d).isoformat(), None)
-    applied = 0
-    for d in range(1, days_dst + 1):
-        dd = _dt.date(dst_year, dst_month, d)
-        if dd.weekday() in weekday_map:
-            _set_plan(user, dd.isoformat(), weekday_map[dd.weekday()])
-            applied += 1
-    return applied
+_WEEKDAY_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+_SKIP_WD = "— No asignar —"
+
+
+def _default_weekdays(n: int) -> list[int | None]:
+    presets = {
+        1: [0],
+        2: [0, 3],
+        3: [0, 2, 4],
+        4: [0, 1, 3, 4],
+        5: [0, 1, 2, 3, 4],
+        6: [0, 1, 2, 3, 4, 5],
+    }
+    base = presets.get(n, list(range(min(n, 7))))
+    while len(base) < n:
+        base.append(None)
+    return base[:n]
+
+
+def _list_training_plans(routines: list[dict]) -> list[dict]:
+    """
+    Planes con varias sesiones: programas guardados + grupos 'Prefijo — Día'.
+    Cada plan: {title, sessions: [{name, session_label, items}], source_routine?}
+    """
+    plans: list[dict] = []
+    claimed: set[str] = set()
+
+    for r in routines:
+        if not is_program(r):
+            continue
+        sessions = program_sessions(r)
+        if len(sessions) < 2:
+            continue
+        plans.append({"title": r["name"], "sessions": sessions, "source": r})
+        claimed.add(r["name"])
+        for s in sessions:
+            claimed.add(s["name"])
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for r in routines:
+        name = str(r.get("name") or "")
+        if name in claimed or is_program(r):
+            continue
+        if " — " in name:
+            prefix = name.split(" — ", 1)[0].strip()
+            groups[prefix].append(r)
+
+    for prefix, items in sorted(groups.items()):
+        if len(items) < 2:
+            continue
+        items_sorted = sorted(items, key=lambda x: str(x.get("name") or ""))
+        sessions = []
+        for r in items_sorted:
+            label = str(r["name"]).split(" — ", 1)[-1]
+            sessions.append(
+                {
+                    "name": r["name"],
+                    "session_label": label,
+                    "focus": "",
+                    "items": list(r.get("items") or []),
+                }
+            )
+        plans.append({"title": prefix, "sessions": sessions, "source": None})
+        for r in items_sorted:
+            claimed.add(r["name"])
+
+    return plans
+
+
+def _assignable_session_options(routines: list[dict], plans: list[dict]) -> list[tuple[str, str]]:
+    """Opciones (label, calendar_name) para asignar un día concreto."""
+    opts: list[tuple[str, str]] = []
+    plan_session_names: set[str] = set()
+    for p in plans:
+        for s in p["sessions"]:
+            plan_session_names.add(s["name"])
+            opts.append((f"{p['title']} · {s['session_label']}", s["name"]))
+    for r in routines:
+        name = str(r.get("name") or "")
+        if not name or name in plan_session_names or is_program(r):
+            continue
+        opts.append((name, name))
+    return opts
 
 
 def _render_month_calendar(plan: dict, year: int, month: int) -> None:
@@ -211,7 +334,7 @@ def render_planner_page(user: str) -> None:
         st.markdown(
             f"<div style='text-align:center;font-family:Barlow Condensed,sans-serif;"
             f"font-size:1.4rem;font-weight:700;text-transform:uppercase;padding-top:0.35rem'>"
-            f"{ym.strftime('%B %Y')}</div>",
+            f"{_month_label(ym.year, ym.month)}</div>",
             unsafe_allow_html=True,
         )
     with nav3:
@@ -225,6 +348,35 @@ def render_planner_page(user: str) -> None:
 
     ym = st.session_state["planner_month"]
     _render_month_calendar(plan, ym.year, ym.month)
+
+    # —— Vaciar mes visible ——
+    month_count = 0
+    for iso, name in plan.items():
+        if not name:
+            continue
+        try:
+            d = _dt.date.fromisoformat(iso)
+        except ValueError:
+            continue
+        if d.year == ym.year and d.month == ym.month:
+            month_count += 1
+    c_clear1, c_clear2 = st.columns([2, 1])
+    with c_clear1:
+        st.caption(
+            f"{month_count} día(s) con rutina en {_month_label(ym.year, ym.month)}."
+            if month_count
+            else f"{_month_label(ym.year, ym.month)} está vacío."
+        )
+    with c_clear2:
+        if st.button(
+            "Vaciar este mes",
+            use_container_width=True,
+            disabled=month_count == 0,
+            key="planner_clear_month",
+        ):
+            n = _clear_month(user, ym.year, ym.month)
+            st.success(f"Eliminadas {n} asignaciones de {_month_label(ym.year, ym.month)}.")
+            st.rerun()
 
     # —— Copiar de otro mes (destino = mes visible) ——
     with st.expander(f"Copiar entrenos a {_month_label(ym.year, ym.month)}", expanded=False):
@@ -254,66 +406,119 @@ def render_planner_page(user: str) -> None:
 
     st.markdown("---")
 
-    # —— Asignar (único flujo principal) ——
-    st.markdown("#### Asignar")
-    a1, a2, a3 = st.columns([1.2, 1.6, 1.2])
-    with a1:
-        sel_date = st.date_input("Día", value=today, key="planner_day")
-    with a2:
-        sel_rt = st.selectbox("Rutina", routine_names, key="planner_rt")
-    with a3:
-        st.write("")
-        st.write("")
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("Asignar", type="primary", use_container_width=True, key="planner_assign"):
-                _set_plan(user, sel_date.isoformat(), sel_rt)
-                st.success("Listo")
-                st.rerun()
-        with b2:
-            if st.button("Quitar", use_container_width=True, key="planner_clear"):
-                _set_plan(user, sel_date.isoformat(), None)
-                st.rerun()
+    training_plans = _list_training_plans(routines)
+    session_opts = _assignable_session_options(routines, training_plans)
 
-    # Preview del día elegido
-    prev = plan.get(sel_date.isoformat())
-    if prev:
-        r = next((rr for rr in routines if rr["name"] == prev), None)
-        with st.expander(f"Detalle · {prev}", expanded=False):
-            if r:
-                st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
-            else:
-                st.caption("La rutina ya no existe.")
+    # —— Asignar plan completo (varios días) ——
+    if training_plans:
+        st.markdown("#### Asignar plan al mes")
+        st.caption("Elige qué día de la semana corresponde a cada entrenamiento del plan.")
+        plan_titles = [p["title"] for p in training_plans]
+        pick_plan = st.selectbox("Plan", plan_titles, key="planner_plan_pick")
+        plan_idx = plan_titles.index(pick_plan)
+        chosen = training_plans[plan_idx]
+        sessions = chosen["sessions"]
+        defaults = _default_weekdays(len(sessions))
 
-    # —— Repetir en el mes (secundario) ——
-    with st.expander("Repetir un día de la semana en todo el mes", expanded=False):
-        weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-        w1, w2 = st.columns(2)
-        with w1:
-            wd = st.selectbox(
-                "Día de la semana",
-                list(range(7)),
-                format_func=lambda i: weekday_names[i],
-                key="planner_wd",
+        mapping: list[int | None] = []
+        for i, s in enumerate(sessions):
+            opts = [_SKIP_WD] + _WEEKDAY_ES
+            default_i = 0
+            if defaults[i] is not None:
+                default_i = int(defaults[i]) + 1
+            choice = st.selectbox(
+                f"Sesión: {s['session_label']}",
+                opts,
+                index=min(default_i, len(opts) - 1),
+                key=f"planner_map_{plan_idx}_{i}",
             )
-        with w2:
-            wr = st.selectbox("Rutina", routine_names, key="planner_wd_rt")
-        if st.button("Aplicar a todo el mes", use_container_width=True, key="planner_wd_apply"):
-            count = 0
+            mapping.append(None if choice == _SKIP_WD else _WEEKDAY_ES.index(choice))
+
+        wipe_plan = st.checkbox("Vaciar el mes antes de asignar", value=False, key="planner_plan_wipe")
+        if st.button("Aplicar plan al mes", type="primary", use_container_width=True, key="planner_plan_apply"):
+            if chosen.get("source") is not None:
+                materialize_program_days(user, chosen["source"])
             days_in = _cal.monthrange(ym.year, ym.month)[1]
+            updates: dict[str, str | None] = {}
+            if wipe_plan:
+                for d in range(1, days_in + 1):
+                    updates[_dt.date(ym.year, ym.month, d).isoformat()] = None
+            applied = 0
             for d in range(1, days_in + 1):
                 dd = _dt.date(ym.year, ym.month, d)
-                if dd.weekday() == wd:
-                    _set_plan(user, dd.isoformat(), wr)
-                    count += 1
-            st.success(f"Asignado a {count} días.")
+                for sess, wd in zip(sessions, mapping):
+                    if wd is not None and dd.weekday() == wd:
+                        updates[dd.isoformat()] = sess["name"]
+                        applied += 1
+                        break
+            _bulk_set_plan(user, updates)
+            st.success(f"Asignados {applied} días en {_month_label(ym.year, ym.month)}.")
             st.rerun()
+
+        st.markdown("---")
+
+    # —— Asignar un día concreto ——
+    st.markdown("#### Asignar un día")
+    if not session_opts:
+        st.warning("No hay sesiones para asignar.")
+    else:
+        a1, a2, a3 = st.columns([1.2, 1.8, 1.2])
+        with a1:
+            sel_date = st.date_input("Fecha", value=today, key="planner_day")
+        with a2:
+            labels = [o[0] for o in session_opts]
+            pick_lab = st.selectbox("Entrenamiento", labels, key="planner_rt")
+            sel_rt = dict(session_opts)[pick_lab]
+        with a3:
+            st.write("")
+            st.write("")
+            b1, b2 = st.columns(2)
+            with b1:
+                if st.button("Asignar", type="primary", use_container_width=True, key="planner_assign"):
+                    # Si viene de un plan programa, materializar hijas
+                    for p in training_plans:
+                        if any(s["name"] == sel_rt for s in p["sessions"]) and p.get("source"):
+                            materialize_program_days(user, p["source"])
+                            break
+                    _set_plan(user, sel_date.isoformat(), sel_rt)
+                    st.success("Listo")
+                    st.rerun()
+            with b2:
+                if st.button("Quitar", use_container_width=True, key="planner_clear"):
+                    _set_plan(user, sel_date.isoformat(), None)
+                    st.rerun()
+
+        prev = plan.get(sel_date.isoformat())
+        if prev:
+            r = next((rr for rr in routines if rr["name"] == prev), None)
+            with st.expander(f"Detalle · {prev}", expanded=False):
+                if r:
+                    items = r.get("items") or []
+                    if is_program(r):
+                        st.caption("Este es un plan completo; en el calendario deberías asignar cada día.")
+                        for d in r.get("days") or []:
+                            st.markdown(f"**{d.get('name')}**")
+                            st.dataframe(
+                                pd.DataFrame(d.get("items") or []),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+                    else:
+                        st.dataframe(pd.DataFrame(items), use_container_width=True, hide_index=True)
+                else:
+                    st.caption("La rutina ya no existe.")
 
     # —— Mis rutinas ——
     with st.expander(f"Mis rutinas ({len(routines)})", expanded=False):
         sel = st.selectbox("Ver", routine_names, key="planner_registry")
         r = next(rr for rr in routines if rr["name"] == sel)
-        st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
+        if is_program(r):
+            st.caption(f"Plan completo · {len(r.get('days') or [])} días")
+            for d in r.get("days") or []:
+                st.markdown(f"**{d.get('name')}** — {d.get('focus', '')}")
+                st.dataframe(pd.DataFrame(d.get("items") or []), use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
         c1, c2 = st.columns(2)
         with c1:
             new_name = st.text_input("Renombrar", value=sel, key="planner_rename")
