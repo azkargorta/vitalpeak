@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+<<<<<<< HEAD
 st.set_page_config(page_title="Vitalpeak", layout="wide")
 
 st.markdown(
@@ -27,6 +28,8 @@ div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { white-spa
 )
 
 
+=======
+>>>>>>> 86ebbb964dec1569e45aff0df3a9ab2e3fe4d431
 from dotenv import load_dotenv
 import os
 load_dotenv()
