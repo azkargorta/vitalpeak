@@ -1,4 +1,3 @@
-
 def _asegurar_dias_minimos(datos_usuario: dict):
     dias = datos_usuario.get("dias")
     if not dias or not isinstance(dias, (list, tuple)) or len(dias) == 0:
@@ -6,10 +5,7 @@ def _asegurar_dias_minimos(datos_usuario: dict):
         datos_usuario["dias"] = ["Lunes", "Miércoles", "Viernes"]
 
 import matplotlib.pyplot as plt
-import sqlite3
 from datetime import date
-from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 import streamlit as st
@@ -69,13 +65,13 @@ if _u and _t:
     if isinstance(_t, list): _t = _t[0]
     st.session_state["_pending_user"] = _u
     st.session_state["_pending_token"] = _t
-import os, time, time
+import os, time
 
 from app.email_utils import send_email
 from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset
 
 from app.datastore import (
-    ensure_base_dirs, register_user, authenticate, load_user, save_user,
+    register_user, authenticate, load_user, save_user,
 )
 from app.exercises import (
     list_all_exercises, add_custom_exercise, remove_custom_exercise, rename_custom_exercise,
@@ -676,7 +672,8 @@ elif page == "Historial":
                     sheet_name = "Entrenamientos"; row = 0
                     for dt, g in df_in.sort_values("date").groupby(df_in["date"].dt.date):
                         g2 = g.sort_values(["date","exercise","set"])
-                        writer.sheets.setdefault(sheet_name, writer.book.add_worksheet(sheet_name))
+                        if sheet_name not in writer.sheets:
+                            writer.book.add_worksheet(sheet_name)
                         ws = writer.sheets[sheet_name]
                         ws.write(row, 0, f"Fecha: {dt.isoformat()}"); row += 1
                         g2.to_excel(writer, sheet_name=sheet_name, index=False, startrow=row)
@@ -690,7 +687,8 @@ elif page == "Historial":
                         sheet = str(key); row = 0
                         for dt, gday in gkey.groupby(gkey["date"].dt.date):
                             g2 = gday.drop(columns=["_key"]).sort_values(["date","exercise","set"])
-                            writer.sheets.setdefault(sheet, writer.book.add_worksheet(sheet))
+                            if sheet not in writer.sheets:
+                                writer.book.add_worksheet(sheet)
                             ws = writer.sheets[sheet]
                             ws.write(row, 0, f"Fecha: {dt.isoformat()}"); row += 1
                             g2.to_excel(writer, sheet_name=sheet, index=False, startrow=row)
@@ -1010,256 +1008,3 @@ elif page in ("Cuenta", "Mi cuenta"):
         if new_acc: set_account_email(user, new_acc)
         if new_rec: set_recovery_email(user, new_rec)
         st.success("Emails actualizados.")
-
-# === Nueva sección integrada: Progreso de ejercicios ===
-
-
-    st.subheader("📈 Progreso de ejercicios")
-    st.caption("Visualiza la evolución de peso y repeticiones por ejercicio.")
-
-    @st.cache_data(show_spinner=False)
-    def discover_data_sources(base_dir: str):
-        dbs, csvs = [], []
-        for root, _, files in os.walk(base_dir):
-            for f in files:
-                low = f.lower()
-                if low.endswith((".db", ".sqlite", ".sqlite3")):
-                    dbs.append(os.path.join(root, f))
-                if low.endswith(".csv"):
-                    csvs.append(os.path.join(root, f))
-        return dbs, csvs
-
-    def _fetch_exercises_from_sqlite(db_path: str) -> Optional[List[str]]:
-        try:
-            con = sqlite3.connect(db_path)
-            cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            candidates = [t for t in tables if any(k in t.lower() for k in ["serie","series","sets","entren","workout","training","registro"])]
-            exercises = set()
-            for t in (candidates or tables):
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols = [c[1].lower() for c in cur.fetchall()]
-                has_ex = any(c in cols for c in ["ejercicio","exercise","nombre_ejercicio"])
-                has_weight = any(c in cols for c in ["peso","weight","kg"])
-                has_reps = any(c in cols for c in ["reps","repeticiones","rep"])
-                if has_ex and (has_weight or has_reps):
-                    ex_col = "ejercicio" if "ejercicio" in cols else ("exercise" if "exercise" in cols else "nombre_ejercicio")
-                    cur.execute(f"SELECT DISTINCT {ex_col} FROM '{t}' WHERE {ex_col} IS NOT NULL AND TRIM({ex_col})<>'' LIMIT 5000")
-                    exercises.update([r[0] for r in cur.fetchall()])
-            con.close()
-            return sorted(e for e in exercises if e)
-        except Exception:
-            return None
-
-    def _fetch_progress_from_sqlite(db_path: str, exercise: str) -> Optional[pd.DataFrame]:
-        try:
-            con = sqlite3.connect(db_path)
-            cur = con.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [r[0] for r in cur.fetchall()]
-            frames = []
-            for t in tables:
-                cur.execute(f"PRAGMA table_info('{t}')")
-                cols_info = cur.fetchall()
-                cols = [c[1] for c in cols_info]
-                lcols = [c.lower() for c in cols]
-                def pick(*opts):
-                    for o in opts:
-                        if o in lcols:
-                            return cols[lcols.index(o)]
-                    return None
-                col_ex = pick("ejercicio","exercise","nombre_ejercicio")
-                col_date = pick("fecha","date","created_at","day","session_date")
-                col_weight = pick("peso","weight","kg")
-                col_reps = pick("reps","repeticiones","rep","repetition")
-                if not col_ex or not (col_weight or col_reps):
-                    continue
-                select_cols = [col_ex]
-                if col_date: select_cols.append(col_date)
-                if col_weight: select_cols.append(col_weight)
-                if col_reps: select_cols.append(col_reps)
-                try:
-                    df = pd.read_sql_query(f"SELECT {', '.join(select_cols)} FROM '{t}' WHERE {col_ex} = ?", con, params=[exercise])
-                except Exception:
-                    continue
-                if df.empty:
-                    continue
-                df.rename(columns={
-                    col_ex: "Ejercicio",
-                    col_date: "Fecha" if col_date else None,
-                    col_weight: "Peso",
-                    col_reps: "Reps",
-                }, inplace=True)
-                if "Fecha" in df.columns:
-                    for fmt in ("%Y-%m-%d","%Y/%m/%d","%d/%m/%Y","%d-%m-%Y","%Y-%m-%d %H:%M:%S","%Y/%m/%d %H:%M:%S"):
-                        try:
-                            df["Fecha"] = pd.to_datetime(df["Fecha"], format=fmt, errors="ignore")
-                        except Exception:
-                            pass
-                    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-                else:
-                    df["Fecha"] = pd.NaT
-                if "Peso" in df.columns:
-                    df["Peso"] = pd.to_numeric(df["Peso"], errors="coerce")
-                else:
-                    df["Peso"] = pd.NA
-                if "Reps" in df.columns:
-                    df["Reps"] = pd.to_numeric(df["Reps"], errors="coerce")
-                else:
-                    df["Reps"] = pd.NA
-                frames.append(df[["Fecha","Peso","Reps"]])
-            con.close()
-            if not frames:
-                return None
-            out = pd.concat(frames, ignore_index=True)
-            out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
-            if out["Fecha"].notna().any():
-                out = out.sort_values("Fecha")
-            else:
-                out = out.reset_index(drop=True)
-            return out
-        except Exception:
-            return None
-
-    def _fetch_from_csvs(csv_paths: List[str]) -> List[str]:
-        exs = set()
-        for p in csv_paths:
-            try:
-                df = pd.read_csv(p)
-            except Exception:
-                try:
-                    df = pd.read_csv(p, sep=";")
-                except Exception:
-                    continue
-            lcols = [c.lower() for c in df.columns]
-            def pick(*opts):
-                for o in opts:
-                    if o in lcols:
-                        return df.columns[lcols.index(o)]
-                return None
-            col_ex = pick("ejercicio","exercise","nombre_ejercicio")
-            if col_ex is not None:
-                exs.update(df[col_ex].dropna().astype(str).str.strip().unique().tolist())
-        return sorted(e for e in exs if e)
-
-    def _progress_from_csvs(csv_paths: List[str], exercise: str) -> Optional[pd.DataFrame]:
-        frames = []
-        for p in csv_paths:
-            try:
-                df = pd.read_csv(p)
-            except Exception:
-                try:
-                    df = pd.read_csv(p, sep=";")
-                except Exception:
-                    continue
-            lcols = [c.lower() for c in df.columns]
-            def pick(*opts):
-                for o in opts:
-                    if o in lcols:
-                        return df.columns[lcols.index(o)]
-                return None
-            col_ex = pick("ejercicio","exercise","nombre_ejercicio")
-            if col_ex is None:
-                continue
-            sub = df[df[col_ex].astype(str).str.strip() == exercise].copy()
-            if sub.empty:
-                continue
-            col_date = pick("fecha","date","created_at","day","session_date")
-            col_weight = pick("peso","weight","kg")
-            col_reps = pick("reps","repeticiones","rep","repetition")
-            sub.rename(columns={
-                col_date: "Fecha" if col_date else None,
-                col_weight: "Peso",
-                col_reps: "Reps",
-            }, inplace=True)
-            if "Fecha" in sub.columns:
-                for fmt in ("%Y-%m-%d","%Y/%m/%d","%d/%m/%Y","%d-%m-%Y","%Y-%m-%d %H:%M:%S","%Y/%m/%d %H:%M:%S"):
-                    try:
-                        sub["Fecha"] = pd.to_datetime(sub["Fecha"], format=fmt, errors="ignore")
-                    except Exception:
-                        pass
-                sub["Fecha"] = pd.to_datetime(sub["Fecha"], errors="coerce")
-            else:
-                sub["Fecha"] = pd.NaT
-            if "Peso" in sub.columns:
-                sub["Peso"] = pd.to_numeric(sub["Peso"], errors="coerce")
-            else:
-                sub["Peso"] = pd.NA
-            if "Reps" in sub.columns:
-                sub["Reps"] = pd.to_numeric(sub["Reps"], errors="coerce")
-            else:
-                sub["Reps"] = pd.NA
-            frames.append(sub[["Fecha","Peso","Reps"]])
-        if not frames:
-            return None
-        out = pd.concat(frames, ignore_index=True)
-        out = out.dropna(how="all", subset=["Fecha","Peso","Reps"])
-        if out["Fecha"].notna().any():
-            out = out.sort_values("Fecha")
-        else:
-            out = out.reset_index(drop=True)
-        return out
-
-    base_dir = os.path.dirname(__file__)
-    dbs, csvs = discover_data_sources(os.path.abspath(os.path.join(base_dir, "..")))
-
-    detected_exercises = set()
-    for db in dbs:
-        exs = _fetch_exercises_from_sqlite(db)
-        if exs:
-            detected_exercises.update(exs)
-    if not detected_exercises:
-        detected_exercises.update(_fetch_from_csvs(csvs))
-
-    if detected_exercises:
-        ejercicio = st.selectbox("Elige un ejercicio", sorted(detected_exercises))
-    else:
-        st.info("No se detectaron ejercicios automáticamente. Puedes escribir uno manualmente.")
-        ejercicio = st.text_input("Nombre del ejercicio")
-
-    if ejercicio:
-        df = None
-        src = ""
-        for db in dbs:
-            df = _fetch_progress_from_sqlite(db, ejercicio)
-            if df is not None and not df.empty:
-                src = f"SQLite: {os.path.basename(db)}"
-                break
-        if (df is None or df.empty) and csvs:
-            df = _progress_from_csvs(csvs, ejercicio)
-            src = "CSV"
-        if df is not None and not df.empty:
-            st.success(f"Datos encontrados desde {src}.")
-            col1, col2, col3, col4 = st.columns(4)
-            if df["Peso"].notna().any() and df["Reps"].notna().any():
-                df["1RM"] = df.apply(lambda r: r["Peso"] * (1 + (r["Reps"]/30)) if pd.notna(r["Peso"]) and pd.notna(r["Reps"]) else pd.NA, axis=1)
-                best_1rm = df["1RM"].max(skipna=True)
-                col1.metric("Mejor 1RM estimada", f"{best_1rm:.1f} kg" if isinstance(best_1rm, (int,float)) else "—")
-            else:
-                col1.metric("Mejor 1RM estimada", "—")
-            max_peso = df["Peso"].max(skipna=True) if "Peso" in df.columns else None
-            col2.metric("Máx. peso", f"{max_peso:.1f} kg" if isinstance(max_peso, (int,float)) else "—")
-            if df["Fecha"].notna().any():
-                first = df["Fecha"].min(); last = df["Fecha"].max()
-                col3.metric("Rango de fechas", f"{first.date()} → {last.date()}")
-            else:
-                col3.metric("Rango de fechas", "—")
-            col4.metric("Registros", f"{df.shape[0]}")
-
-            st.subheader("Tendencia de Peso")
-            if df["Fecha"].notna().any():
-                st.line_chart(df.set_index("Fecha")[["Peso"]])
-            else:
-                st.line_chart(df[["Peso"]])
-
-            st.subheader("Tendencia de Reps")
-            if df["Fecha"].notna().any():
-                st.line_chart(df.set_index("Fecha")[["Reps"]])
-            else:
-                st.line_chart(df[["Reps"]])
-
-            with st.expander("Ver tabla de datos"):
-                st.dataframe(df)
-        else:
-            st.warning("No se encontraron datos de progresión. Agrega registros con columnas de ejercicio, peso, repeticiones y opcionalmente fecha.")
