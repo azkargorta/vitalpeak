@@ -3,17 +3,17 @@
   "steps": [
     {
       "title": "1 · Inicio",
-      "tip": "Brazos extendidos.",
+      "tip": "Brazos extendidos, asas abajo.",
       "file": "01_inicio.png"
     },
     {
       "title": "2 · Fondo",
-      "tip": "Baja flexionando codos.",
+      "tip": "Flexiona codos; las asas suben.",
       "file": "02_fondo.png"
     },
     {
       "title": "3 · Empuje",
-      "tip": "Empuja hacia arriba.",
+      "tip": "Empuja hacia abajo.",
       "file": "03_empuje.png"
     }
   ]
