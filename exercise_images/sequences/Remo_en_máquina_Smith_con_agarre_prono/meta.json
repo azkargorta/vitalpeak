@@ -1,0 +1,20 @@
+{
+  "label": "Remo en máquina Smith con agarre prono",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Barra con discos en las guías.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Remo",
+      "tip": "Tira al torso.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

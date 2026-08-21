@@ -1,0 +1,20 @@
+{
+  "label": "Remo a un brazo en máquina sentado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazo extendido, discos adelante.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Tirón",
+      "tip": "Asa al torso; los discos se mueven.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

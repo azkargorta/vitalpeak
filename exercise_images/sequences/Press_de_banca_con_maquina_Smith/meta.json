@@ -1,0 +1,20 @@
+{
+  "label": "Press de banca con maquina Smith",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Barra guiada arriba.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Baja la barra al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Empuja hasta el bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

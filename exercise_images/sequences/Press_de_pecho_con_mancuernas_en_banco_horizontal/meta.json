@@ -1,0 +1,20 @@
+{
+  "label": "Press de pecho con mancuernas en banco horizontal",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Mancuernas arriba, brazos extendidos.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Baja a los lados del pecho con control.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Empuja de nuevo arriba.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

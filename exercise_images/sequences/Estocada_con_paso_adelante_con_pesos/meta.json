@@ -1,0 +1,20 @@
+{
+  "label": "Estocada con paso adelante con pesos",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "De pie con mancuernas.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Estocada",
+      "tip": "Rodilla delantera ~90°, trasera cerca del suelo.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Vuelve de pie.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

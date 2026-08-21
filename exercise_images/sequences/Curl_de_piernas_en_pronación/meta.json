@@ -1,0 +1,20 @@
+{
+  "label": "Curl de piernas en pronación",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Piernas casi extendidas, brazo abajo.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Curl",
+      "tip": "Talones a glúteos; el brazo de la máquina sube.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende; el brazo baja.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

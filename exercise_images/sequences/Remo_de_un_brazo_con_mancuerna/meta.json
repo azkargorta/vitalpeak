@@ -1,0 +1,20 @@
+{
+  "label": "Remo de un brazo con mancuerna",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Mancuerna colgando.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Remo",
+      "tip": "Lleva la mancuerna a la cadera.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

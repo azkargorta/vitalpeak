@@ -1,0 +1,20 @@
+{
+  "label": "Remo con polea de agarre cerrado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazos extendidos.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Remo",
+      "tip": "Lleva el agarre al abdomen.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

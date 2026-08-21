@@ -1,0 +1,20 @@
+{
+  "label": "Remo inclinado con barra T agarre ancho",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Brazos extendidos, discos abajo.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Remo",
+      "tip": "Tira; los discos suben.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Extiende; los discos bajan.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

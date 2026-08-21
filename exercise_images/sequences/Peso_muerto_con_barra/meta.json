@@ -1,0 +1,20 @@
+{
+  "label": "Peso muerto con barra",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "De pie, barra en muslos.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Barra al suelo, cadera atrás, espalda plana.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Subida",
+      "tip": "Extiende cadera y vuelve arriba.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

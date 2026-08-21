@@ -1,0 +1,20 @@
+{
+  "label": "Press inclinado en máquina Smith",
+  "steps": [
+    {
+      "title": "1 · Bloqueo",
+      "tip": "Barra con discos arriba.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Fondo",
+      "tip": "Baja la barra al pecho.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Empuje",
+      "tip": "Sube de nuevo al bloqueo.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

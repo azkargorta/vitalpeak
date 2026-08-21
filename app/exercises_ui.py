@@ -166,45 +166,87 @@ def render_exercise_detail(
                 st.rerun()
 
     with col_img:
-        st.markdown("##### Imagen del ejercicio")
-        img_path = resolve_exercise_image_path(imagen_rel)
+        st.markdown("##### Referencia visual")
+        tab_foto, tab_mov = st.tabs(["Foto", "Movimiento"])
 
-        if img_path:
-            st.image(str(img_path), use_container_width=True)
-            if st.button("Quitar imagen", use_container_width=True, key=f"ex_remove_img_{key_safe}"):
-                g = st.session_state.get(f"ex_group_edit_{key_safe}", grupo_actual)
-                save_exercise_meta(user, exercise, g, None)
-                st.success("Imagen eliminada.")
-                st.rerun()
-        else:
-            st.markdown(
-                '<div class="vp-img-box"><div class="vp-img-empty">'
-                "Sin imagen todavía.<br/>Sube una foto o esquema del ejercicio."
-                "</div></div>",
-                unsafe_allow_html=True,
-            )
+        with tab_foto:
+            img_path = resolve_exercise_image_path(imagen_rel)
 
-        up = st.file_uploader(
-            "PNG, JPG o WEBP",
-            type=["png", "jpg", "jpeg", "webp"],
-            key=f"ex_img_upload_{key_safe}",
-            help="Asigna una imagen a este ejercicio. Se guarda en tu cuenta.",
-        )
-        if up is not None:
-            st.caption(f"Seleccionada: **{up.name}** ({len(up.getvalue()) // 1024} KB)")
-            if st.button(
-                "Guardar imagen",
-                type="primary",
-                use_container_width=True,
-                key=f"ex_save_img_{key_safe}",
-            ):
-                g = st.session_state.get(f"ex_group_edit_{key_safe}", grupo_actual)
-                rel = store_exercise_image(
-                    user,
-                    up.name,
-                    up.getvalue(),
-                    exercise_name=exercise,
+            if img_path:
+                st.image(str(img_path), use_container_width=True)
+                if st.button("Quitar imagen", use_container_width=True, key=f"ex_remove_img_{key_safe}"):
+                    g = st.session_state.get(f"ex_group_edit_{key_safe}", grupo_actual)
+                    save_exercise_meta(user, exercise, g, None)
+                    st.success("Imagen eliminada.")
+                    st.rerun()
+            else:
+                st.markdown(
+                    '<div class="vp-img-box"><div class="vp-img-empty">'
+                    "Sin imagen todavía.<br/>Sube una foto o esquema del ejercicio."
+                    "</div></div>",
+                    unsafe_allow_html=True,
                 )
-                save_exercise_meta(user, exercise, g, rel)
-                st.success("Imagen asignada al ejercicio.")
-                st.rerun()
+
+            up = st.file_uploader(
+                "PNG, JPG o WEBP",
+                type=["png", "jpg", "jpeg", "webp"],
+                key=f"ex_img_upload_{key_safe}",
+                help="Asigna una imagen a este ejercicio. Se guarda en tu cuenta.",
+            )
+            if up is not None:
+                st.caption(f"Seleccionada: **{up.name}** ({len(up.getvalue()) // 1024} KB)")
+                if st.button(
+                    "Guardar imagen",
+                    type="primary",
+                    use_container_width=True,
+                    key=f"ex_save_img_{key_safe}",
+                ):
+                    g = st.session_state.get(f"ex_group_edit_{key_safe}", grupo_actual)
+                    rel = store_exercise_image(
+                        user,
+                        up.name,
+                        up.getvalue(),
+                        exercise_name=exercise,
+                    )
+                    save_exercise_meta(user, exercise, g, rel)
+                    st.success("Imagen asignada al ejercicio.")
+                    st.rerun()
+
+        with tab_mov:
+            from app.movement_sequences import get_movement_sequence
+
+            seq = get_movement_sequence(exercise)
+            if seq:
+                st.caption(f"Movimiento · {seq['label']}")
+                if seq.get("gif"):
+                    st.image(seq["gif"], use_container_width=True)
+                    st.caption("GIF del movimiento (mismo ángulo en todas las fases).")
+                with st.expander("Ver pasos uno a uno", expanded=not bool(seq.get("gif"))):
+                    steps = seq["steps"]
+                    if not steps:
+                        st.info("No hay fotogramas todavía.")
+                    else:
+                        key_step = f"ex_mov_step_{key_safe}"
+                        if key_step not in st.session_state:
+                            st.session_state[key_step] = 0
+                        idx = int(st.session_state[key_step]) % len(steps)
+                        step = steps[idx]
+                        st.markdown(f"**{step['title']}**")
+                        st.caption(step["tip"])
+                        st.image(step["path"], use_container_width=True)
+                        n1, n2, n3 = st.columns([1, 1, 2])
+                        with n1:
+                            if st.button("← Anterior", use_container_width=True, key=f"ex_mov_prev_{key_safe}"):
+                                st.session_state[key_step] = (idx - 1) % len(steps)
+                                st.rerun()
+                        with n2:
+                            if st.button("Siguiente →", use_container_width=True, key=f"ex_mov_next_{key_safe}"):
+                                st.session_state[key_step] = (idx + 1) % len(steps)
+                                st.rerun()
+                        with n3:
+                            st.caption(f"Paso {idx + 1} de {len(steps)}")
+            else:
+                st.info(
+                    "Todavía no hay secuencia de movimiento para este ejercicio. "
+                    "Prueba con **Press con barra en banco horizontal**."
+                )

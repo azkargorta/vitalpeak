@@ -1,0 +1,20 @@
+{
+  "label": "Peso muerto de sumo",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "De pie, postura sumo.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Bajada",
+      "tip": "Baja a agarrar la barra.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Subida",
+      "tip": "Extiende y vuelve arriba.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

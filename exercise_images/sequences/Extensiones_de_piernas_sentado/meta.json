@@ -1,0 +1,20 @@
+{
+  "label": "Extensiones de piernas sentado",
+  "steps": [
+    {
+      "title": "1 · Inicio",
+      "tip": "Rodillas flexionadas.",
+      "file": "01_inicio.png"
+    },
+    {
+      "title": "2 · Extensión",
+      "tip": "Extiende las piernas.",
+      "file": "02_fondo.png"
+    },
+    {
+      "title": "3 · Retorno",
+      "tip": "Baja con control.",
+      "file": "03_empuje.png"
+    }
+  ]
+}

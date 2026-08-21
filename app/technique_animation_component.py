@@ -16,9 +16,9 @@ def _default_config_for(exercise_name: str) -> Dict[str, Any]:
         kind = "squat"
     elif any(k in s for k in ["peso muerto", "deadlift", "hinge"]):
         kind = "hinge"
-    elif any(k in s for k in ["press banca", "bench", "banca"]):
+    elif any(k in s for k in ["press banca", "bench", "banca", "banco horizontal", "press con barra en banco", "press de banco", "press de pecho"]):
         kind = "bench"
-    elif any(k in s for k in ["press militar", "overhead", "militar", "shoulder press"]):
+    elif any(k in s for k in ["press militar", "overhead", "militar", "shoulder press", "press de hombro", "press con mancuernas sentado"]):
         kind = "ohp"
     elif any(k in s for k in ["remo", "row"]):
         kind = "row"
