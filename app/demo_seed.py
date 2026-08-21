@@ -53,16 +53,21 @@ def maybe_seed_admin() -> None:
     email = _conf("VITALPEAK_ADMIN_EMAIL", "gg@gg.com").strip() or "gg@gg.com"
     password = _conf("VITALPEAK_ADMIN_PASSWORD", "admin")
 
-    # 1) Crear usuario si no existe
-    register_user(username, password, email=email)
+    try:
+        existing = load_user(username)
+        if existing is None:
+            register_user(username, password, email=email)
+            set_password(username, password)
+            set_account_email(username, email)
+            set_recovery_email(username, email)
+        # Si ya existe, no reescribir credenciales en cada arranque (evita bloqueos OneDrive)
 
-    # 2) Forzar credenciales/Emails del usuario demo (lo pidió el proyecto)
-    #    Nota: si lo quieres desactivar, pon VITALPEAK_SEED=0.
-    set_password(username, password)
-    set_account_email(username, email)
-    set_recovery_email(username, email)
-
-    data = load_user(username) or {}
+        data = load_user(username) or {}
+    except PermissionError:
+        # Arranque no debe caerse por un JSON bloqueado
+        return
+    except OSError:
+        return
 
     # 3) Completar datos básicos sin pisar si ya existen (pero ya hemos forzado emails arriba)
     data.setdefault("email", email)
@@ -272,4 +277,9 @@ def maybe_seed_admin() -> None:
         },
     )
 
-    save_user(username, data)
+    try:
+        save_user(username, data)
+    except PermissionError:
+        return
+    except OSError:
+        return

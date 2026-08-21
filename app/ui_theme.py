@@ -189,13 +189,54 @@ h3 {{ font-weight: 700 !important; }}
   background: #FFFFFF;
   border: 1px solid var(--vp-border);
   border-radius: 14px;
-  padding: 1.2rem 1.3rem;
-  margin-bottom: 1rem;
+  padding: 1.2rem 1.3rem 1.35rem;
+  margin-bottom: 1.15rem;
   box-shadow: 0 8px 28px rgba(20, 40, 48, 0.05);
   animation: vpFadeIn 0.5s ease-out;
 }}
 .vp-today h3 {{
   margin-top: 0 !important;
+  margin-bottom: 0.65rem !important;
+}}
+
+.vp-week-day {{
+  background: #FFFFFF;
+  border: 1px solid var(--vp-border);
+  border-radius: 12px;
+  padding: 0.65rem 0.35rem 0.75rem;
+  text-align: center;
+  min-height: 5.6rem;
+  box-shadow: 0 4px 14px rgba(20, 40, 48, 0.04);
+}}
+.vp-week-day--today {{
+  border-color: #3AA899;
+  background: #E6F6F3;
+  box-shadow: 0 4px 16px rgba(58, 168, 153, 0.18);
+}}
+.vp-week-abbr {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6A7F88;
+}}
+.vp-week-num {{
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #142830;
+  line-height: 1.1;
+  margin: 0.15rem 0 0.35rem;
+}}
+.vp-week-rt {{
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #2A4450;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.vp-week-day--today .vp-week-rt {{
+  color: #1B3A44;
 }}
 
 /* Botones principales (contenido) — no forzar el sidebar */
@@ -400,7 +441,6 @@ NAV_META = [
     ("Entrenar", "Entrenar"),
     ("Rutinas", "Rutinas"),
     ("Progreso", "Progreso"),
-    ("Técnica", "Técnica"),
     ("Cuenta", "Cuenta"),
 ]
 

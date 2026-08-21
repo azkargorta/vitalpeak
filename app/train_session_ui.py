@@ -245,6 +245,34 @@ def _render_rest_timer(sess: Dict[str, Any]) -> None:
     _tick()
 
 
+def _logged_set_count(sess: Dict[str, Any], exercise: str) -> int:
+    return sum(1 for x in (sess.get("logged") or []) if x.get("exercise") == exercise)
+
+
+def _render_session_exercise_list(sess: Dict[str, Any]) -> None:
+    """Lista del entreno: hechos, actual y pendientes."""
+    items = sess.get("items") or []
+    if not items:
+        return
+    ix = int(sess.get("ex_idx") or 0)
+    phase = sess.get("phase") or "logging"
+    lines: List[str] = []
+    for i, it in enumerate(items):
+        name = it["exercise"]
+        planned = int(it.get("sets") or 0)
+        done_n = _logged_set_count(sess, name)
+        if phase == "done" or i < ix:
+            mark = "✅"
+        elif i == ix:
+            mark = "▶️"
+        else:
+            mark = "○"
+        sets_txt = f"{done_n}/{planned}" if planned else str(done_n)
+        lines.append(f"{mark} **{i + 1}. {name}** · {sets_txt} series")
+    with st.expander("Lista del entreno", expanded=False):
+        st.markdown("\n\n".join(lines))
+
+
 def _render_progress(sess: Dict[str, Any]) -> None:
     items = sess.get("items") or []
     ix = int(sess.get("ex_idx") or 0)
@@ -253,6 +281,7 @@ def _render_progress(sess: Dict[str, Any]) -> None:
         f"**{sess.get('routine_name')}** · {sess.get('date')} · "
         f"Ejercicio {min(ix + 1, len(items))}/{len(items)}"
     )
+    _render_session_exercise_list(sess)
     if item:
         planned = int(item["sets"])
         set_num = int(sess.get("set_num") or 1)

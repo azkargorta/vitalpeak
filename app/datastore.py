@@ -33,9 +33,37 @@ def load_user(username: str) -> Optional[Dict[str, Any]]:
         return None
 
 def save_user(username: str, data: Dict[str, Any]) -> None:
+    """Guarda JSON de usuario con reintentos (OneDrive a veces bloquea el archivo)."""
     ensure_base_dirs()
     p = user_json_path(username)
-    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    tmp = p.with_suffix(p.suffix + f".tmp.{os.getpid()}")
+    last_err: Exception | None = None
+    for attempt in range(8):
+        try:
+            tmp.write_text(payload, encoding="utf-8")
+            os.replace(tmp, p)
+            return
+        except PermissionError as e:
+            last_err = e
+            time.sleep(0.05 * (attempt + 1))
+        except OSError as e:
+            last_err = e
+            time.sleep(0.05 * (attempt + 1))
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+    # Último intento directo (mensaje más claro si falla)
+    try:
+        p.write_text(payload, encoding="utf-8")
+    except PermissionError as e:
+        raise PermissionError(
+            f"No se pudo escribir {p}. Cierra otras instancias de Streamlit/OneDrive "
+            f"o espera a que sincronice, e inténtalo de nuevo. Detalle: {e}"
+        ) from (last_err or e)
 
 def ensure_user(username: str) -> Dict[str, Any]:
     ensure_base_dirs()

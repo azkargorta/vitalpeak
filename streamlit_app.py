@@ -97,8 +97,7 @@ from app.routines import (
     list_routines, add_routine, delete_routine, rename_routine, apply_routine
 )
 
-# Biblioteca de técnica (animaciones cortas + claves)
-from app.technique_library import render_technique_page
+from app.today_ui import render_today_page
 
 def pagina_progreso():
     """Progreso de ejercicios basado en los entrenamientos guardados (usuarios_data/<user>.json).
@@ -332,6 +331,7 @@ with st.sidebar:
                 "Objetivos": "Progreso",
                 "Peso corporal": "Progreso",
                 "Mi cuenta": "Cuenta",
+                "Técnica": "Hoy",
             }
             cur = st.session_state.get("nav_page")
             st.session_state["nav_page"] = legacy.get(cur, "Hoy")
@@ -361,7 +361,7 @@ if not logged_in or page == "Entrar":
     render_brand_hero(
         title="VitalPeak",
         kicker="Gimnasio · Salud · Progreso",
-        lead="Tu entrenamiento organizado: qué toca hoy, cómo ejecutarlo y cómo mejoras.",
+        lead="Tu entrenamiento organizado: qué toca hoy y cómo mejoras.",
         panel_title="Empieza en 30 segundos",
         panel_body="Entra con tu cuenta o crea una. Demo: admin / admin",
     )
@@ -474,132 +474,7 @@ if not logged_in or page == "Entrar":
 # ---------- App autenticada ----------
 if page == "Hoy":
     require_auth()
-    user = st.session_state["user"]
-    data_u = load_user(user) or {}
-    plan = dict(data_u.get("routine_plan", {}))
-    routines = list_routines(user)
-    routines_by_name = {r.get("name"): r for r in (routines or [])}
-    today = date.today()
-    today_iso = today.isoformat()
-    rt_name = plan.get(today_iso)
-
-    panel_title = rt_name if rt_name else "Día libre"
-    panel_body = (
-        "Tu sesión de hoy está lista. Regístrala cuando termines."
-        if rt_name
-        else "No hay rutina asignada. Elige una plantilla o planifica la semana."
-    )
-    render_brand_hero(
-        title="VitalPeak",
-        kicker=today.strftime("%A %d · %B").capitalize(),
-        lead="Un vistazo a lo que toca hoy y atajos a lo que más usas.",
-        panel_title=panel_title,
-        panel_body=panel_body,
-    )
-
-    section_label("Atajos")
-    a1, a2, a3, a4 = st.columns(4)
-    with a1:
-        if st.button("Registrar sesión", type="primary", use_container_width=True):
-            _goto("Entrenar")
-    with a2:
-        if st.button("Plantillas", use_container_width=True):
-            st.session_state["rutinas_tab"] = "Plantillas"
-            _goto("Rutinas")
-    with a3:
-        if st.button("Planificar", use_container_width=True):
-            st.session_state["rutinas_tab"] = "Planificar"
-            _goto("Rutinas")
-    with a4:
-        if st.button("Técnica", use_container_width=True):
-            _goto("Técnica")
-
-    section_label("Hoy")
-    st.markdown('<div class="vp-today">', unsafe_allow_html=True)
-    topA, topB = st.columns([2.2, 1])
-    with topA:
-        if rt_name:
-            st.markdown(f"### {rt_name}")
-            r = routines_by_name.get(rt_name)
-            if r and r.get("items"):
-                st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
-                first_ex = (r["items"][0] or {}).get("exercise")
-                if first_ex:
-                    from app.exercises_ui import render_movement_preview
-
-                    with st.expander(f"Ver movimiento · {first_ex}", expanded=False):
-                        render_movement_preview(
-                            first_ex,
-                            key="hoy_mov",
-                            show_steps=False,
-                        )
-                    if st.button(
-                        f"Empezar con {first_ex}",
-                        type="primary",
-                        use_container_width=True,
-                        key="hoy_start_train",
-                    ):
-                        from app.train_session_ui import SESSION_KEY, get_or_start_session
-                        from datetime import date as _date
-
-                        sess = get_or_start_session(user, _date.today())
-                        if sess and sess.get("items"):
-                            # Sitúa el índice en el primer ejercicio (o el elegido)
-                            for i, it in enumerate(sess["items"]):
-                                if it["exercise"] == first_ex:
-                                    sess["ex_idx"] = i
-                                    sess["set_num"] = 1
-                                    sess["draft_reps"] = it["reps"]
-                                    sess["draft_weight"] = it["weight"]
-                                    sess["phase"] = "logging"
-                                    break
-                            st.session_state[SESSION_KEY] = sess
-                        _goto("Entrenar")
-            else:
-                st.info("La rutina asignada no existe o está vacía. Revísala en Planificar rutinas.")
-        else:
-            st.markdown("### Sin sesión asignada")
-            st.caption("Ve a Plantillas para crear un plan, o a Planificar rutinas para asignar el día.")
-    with topB:
-        st.metric("Fecha", today.strftime("%d/%m/%Y"))
-        st.metric("Semana", today.isocalendar().week)
-        st.metric("Rutinas guardadas", len(routines or []))
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-    section_label("Esta semana")
-    st.caption("Lunes a domingo — lo que tienes planificado.")
-
-    import datetime as _dt
-    from io import BytesIO as _BytesIO
-
-    monday = today - _dt.timedelta(days=today.weekday())
-    week_dates = [monday + _dt.timedelta(days=i) for i in range(7)]
-    dias_abrev = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
-    dias_full = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    labels = [f"{dias_abrev[i]}\n{week_dates[i].strftime('%d/%m')}" for i in range(7)]
-    values = [plan.get(d.isoformat(), "") or "—" for d in week_dates]
-
-    fig, ax = plt.subplots(figsize=(12, 2.6))
-    ax.axis("off")
-    tbl = ax.table(cellText=[values], colLabels=labels, cellLoc="center", loc="center")
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(10)
-    tbl.scale(1, 2.0)
-    fig.tight_layout()
-    buf = _BytesIO()
-    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight", facecolor="#F3F6F4")
-    plt.close(fig)
-    st.image(buf.getvalue(), use_container_width=True)
-
-    df_week = pd.DataFrame(
-        {"Día": dias_full, "Fecha": [d.isoformat() for d in week_dates], "Rutina": values}
-    )
-    st.dataframe(df_week, use_container_width=True, hide_index=True)
-
-elif page == "Técnica":
-    require_auth()
-    render_technique_page()
+    render_today_page(st.session_state["user"])
 
 elif page == "Rutinas":
     require_auth()
