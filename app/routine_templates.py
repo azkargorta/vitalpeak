@@ -10,12 +10,13 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 
-def _item(exercise: str, sets: int, reps: int, *, notes: str = "") -> Dict[str, Any]:
+def _item(exercise: str, sets: int, reps: int, *, notes: str = "", rest_sec: int = 90) -> Dict[str, Any]:
     return {
         "exercise": exercise,
         "sets": int(sets),
         "reps": int(reps),
         "weight": 0.0,
+        "rest_sec": int(rest_sec),
         "notes": notes,
     }
 
@@ -656,6 +657,7 @@ def day_to_routine_items(day: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "sets": int(it.get("sets") or 3),
                 "reps": int(it.get("reps") or 10),
                 "weight": float(it.get("weight") or 0.0),
+                "rest_sec": int(it.get("rest_sec") or 90),
             }
         )
     return items

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
@@ -12,6 +12,76 @@ from app.exercises import (
     save_exercise_meta,
     store_exercise_image,
 )
+from app.movement_sequences import get_movement_sequence
+
+
+def render_movement_preview(
+    exercise: str,
+    *,
+    key: str = "mov_prev",
+    next_exercise: Optional[str] = None,
+    show_steps: bool = True,
+) -> None:
+    """Preview compacto de movimiento (GIF + tip) para Entrenar / Hoy."""
+    seq = get_movement_sequence(exercise)
+    st.markdown("##### Movimiento")
+    if not seq:
+        st.caption("Sin GIF de movimiento para este ejercicio.")
+        return
+
+    if seq.get("gif"):
+        st.image(seq["gif"], use_container_width=True)
+    else:
+        st.caption("Hay pasos, pero aún no hay GIF.")
+
+    tips = [s.get("tip") or "" for s in (seq.get("steps") or []) if s.get("tip")]
+    if tips:
+        st.markdown(f"**Tip:** {tips[0]}")
+        if len(tips) > 1:
+            st.caption(" · ".join(tips[1:3]))
+
+    if show_steps and seq.get("steps"):
+        with st.expander("Ver fases", expanded=False):
+            key_step = f"{key}_step"
+            steps = seq["steps"]
+            if key_step not in st.session_state:
+                st.session_state[key_step] = 0
+            idx = int(st.session_state[key_step]) % len(steps)
+            step = steps[idx]
+            st.markdown(f"**{step['title']}**")
+            st.caption(step.get("tip") or "")
+            if step.get("path"):
+                st.image(step["path"], use_container_width=True)
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                if st.button("←", use_container_width=True, key=f"{key}_prev"):
+                    st.session_state[key_step] = (idx - 1) % len(steps)
+                    st.rerun()
+            with c2:
+                if st.button("→", use_container_width=True, key=f"{key}_next"):
+                    st.session_state[key_step] = (idx + 1) % len(steps)
+                    st.rerun()
+            with c3:
+                st.caption(f"{idx + 1}/{len(steps)}")
+
+    if next_exercise:
+        st.caption(f"Siguiente en la rutina: **{next_exercise}**")
+
+
+def next_exercise_in_routine(rows: List[Dict[str, Any]], current: str) -> Optional[str]:
+    """Primer ejercicio distinto que aparece después de `current` en la rutina importada."""
+    if not rows or not current:
+        return None
+    order: List[str] = []
+    for row in rows:
+        name = (row.get("ejercicio") or "").strip()
+        if name and (not order or order[-1].lower() != name.lower()):
+            order.append(name)
+    cur_l = current.strip().lower()
+    for i, name in enumerate(order):
+        if name.lower() == cur_l and i + 1 < len(order):
+            return order[i + 1]
+    return None
 
 
 def _fmt_num(v: Any) -> str:
@@ -213,8 +283,6 @@ def render_exercise_detail(
                     st.rerun()
 
         with tab_mov:
-            from app.movement_sequences import get_movement_sequence
-
             seq = get_movement_sequence(exercise)
             if seq:
                 st.caption(f"Movimiento · {seq['label']}")

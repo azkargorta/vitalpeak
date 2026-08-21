@@ -3,7 +3,50 @@
   "email": "azkardurant@gmail.com",
   "recovery_email": "azkardurant@gmail.com",
   "profile": {},
-  "entrenamientos": [],
+  "entrenamientos": [
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 1,
+      "reps": 10,
+      "weight": 60.0
+    },
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 2,
+      "reps": 8,
+      "weight": 60.0
+    },
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 3,
+      "reps": 8,
+      "weight": 60.0
+    },
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 1,
+      "reps": 8,
+      "weight": 60.0
+    },
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 2,
+      "reps": 8,
+      "weight": 60.0
+    },
+    {
+      "date": "2026-08-21",
+      "exercise": "Prensa de piernas en posición ancha",
+      "set": 3,
+      "reps": 8,
+      "weight": 60.0
+    }
+  ],
   "rutinas": [
     {
       "name": "Full Body 3 días · intermedio — Full Body A",

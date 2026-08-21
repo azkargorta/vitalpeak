@@ -523,6 +523,38 @@ if page == "Hoy":
             r = routines_by_name.get(rt_name)
             if r and r.get("items"):
                 st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
+                first_ex = (r["items"][0] or {}).get("exercise")
+                if first_ex:
+                    from app.exercises_ui import render_movement_preview
+
+                    with st.expander(f"Ver movimiento · {first_ex}", expanded=False):
+                        render_movement_preview(
+                            first_ex,
+                            key="hoy_mov",
+                            show_steps=False,
+                        )
+                    if st.button(
+                        f"Empezar con {first_ex}",
+                        type="primary",
+                        use_container_width=True,
+                        key="hoy_start_train",
+                    ):
+                        from app.train_session_ui import SESSION_KEY, get_or_start_session
+                        from datetime import date as _date
+
+                        sess = get_or_start_session(user, _date.today())
+                        if sess and sess.get("items"):
+                            # Sitúa el índice en el primer ejercicio (o el elegido)
+                            for i, it in enumerate(sess["items"]):
+                                if it["exercise"] == first_ex:
+                                    sess["ex_idx"] = i
+                                    sess["set_num"] = 1
+                                    sess["draft_reps"] = it["reps"]
+                                    sess["draft_weight"] = it["weight"]
+                                    sess["phase"] = "logging"
+                                    break
+                            st.session_state[SESSION_KEY] = sess
+                        _goto("Entrenar")
             else:
                 st.info("La rutina asignada no existe o está vacía. Revísala en Planificar rutinas.")
         else:
@@ -601,110 +633,8 @@ elif page == "Plantillas":
 
 if page == "Entrenar":
     require_auth()
-    st.title("Entrenar")
-    user = st.session_state["user"]
-    d = st.date_input("Fecha", value=date.today())
-    exercises = list_all_exercises(user)
-    ex = st.selectbox("Ejercicio", options=exercises)
-    suggestion = last_values_for_exercise(user, ex)
-
-    with st.form("add_set_form", clear_on_submit=False):
-        colA, colB, colC = st.columns(3)
-        with colA:
-            set_idx = st.number_input("Serie #", min_value=1, step=1, value=1)
-        with colB:
-            reps = st.number_input("Repeticiones", min_value=1, step=1, value=int(suggestion[0]) if suggestion else 10)
-        with colC:
-            weight = st.number_input("Peso (kg)", min_value=0.0, step=0.5, value=float(suggestion[1]) if suggestion else 0.0)
-        if suggestion:
-            st.caption(f"Sugerencia última serie de **{ex}**: {suggestion[0]} reps @ {suggestion[1]} kg")
-        submit_add = st.form_submit_button("Añadir serie", type="primary")
-    if submit_add:
-        add_training_set(user, d.isoformat(), ex, int(set_idx), int(reps), float(weight))
-        st.success("Serie guardada.")
-
-    st.markdown("---")
-    st.subheader("Importar rutina y rellenar pesos")
-    # Editor de entrenamiento desde rutina (nuevo)
-    import pandas as _pd
-
-    routines = list_routines(user)
-    if routines:
-        names = [r["name"] for r in routines]
-        col1, col2 = st.columns([3,1])
-        sel_r = col1.selectbox("Rutina", names, key="train_sel_routine")
-        if col2.button("Importar rutina", use_container_width=True):
-            r = next(r for r in routines if r["name"] == sel_r)
-            rows = []
-            for it in r.get("items", []):
-                ex_name = it.get("exercise")
-                sets = int(it.get("sets", 1))
-                reps = int(it.get("reps", 10))
-                for s in range(1, sets+1):
-                    rows.append({"ejercicio": ex_name, "serie": s, "reps": reps, "peso": 0.0})
-            st.session_state['routine_rows'] = rows
-            st.success(f"Rutina '{sel_r}' importada para el {d.isoformat()}.")
-            st.rerun()
-
-        if 'routine_rows' in st.session_state and st.session_state['routine_rows']:
-            with st.form("routine_editor_form", clear_on_submit=False):
-                df = _pd.DataFrame(st.session_state['routine_rows'])
-                edited = st.data_editor(
-                    df,
-                    key="routine_editor_table",
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    column_config={
-                        "ejercicio": st.column_config.TextColumn("Ejercicio", disabled=True),
-                        "serie": st.column_config.NumberColumn("Serie", min_value=1, step=1),
-                        "reps": st.column_config.NumberColumn("Reps", min_value=1, step=1),
-                        "peso": st.column_config.NumberColumn("Peso (kg)", min_value=0.0, step=0.5),
-                    },
-                    hide_index=True
-                )
-
-                cA, cB, cC = st.columns(3)
-                target = cA.text_input("Ejercicio objetivo", placeholder="ej. press banca")
-                add_series = cB.form_submit_button("+ Añadir serie", disabled=not target)
-                del_series = cC.form_submit_button("Eliminar última serie", disabled=not target)
-
-                # Aplicar acciones de serie
-                if add_series:
-                    subset = edited[edited["ejercicio"].str.lower() == target.lower()]
-                    if subset.empty:
-                        st.warning("No encontré ese ejercicio en la tabla.")
-                    else:
-                        max_s = int(subset["serie"].max())
-                        reps_def = int(subset["reps"].iloc[0])
-                        new_row = {"ejercicio": target, "serie": max_s+1, "reps": reps_def, "peso": 0.0}
-                        edited = _pd.concat([edited, _pd.DataFrame([new_row])], ignore_index=True)
-
-                if del_series:
-                    mask = edited["ejercicio"].str.lower() == target.lower()
-                    subset = edited[mask]
-                    if subset.empty:
-                        st.warning("No encontré ese ejercicio en la tabla.")
-                    else:
-                        max_s = int(subset["serie"].max())
-                        drop_idx = edited[(mask) & (edited["serie"] == max_s)].index
-                        edited = edited.drop(index=drop_idx)
-
-                # Guardar
-                save_edited = st.form_submit_button("Guardar entrenamiento desde rutina", type="primary")
-            # Fuera del form: sincroniza y guarda si procede
-            st.session_state['routine_rows'] = edited.to_dict(orient="records")
-            if save_edited:
-                count = 0
-                for row in st.session_state['routine_rows']:
-                    try:
-                        add_training_set(user, d.isoformat(), row["ejercicio"], int(row["serie"]), int(row["reps"]), float(row.get("peso") or 0.0))
-                        count += 1
-                    except Exception as e:
-                        st.error(f"Error guardando {row}: {e}")
-                st.success(f"Se guardaron {count} series en {d.isoformat()}.")
-                st.session_state.pop('routine_rows', None)
-    else:
-        st.info("Primero crea una rutina en Plantillas o Planificar rutinas.")
+    from app.train_session_ui import render_train_page
+    render_train_page(st.session_state["user"])
 
 elif page == "Ejercicios y progreso":
     require_auth()

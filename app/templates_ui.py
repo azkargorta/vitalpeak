@@ -209,7 +209,7 @@ def render_templates_page(*, embedded: bool = True) -> None:
                 ex = it.get("exercise", "")
                 grupo = get_grupo(ex, user)
 
-                c1, c2, c3, c4 = st.columns([3.2, 0.9, 0.9, 1.2])
+                c1, c2, c3, c4, c5 = st.columns([2.8, 0.75, 0.75, 0.9, 1.0])
                 with c1:
                     st.markdown(f"**{ex}**")
                     st.caption(grupo)
@@ -240,6 +240,15 @@ def render_templates_page(*, embedded: bool = True) -> None:
                         key=f"reps_{d_idx}_{i_idx}",
                     )
                 with c4:
+                    it["rest_sec"] = st.number_input(
+                        "Desc.(s)",
+                        0,
+                        600,
+                        int(it.get("rest_sec") or 90),
+                        step=15,
+                        key=f"rest_{d_idx}_{i_idx}",
+                    )
+                with c5:
                     if st.button("Quitar", key=f"del_{d_idx}_{i_idx}"):
                         remove_idx = i_idx
 
@@ -276,7 +285,7 @@ def render_templates_page(*, embedded: bool = True) -> None:
                 day["items"] = items
                 st.rerun()
 
-            ac1, ac2, ac3, ac4 = st.columns([2.5, 0.8, 0.8, 1])
+            ac1, ac2, ac3, ac4, ac5 = st.columns([2.2, 0.7, 0.7, 0.8, 1])
             with ac1:
                 add_ex = st.selectbox("Añadir", pool, key=f"add_ex_{d_idx}", label_visibility="collapsed")
             with ac2:
@@ -284,6 +293,8 @@ def render_templates_page(*, embedded: bool = True) -> None:
             with ac3:
                 add_reps = st.number_input("R", 1, 50, 10, key=f"add_reps_{d_idx}", label_visibility="collapsed")
             with ac4:
+                add_rest = st.number_input("D", 0, 600, 90, step=15, key=f"add_rest_{d_idx}", label_visibility="collapsed")
+            with ac5:
                 if st.button("＋ Añadir", key=f"add_btn_{d_idx}", use_container_width=True):
                     items.append(
                         {
@@ -291,6 +302,7 @@ def render_templates_page(*, embedded: bool = True) -> None:
                             "sets": int(add_sets),
                             "reps": int(add_reps),
                             "weight": 0.0,
+                            "rest_sec": int(add_rest),
                             "notes": "",
                         }
                     )
