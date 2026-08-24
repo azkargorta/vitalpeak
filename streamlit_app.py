@@ -5,32 +5,6 @@ def _asegurar_dias_minimos(datos_usuario: dict):
         datos_usuario["dias"] = ["Lunes", "Miércoles", "Viernes"]
 
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
-from datetime import date, timedelta
-from pathlib import Path
-
-import pandas as pd
-import streamlit as st
-<<<<<<< HEAD
-st.set_page_config(page_title="Vitalpeak", layout="wide")
-
-st.markdown(
-    """
-<style>
-/* Usar el ancho completo de la página */
-.block-container { max-width: 100% !important; padding-left: 2rem; padding-right: 2rem; }
-/* Tablas más compactas para que quepan más columnas */
-div[data-testid="stDataFrame"] { font-size: 12px; }
-div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { white-space: normal; }
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-
-=======
->>>>>>> 86ebbb964dec1569e45aff0df3a9ab2e3fe4d431
-=======
 from datetime import date
 
 import pandas as pd
@@ -49,7 +23,6 @@ if not hasattr(st, "_escape_markdown"):
         return s
     st._escape_markdown = _escape_markdown  # type: ignore[attr-defined]
 # -------------------------------
->>>>>>> ca905ab1ce62eef6a31fd75c72bbf874b9943609
 from dotenv import load_dotenv
 import os
 
@@ -375,37 +348,6 @@ with st.sidebar:
         st.markdown('<span class="vp-logout-mark"></span>', unsafe_allow_html=True)
         if st.button("Cerrar sesión", use_container_width=True, key="btn_logout"):
             logout()
-<<<<<<< HEAD
-    st.markdown("---")
-    options = [
-    "🔐 Login / Registro",
-    "🏠 Inicio",
-    "🏋️ Añadir entrenamiento",
-    "📚 Gestor de ejercicios",
-    "📈 Tabla de entrenamientos",
-    "🩺 Salud (Peso)",
-    "📘 Rutinas",
-    "👤 Perfil",
-]
-default_index = 0 if "user" not in st.session_state else 1
-if st.session_state.get("nav_page") in options:
-    default_index = options.index(st.session_state["nav_page"])
-page = st.radio(
-    "Secciones",
-    options,
-    index=default_index,
-    key="nav_page",
-)
-if page == "🔐 Login / Registro":
-    st.title("Acceso")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Iniciar sesión")
-        u = st.text_input("Usuario")
-        p = st.text_input("Contraseña", type="password")
-=======
     else:
         st.caption("Entra para ver tu plan y registrar series.")
         page = "Entrar"
@@ -421,7 +363,6 @@ if not logged_in or page == "Entrar":
     )
 
     tab_login, tab_reg = st.tabs(["Entrar", "Crear cuenta"])
->>>>>>> ca905ab1ce62eef6a31fd75c72bbf874b9943609
 
     with tab_login:
         # Reseteo por token desde URL (?user=&reset_token=)
@@ -529,231 +470,9 @@ if not logged_in or page == "Entrar":
 # ---------- App autenticada ----------
 if page == "Hoy":
     require_auth()
-<<<<<<< HEAD
-    user = st.session_state["user"]
-    data = load_user(user) or {}
-    plan = dict(data.get("routine_plan", {}))
-
-    st.title("🏠 Inicio")
-
-    # -------------------------
-    # 🔥 HOY TOCA (arriba del todo)
-    # -------------------------
-    today = date.today()
-    today_iso = today.isoformat()
-    routines = list_routines(user)
-
-    st.subheader("🔥 Hoy toca")
-    rt_name = plan.get(today_iso)
-
-    colA, colB = st.columns([3, 2])
-    with colA:
-        if rt_name:
-            st.markdown(f"### **{rt_name}**")
-            r = next((rr for rr in routines if rr.get("name") == rt_name), None)
-            if r and r.get("items"):
-                st.dataframe(pd.DataFrame(r.get("items", [])), use_container_width=True, hide_index=True)
-            else:
-                st.info("La rutina asignada para hoy no existe o está vacía.")
-        else:
-            st.info("Hoy no tienes rutina asignada. Puedes planificar una o entrenar libre.")
-    with colB:
-        def _go(target: str):
-            st.session_state["nav_page"] = target
-            st.rerun()
-
-        if st.button("▶️ Iniciar entrenamiento", use_container_width=True):
-            _go("🏋️ Añadir entrenamiento")
-        if st.button("🗓️ Ir al planificador", use_container_width=True):
-            _go("📘 Rutinas")
-        if st.button("➕ Añadir peso", use_container_width=True):
-            _go("🩺 Salud (Peso)")
-
-    st.markdown("---")
-
-    # -------------------------
-    # 📊 Resumen rápido
-    # -------------------------
-    entrenos = list_training(user)
-    df_t = pd.DataFrame(entrenos) if entrenos else pd.DataFrame(columns=["date", "exercise", "set", "reps", "weight"])
-    if not df_t.empty:
-        df_t["date_dt"] = pd.to_datetime(df_t["date"], errors="coerce")
-        df_t = df_t.dropna(subset=["date_dt"])
-        df_t["Fecha"] = df_t["date_dt"].dt.date
-        df_t["Reps"] = pd.to_numeric(df_t.get("reps"), errors="coerce").fillna(0).astype(int)
-        df_t["Peso"] = pd.to_numeric(df_t.get("weight"), errors="coerce").fillna(0.0).astype(float)
-        df_t["Volumen"] = df_t["Reps"] * df_t["Peso"]
-
-    # Semana actual (Lun-Dom)
-    monday = today - timedelta(days=today.weekday())
-    week_dates = [monday + timedelta(days=i) for i in range(7)]
-    week_isos = [d.isoformat() for d in week_dates]
-
-    entrenos_week = int(df_t[df_t["Fecha"].isin(week_dates)]["Fecha"].nunique()) if not df_t.empty else 0
-    plan_week = int(sum(1 for di in week_isos if plan.get(di))) if plan else 0
-
-    # Último entreno
-    last_train = None
-    if not df_t.empty and df_t["Fecha"].notna().any():
-        last_train = df_t["Fecha"].max()
-
-    # Peso actual y cambio 7d
-    weights = list_weights(user)
-    df_w = pd.DataFrame(weights) if weights else pd.DataFrame(columns=["date", "weight"])
-    current_weight = None
-    delta_7d = None
-    if not df_w.empty:
-        df_w["date_dt"] = pd.to_datetime(df_w["date"], errors="coerce")
-        df_w = df_w.dropna(subset=["date_dt"])
-        df_w = df_w.sort_values("date_dt")
-        df_w["Fecha"] = df_w["date_dt"].dt.date
-        df_w["Peso"] = pd.to_numeric(df_w.get("weight"), errors="coerce")
-        if df_w["Peso"].notna().any():
-            current_weight = float(df_w.dropna(subset=["Peso"]).iloc[-1]["Peso"])
-            target = today - timedelta(days=7)
-            past = df_w[df_w["Fecha"] <= target].dropna(subset=["Peso"])
-            if not past.empty:
-                w7 = float(past.iloc[-1]["Peso"])
-                delta_7d = current_weight - w7
-
-    # Racha (días entrenados consecutivos)
-    streak = 0
-    if not df_t.empty and df_t["Fecha"].notna().any():
-        days = sorted(set(df_t["Fecha"].tolist()))
-        cur = today
-        if cur not in days:
-            cur = today - timedelta(days=1)
-        while cur in days:
-            streak += 1
-            cur = cur - timedelta(days=1)
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Entrenos semana", f"{entrenos_week}/{plan_week}" if plan_week else str(entrenos_week))
-    m2.metric("Último entreno", str(last_train) if last_train else "—")
-    if current_weight is not None:
-        m3.metric("Peso actual", f"{current_weight:.1f} kg", f"{delta_7d:+.1f} kg (7d)" if delta_7d is not None else None)
-    else:
-        m3.metric("Peso actual", "—")
-    m4.metric("Racha", f"{streak} días")
-
-    st.markdown("---")
-
-    # -------------------------
-    # 📈 Progreso rápido
-    # -------------------------
-    g1, g2, g3 = st.columns([2, 2, 2])
-
-    with g1:
-        st.subheader("📉 Peso (30 días)")
-        if not df_w.empty:
-            last_30 = today - timedelta(days=30)
-            df_w30 = df_w[df_w["Fecha"] >= last_30].dropna(subset=["Peso"])
-            if not df_w30.empty:
-                st.line_chart(df_w30.set_index("Fecha")[["Peso"]])
-            else:
-                st.info("Aún no hay pesos en los últimos 30 días.")
-        else:
-            st.info("Aún no has añadido peso.")
-
-    with g2:
-        st.subheader("🏋️ Volumen semanal")
-        if not df_t.empty:
-            df_t2 = df_t.copy()
-            df_t2["Semana"] = pd.to_datetime(df_t2["Fecha"]).dt.to_period("W").apply(lambda r: r.start_time.date())
-            wk = df_t2.groupby("Semana", as_index=False)["Volumen"].sum().sort_values("Semana").tail(8)
-            if not wk.empty:
-                st.bar_chart(wk.set_index("Semana")[["Volumen"]])
-            else:
-                st.info("Aún no hay volumen para mostrar.")
-        else:
-            st.info("Aún no tienes entrenamientos registrados.")
-
-    with g3:
-        st.subheader("📌 1RM estimado")
-        if not df_t.empty:
-            last_30 = today - timedelta(days=30)
-            df_last = df_t[df_t["Fecha"] >= last_30].copy()
-            if df_last.empty:
-                df_last = df_t.copy()
-            ex_counts = df_last["exercise"].astype(str).str.strip().value_counts()
-            default_ex = ex_counts.index[0] if len(ex_counts) else df_t["exercise"].astype(str).str.strip().iloc[0]
-            ex_options = sorted(set(df_t["exercise"].astype(str).str.strip().tolist()))
-            ex_sel = st.selectbox("Ejercicio", ex_options, index=ex_options.index(default_ex) if default_ex in ex_options else 0, key="home_1rm_ex")
-            dfx = df_t[df_t["exercise"].astype(str).str.strip() == ex_sel].copy()
-            dfx["1RM"] = dfx.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
-            per_day = dfx.groupby("Fecha", as_index=False)["1RM"].max().sort_values("Fecha").tail(20)
-            if not per_day.empty:
-                st.line_chart(per_day.set_index("Fecha")[["1RM"]])
-            else:
-                st.info("No hay datos para ese ejercicio todavía.")
-        else:
-            st.info("Aún no tienes entrenamientos registrados.")
-
-    st.markdown("---")
-
-    # -------------------------
-    # 🏅 Últimos PRs + Acciones rápidas
-    # -------------------------
-    left, right = st.columns([3, 2])
-
-    with left:
-        st.subheader("🏅 Últimos PRs")
-        if not df_t.empty:
-            dfp = df_t.copy()
-            dfp["Ejercicio"] = dfp["exercise"].astype(str).str.strip()
-            dfp["1RM"] = dfp.apply(lambda r: float(r["Peso"]) * (1.0 + float(r["Reps"]) / 30.0) if r["Peso"] > 0 and r["Reps"] > 0 else 0.0, axis=1)
-            dfp = dfp.sort_values(["Fecha", "set"])
-            best_w = {}
-            best_1 = {}
-            prs = []
-            for _, r in dfp.iterrows():
-                ex = r["Ejercicio"]
-                w = float(r["Peso"])
-                one = float(r["1RM"])
-                is_pr = False
-                if ex not in best_w or w > best_w[ex]:
-                    best_w[ex] = w
-                    is_pr = True
-                if ex not in best_1 or one > best_1[ex]:
-                    best_1[ex] = one
-                    is_pr = True
-                if is_pr and w > 0:
-                    prs.append({
-                        "Fecha": r["Fecha"],
-                        "Ejercicio": ex,
-                        "Peso": w,
-                        "Reps": int(r["Reps"]),
-                        "1RM est.": round(one, 1),
-                    })
-            if prs:
-                prs_df = pd.DataFrame(prs).tail(12).iloc[::-1]
-                st.dataframe(prs_df, use_container_width=True, hide_index=True, height=380)
-            else:
-                st.info("Aún no hay PRs detectables (registra más series).")
-        else:
-            st.info("Aún no tienes entrenamientos registrados.")
-
-    with right:
-        st.subheader("⚡ Acciones rápidas")
-        def _go2(target: str):
-            st.session_state["nav_page"] = target
-            st.rerun()
-
-        if st.button("➕ Registrar entrenamiento", use_container_width=True):
-            _go2("🏋️ Añadir entrenamiento")
-        if st.button("📚 Gestor de ejercicios", use_container_width=True):
-            _go2("📚 Gestor de ejercicios")
-        if st.button("🗓️ Planificador de rutinas", use_container_width=True):
-            _go2("📘 Rutinas")
-        if st.button("🩺 Registrar peso", use_container_width=True):
-            _go2("🩺 Salud (Peso)")
-
-elif page == "🏋️ Añadir entrenamiento":
-=======
     render_today_page(st.session_state["user"])
 
 elif page == "Rutinas":
->>>>>>> ca905ab1ce62eef6a31fd75c72bbf874b9943609
     require_auth()
     _rt = ["Plantillas", "Planificar"]
     _cur = st.session_state.get("rutinas_tab", "Plantillas")
