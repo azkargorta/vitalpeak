@@ -144,6 +144,11 @@ def render_exercise_detail(
   gap: 0.55rem;
   margin: 0.35rem 0 0.85rem 0;
 }}
+@media (max-width: 480px) {{
+  .vp-stat-grid {{
+    grid-template-columns: 1fr;
+  }}
+}}
 .vp-stat {{
   background: #fff;
   border: 1px solid rgba(20,40,48,0.08);

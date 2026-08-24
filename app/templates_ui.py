@@ -209,48 +209,43 @@ def render_templates_page(*, embedded: bool = True) -> None:
                 ex = it.get("exercise", "")
                 grupo = get_grupo(ex, user)
 
-                c1, c2, c3, c4, c5 = st.columns([2.8, 0.75, 0.75, 0.9, 1.0])
-                with c1:
-                    st.markdown(f"**{ex}**")
-                    st.caption(grupo)
-                    if user:
-                        meta = get_exercise_meta(user, ex)
-                        from app.exercises import resolve_exercise_image_path
+                st.markdown(f"**{ex}**")
+                st.caption(grupo)
+                if user:
+                    meta = get_exercise_meta(user, ex)
+                    from app.exercises import resolve_exercise_image_path
 
-                        img = resolve_exercise_image_path(meta.get("imagen"))
-                        if img:
-                            try:
-                                st.image(str(img), width=120)
-                            except Exception:
-                                pass
-                with c2:
-                    it["sets"] = st.number_input(
-                        "Ser.",
-                        1,
-                        10,
-                        int(it.get("sets") or 3),
-                        key=f"sets_{d_idx}_{i_idx}",
-                    )
-                with c3:
-                    it["reps"] = st.number_input(
-                        "Rep.",
-                        1,
-                        50,
-                        int(it.get("reps") or 10),
-                        key=f"reps_{d_idx}_{i_idx}",
-                    )
-                with c4:
-                    it["rest_sec"] = st.number_input(
-                        "Desc.(s)",
-                        0,
-                        600,
-                        int(it.get("rest_sec") or 90),
-                        step=15,
-                        key=f"rest_{d_idx}_{i_idx}",
-                    )
-                with c5:
-                    if st.button("Quitar", key=f"del_{d_idx}_{i_idx}"):
-                        remove_idx = i_idx
+                    img = resolve_exercise_image_path(meta.get("imagen"))
+                    if img:
+                        try:
+                            st.image(str(img), width=160)
+                        except Exception:
+                            pass
+
+                it["sets"] = st.number_input(
+                    "Series",
+                    1,
+                    10,
+                    int(it.get("sets") or 3),
+                    key=f"sets_{d_idx}_{i_idx}",
+                )
+                it["reps"] = st.number_input(
+                    "Repeticiones",
+                    1,
+                    50,
+                    int(it.get("reps") or 10),
+                    key=f"reps_{d_idx}_{i_idx}",
+                )
+                it["rest_sec"] = st.number_input(
+                    "Descanso (s)",
+                    0,
+                    600,
+                    int(it.get("rest_sec") or 90),
+                    step=15,
+                    key=f"rest_{d_idx}_{i_idx}",
+                )
+                if st.button("Quitar ejercicio", key=f"del_{d_idx}_{i_idx}", use_container_width=True):
+                    remove_idx = i_idx
 
                 alts = suggest_alternatives(
                     ex,
@@ -285,29 +280,23 @@ def render_templates_page(*, embedded: bool = True) -> None:
                 day["items"] = items
                 st.rerun()
 
-            ac1, ac2, ac3, ac4, ac5 = st.columns([2.2, 0.7, 0.7, 0.8, 1])
-            with ac1:
-                add_ex = st.selectbox("Añadir", pool, key=f"add_ex_{d_idx}", label_visibility="collapsed")
-            with ac2:
-                add_sets = st.number_input("S", 1, 10, 3, key=f"add_sets_{d_idx}", label_visibility="collapsed")
-            with ac3:
-                add_reps = st.number_input("R", 1, 50, 10, key=f"add_reps_{d_idx}", label_visibility="collapsed")
-            with ac4:
-                add_rest = st.number_input("D", 0, 600, 90, step=15, key=f"add_rest_{d_idx}", label_visibility="collapsed")
-            with ac5:
-                if st.button("＋ Añadir", key=f"add_btn_{d_idx}", use_container_width=True):
-                    items.append(
-                        {
-                            "exercise": add_ex,
-                            "sets": int(add_sets),
-                            "reps": int(add_reps),
-                            "weight": 0.0,
-                            "rest_sec": int(add_rest),
-                            "notes": "",
-                        }
-                    )
-                    day["items"] = items
-                    st.rerun()
+            add_ex = st.selectbox("Añadir ejercicio", pool, key=f"add_ex_{d_idx}")
+            add_sets = st.number_input("Series", 1, 10, 3, key=f"add_sets_{d_idx}")
+            add_reps = st.number_input("Repeticiones", 1, 50, 10, key=f"add_reps_{d_idx}")
+            add_rest = st.number_input("Descanso (s)", 0, 600, 90, step=15, key=f"add_rest_{d_idx}")
+            if st.button("＋ Añadir ejercicio", key=f"add_btn_{d_idx}", type="primary", use_container_width=True):
+                items.append(
+                    {
+                        "exercise": add_ex,
+                        "sets": int(add_sets),
+                        "reps": int(add_reps),
+                        "weight": 0.0,
+                        "rest_sec": int(add_rest),
+                        "notes": "",
+                    }
+                )
+                day["items"] = items
+                st.rerun()
 
     st.session_state["tpl_editor"] = plan
 

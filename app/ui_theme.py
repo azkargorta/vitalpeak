@@ -344,6 +344,137 @@ hr {{
   }}
   .vp-hero .vp-brand {{ font-size: 2.6rem; }}
 }}
+
+/* —— Móvil / WebView (Camino A) —— */
+@media (max-width: 768px) {{
+  .block-container {{
+    padding-left: max(0.85rem, env(safe-area-inset-left)) !important;
+    padding-right: max(0.85rem, env(safe-area-inset-right)) !important;
+    padding-top: 1rem !important;
+    padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important;
+    max-width: 100% !important;
+  }}
+
+  h1 {{ font-size: 1.85rem !important; }}
+  h2 {{ font-size: 1.35rem !important; }}
+  h3 {{ font-size: 1.15rem !important; }}
+
+  .vp-today {{
+    padding: 1rem 0.95rem 1.1rem;
+  }}
+
+  /* Botones táctiles */
+  div.stButton > button {{
+    min-height: 2.85rem !important;
+    font-size: 1rem !important;
+  }}
+  div.stButton > button[kind="primary"],
+  div.stButton > button[data-testid="baseButton-primary"] {{
+    min-height: 3rem !important;
+  }}
+
+  /* Inputs cómodos */
+  .stTextInput input,
+  .stNumberInput input,
+  .stSelectbox [data-baseweb="select"] > div,
+  .stDateInput input {{
+    min-height: 2.75rem !important;
+    font-size: 16px !important; /* evita zoom iOS */
+  }}
+
+  /* Tablas: scroll horizontal */
+  div[data-testid="stDataFrame"],
+  div[data-testid="stTable"] {{
+    overflow-x: auto !important;
+    max-width: 100%;
+  }}
+
+  /* Columnas: apilar en móvil (excepto filas marcadas) */
+  div[data-testid="stHorizontalBlock"]:not(.vp-keep-row) {{
+    flex-wrap: wrap !important;
+    gap: 0.35rem !important;
+  }}
+  div[data-testid="stHorizontalBlock"]:not(.vp-keep-row) > div[data-testid="column"] {{
+    width: 100% !important;
+    min-width: 100% !important;
+    flex: 1 1 100% !important;
+  }}
+
+  /* Métricas */
+  [data-testid="stMetric"] {{
+    padding: 0.7rem 0.85rem;
+  }}
+
+  /* Sidebar: targets grandes */
+  section[data-testid="stSidebar"] div.stButton > button {{
+    min-height: 3rem !important;
+    font-size: 1.05rem !important;
+    margin-bottom: 0.15rem !important;
+  }}
+
+  /* Semana como lista */
+  .vp-week-list {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }}
+  .vp-week-row {{
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #FFFFFF;
+    border: 1px solid var(--vp-border);
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+  }}
+  .vp-week-row--today {{
+    border-color: #3AA899;
+    background: #E6F6F3;
+  }}
+  .vp-week-row .vp-week-abbr {{
+    min-width: 2.4rem;
+  }}
+  .vp-week-row .vp-week-num {{
+    min-width: 1.6rem;
+    margin: 0;
+    font-size: 1.25rem;
+  }}
+  .vp-week-row .vp-week-rt {{
+    flex: 1;
+    font-size: 0.85rem;
+    text-align: left;
+  }}
+}}
+
+/* Semana lista también en escritorio (compacta y usable en WebView) */
+.vp-week-list {{
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}}
+.vp-week-row {{
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #FFFFFF;
+  border: 1px solid var(--vp-border);
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  box-shadow: 0 2px 10px rgba(20, 40, 48, 0.03);
+}}
+.vp-week-row--today {{
+  border-color: #3AA899;
+  background: #E6F6F3;
+}}
+.vp-week-row .vp-week-num {{
+  margin: 0;
+}}
+.vp-week-row .vp-week-rt {{
+  flex: 1;
+  text-align: left;
+  font-size: 0.82rem;
+}}
 </style>
         """,
         unsafe_allow_html=True,
@@ -384,9 +515,34 @@ def section_label(text: str) -> None:
 
 
 def render_mode_switch(options: list[str], current: str, *, key: str) -> str:
-    """Interruptor visual de 2+ modos (botones grandes)."""
+    """Interruptor de modos. En móvil: selectbox si hay 3+ opciones."""
     if current not in options:
         current = options[0]
+
+    # Teléfono primero: muchas pestañas en fila no caben
+    if len(options) >= 3:
+        idx = options.index(current) if current in options else 0
+        chosen = st.selectbox(
+            "Sección",
+            options,
+            index=idx,
+            key=f"{key}_select",
+            label_visibility="collapsed",
+        )
+        st.session_state[key] = chosen
+        hints = {
+            "Plantillas": "Elige un plan listo y personalízalo",
+            "Planificar": "Pon tus rutinas en el calendario",
+            "Ejercicios": "Catálogo y evolución",
+            "Historial": "Series registradas",
+            "Objetivos": "Metas semanales y por ejercicio",
+            "Peso": "Seguimiento corporal",
+        }
+        hint = hints.get(chosen, "")
+        if hint:
+            st.caption(hint)
+        return chosen
+
     st.markdown(
         """
 <style>

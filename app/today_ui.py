@@ -154,31 +154,29 @@ def render_today_page(username: str) -> None:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # —— Semana ——
+    # —— Semana (lista: usable en teléfono / WebView) ——
     section_label("Esta semana")
     monday = today - _dt.timedelta(days=today.weekday())
     week_dates = [monday + _dt.timedelta(days=i) for i in range(7)]
     abbr = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-    cols = st.columns(7)
+    rows_html: List[str] = ['<div class="vp-week-list">']
     for i, d in enumerate(week_dates):
         rt = plan.get(d.isoformat()) or ""
         is_today = d.isoformat() == today_iso
         label = rt if rt else "Libre"
-        if len(label) > 18:
-            label = label[:16] + "…"
-        cls = "vp-week-day vp-week-day--today" if is_today else "vp-week-day"
-        with cols[i]:
-            st.markdown(
-                f"""
-                <div class="{cls}">
-                  <div class="vp-week-abbr">{abbr[i]}</div>
-                  <div class="vp-week-num">{d.day}</div>
-                  <div class="vp-week-rt">{label}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        if len(label) > 28:
+            label = label[:26] + "…"
+        cls = "vp-week-row vp-week-row--today" if is_today else "vp-week-row"
+        rows_html.append(
+            f'<div class="{cls}">'
+            f'<div class="vp-week-abbr">{abbr[i]}</div>'
+            f'<div class="vp-week-num">{d.day}</div>'
+            f'<div class="vp-week-rt">{label}</div>'
+            f"</div>"
+        )
+    rows_html.append("</div>")
+    st.markdown("\n".join(rows_html), unsafe_allow_html=True)
 
     planned_n = sum(1 for d in week_dates if plan.get(d.isoformat()))
     st.caption(f"{planned_n} de 7 días con rutina · {len(routines)} plantillas guardadas")

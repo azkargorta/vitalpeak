@@ -301,88 +301,77 @@ def _render_logging(username: str, sess: Dict[str, Any]) -> None:
         return
 
     next_ex = (_next_item(sess) or {}).get("exercise")
-    col_log, col_mov = st.columns([1.1, 1], gap="large")
 
-    with col_log:
-        if sess.get("rest_ends_at"):
-            _render_rest_timer(sess)
+    # Teléfono primero: formulario arriba, movimiento debajo (no dos columnas)
+    if sess.get("rest_ends_at"):
+        _render_rest_timer(sess)
 
-        sk = f"{int(sess.get('ex_idx') or 0)}_{int(sess.get('set_num') or 1)}"
-        with st.form("session_set_form", clear_on_submit=False):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                set_num = st.number_input(
-                    "Serie #",
-                    min_value=1,
-                    step=1,
-                    value=int(sess.get("set_num") or 1),
-                    key=f"sess_set_num_{sk}",
-                )
-            with c2:
-                reps = st.number_input(
-                    "Repeticiones",
-                    min_value=1,
-                    step=1,
-                    value=int(sess.get("draft_reps") or item["reps"]),
-                    key=f"sess_reps_{sk}",
-                )
-            with c3:
-                weight = st.number_input(
-                    "Peso (kg)",
-                    min_value=0.0,
-                    step=0.5,
-                    value=float(sess.get("draft_weight") or item["weight"]),
-                    key=f"sess_weight_{sk}",
-                )
-            rest_sec = st.number_input(
-                "Descanso tras esta serie (s)",
-                min_value=0,
-                step=15,
-                value=int(item.get("rest_sec") or 90),
-                key=f"sess_rest_sec_{sk}",
-                help="0 = sin temporizador. Puedes omitirlo después.",
-            )
-            submitted = st.form_submit_button("Guardar serie", type="primary", use_container_width=True)
+    sk = f"{int(sess.get('ex_idx') or 0)}_{int(sess.get('set_num') or 1)}"
+    with st.form("session_set_form", clear_on_submit=False):
+        set_num = st.number_input(
+            "Serie #",
+            min_value=1,
+            step=1,
+            value=int(sess.get("set_num") or 1),
+            key=f"sess_set_num_{sk}",
+        )
+        reps = st.number_input(
+            "Repeticiones",
+            min_value=1,
+            step=1,
+            value=int(sess.get("draft_reps") or item["reps"]),
+            key=f"sess_reps_{sk}",
+        )
+        weight = st.number_input(
+            "Peso (kg)",
+            min_value=0.0,
+            step=0.5,
+            value=float(sess.get("draft_weight") or item["weight"]),
+            key=f"sess_weight_{sk}",
+        )
+        rest_sec = st.number_input(
+            "Descanso tras esta serie (s)",
+            min_value=0,
+            step=15,
+            value=int(item.get("rest_sec") or 90),
+            key=f"sess_rest_sec_{sk}",
+            help="0 = sin temporizador. Puedes omitirlo después.",
+        )
+        submitted = st.form_submit_button("Guardar serie", type="primary", use_container_width=True)
 
-        if submitted:
-            add_training_set(
-                username,
-                sess["date"],
-                item["exercise"],
-                int(set_num),
-                int(reps),
-                float(weight),
-            )
-            sess["logged"].append(
-                {
-                    "exercise": item["exercise"],
-                    "set": int(set_num),
-                    "reps": int(reps),
-                    "weight": float(weight),
-                }
-            )
-            # Autorelleno siguiente serie con los mismos valores
-            sess["draft_reps"] = int(reps)
-            sess["draft_weight"] = float(weight)
-            sess["set_num"] = int(set_num)  # _advance usará esto
-            item["rest_sec"] = int(rest_sec)
-            _start_rest(sess, int(rest_sec))
-            _advance_after_set(sess)
-            # Si avanzamos set_num dentro del mismo ejercicio, draft ya está
-            if sess.get("phase") == "logging" and sess.get("set_num") == int(set_num):
-                # edge: planned was current; advance bumped set_num
-                pass
-            st.success(f"Serie {set_num} guardada · {reps} reps @ {weight} kg")
-            st.rerun()
+    if submitted:
+        add_training_set(
+            username,
+            sess["date"],
+            item["exercise"],
+            int(set_num),
+            int(reps),
+            float(weight),
+        )
+        sess["logged"].append(
+            {
+                "exercise": item["exercise"],
+                "set": int(set_num),
+                "reps": int(reps),
+                "weight": float(weight),
+            }
+        )
+        sess["draft_reps"] = int(reps)
+        sess["draft_weight"] = float(weight)
+        sess["set_num"] = int(set_num)
+        item["rest_sec"] = int(rest_sec)
+        _start_rest(sess, int(rest_sec))
+        _advance_after_set(sess)
+        st.success(f"Serie {set_num} guardada · {reps} reps @ {weight} kg")
+        st.rerun()
 
-        # Series ya hechas de este ejercicio hoy en la sesión
-        done = [x for x in sess.get("logged") or [] if x["exercise"] == item["exercise"]]
-        if done:
-            st.caption("En esta sesión:")
-            for row in done:
-                st.write(f"- Serie {row['set']}: {row['reps']} × {row['weight']} kg")
+    done = [x for x in sess.get("logged") or [] if x["exercise"] == item["exercise"]]
+    if done:
+        st.caption("En esta sesión:")
+        for row in done:
+            st.write(f"- Serie {row['set']}: {row['reps']} × {row['weight']} kg")
 
-    with col_mov:
+    with st.expander("Ver movimiento", expanded=False):
         render_movement_preview(
             item["exercise"],
             key="sess_mov",
