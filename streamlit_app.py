@@ -37,16 +37,46 @@ from app.planner_ui import render_planner_page
 
 apply_theme()
 
-# En Streamlit Cloud, la API key se configura en Settings → Secrets.
-# Si existe en st.secrets, la volcamos a variables de entorno para que el resto del código funcione igual.
+# En Streamlit Cloud, secrets → variables de entorno (OpenAI, SMTP, etc.).
 try:
-    if hasattr(st, 'secrets'):
-        for _k in ("OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL", "OPENAI_API_BASE"):
+    if hasattr(st, "secrets"):
+        _secret_keys = (
+            "OPENAI_API_KEY",
+            "OPENAI_MODEL",
+            "OPENAI_BASE_URL",
+            "OPENAI_API_BASE",
+            "SMTP_HOST",
+            "SMTP_PORT",
+            "SMTP_USER",
+            "SMTP_PASS",
+            "SMTP_FROM",
+            "APP_BASE_URL",
+            "VITALPEAK_SEED",
+            "VITALPEAK_ADMIN_USER",
+            "VITALPEAK_ADMIN_PASSWORD",
+            "VITALPEAK_ADMIN_EMAIL",
+        )
+        for _k in _secret_keys:
             if _k in st.secrets and str(st.secrets[_k]).strip():
-                # MODEL/BASE_URL: permitir override desde secrets; API_KEY solo si no existe en env
                 if _k == "OPENAI_API_KEY" and os.getenv("OPENAI_API_KEY"):
                     continue
                 os.environ[_k] = str(st.secrets[_k]).strip()
+        # Tabla anidada [smtp]
+        try:
+            smtp_tbl = st.secrets.get("smtp")
+            if smtp_tbl:
+                for src, dst in (
+                    ("host", "SMTP_HOST"),
+                    ("port", "SMTP_PORT"),
+                    ("user", "SMTP_USER"),
+                    ("pass", "SMTP_PASS"),
+                    ("password", "SMTP_PASS"),
+                    ("from", "SMTP_FROM"),
+                ):
+                    if src in smtp_tbl and str(smtp_tbl[src]).strip():
+                        os.environ[dst] = str(smtp_tbl[src]).strip()
+        except Exception:
+            pass
 except Exception:
     pass
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -444,7 +474,12 @@ if not logged_in or page == "Entrar":
                             if ok:
                                 st.info("Si existe, te llegará un correo con instrucciones.")
                             else:
-                                st.warning("No se pudo enviar email. Usa este código en la app: " + token)
+                                st.warning(
+                                    "No se pudo enviar email ("
+                                    + msg
+                                    + "). Usa este código en la app: "
+                                    + token
+                                )
 
     with tab_reg:
         with st.form("register_form"):
