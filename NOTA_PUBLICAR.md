@@ -6,10 +6,12 @@ Checklist para pasar de “solo en tu PC” a “gente puede entrar, datos se gu
 
 ## Fase 0 — Dejar el repo listo (hoy)
 
-1. Revisar que no subes secretos (`.env`, passwords, API keys).
-2. Asegurar que `.gitignore` ignore cosas locales: `usuarios_data/`, `.env`, `__pycache__/`, etc.
-3. Hacer commit de lo pendiente (Hoy, Entrenar, quitar Técnica, etc.).
-4. Push a GitHub (`main` o la rama que uses).
+- [x] Repo conectado a GitHub (`origin`)
+- [x] `.gitignore` con `usuarios_data/`, `.env`, secrets
+- [ ] Quitar JSON de usuarios del historial de git (commit pendiente)
+- [ ] Push a GitHub
+
+Pasos manuales tras el commit:
 
 ```bash
 git status
@@ -23,6 +25,11 @@ Si el repo aún no está en GitHub: crear el repo vacío en github.com y conecta
 ---
 
 ## Fase 1 — Publicar la web (que la gente entre)
+
+- [ ] Cuenta en [share.streamlit.io](https://share.streamlit.io) con GitHub
+- [ ] New app → repo `vitalpeak` → main file `streamlit_app.py`
+- [ ] Secrets configurados (OpenAI si usas IA)
+- [ ] App desplegada y URL probada en móvil
 
 Objetivo: URL pública (Streamlit Community Cloud es lo más simple).
 

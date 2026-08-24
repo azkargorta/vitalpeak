@@ -208,3 +208,11 @@ __marimo__/
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# VitalPeak — datos locales (no subir a GitHub)
+usuarios_data/*
+!usuarios_data/README.md
+
+# Backups locales
+*.bak
+*.bak.*
