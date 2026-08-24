@@ -68,7 +68,19 @@ if _u and _t:
 import os, time
 
 from app.email_utils import send_email
-from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset, resolve_login_identifier
+from app.datastore import (
+    set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile,
+    get_password_reset, create_password_reset, clear_password_reset, load_user,
+)
+try:
+    from app.datastore import resolve_login_identifier
+except ImportError:
+    def resolve_login_identifier(identifier: str):
+        """Fallback si el deploy aún no tiene la función en datastore."""
+        ident = (identifier or "").strip()
+        if not ident:
+            return None
+        return ident if load_user(ident) else None
 
 from app.datastore import (
     register_user, authenticate, load_user, save_user,
