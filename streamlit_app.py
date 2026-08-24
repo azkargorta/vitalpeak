@@ -68,7 +68,7 @@ if _u and _t:
 import os, time
 
 from app.email_utils import send_email
-from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset
+from app.datastore import set_password, set_account_email, set_recovery_email, get_emails_for_user, set_profile, get_password_reset, create_password_reset, clear_password_reset, resolve_login_identifier
 
 from app.datastore import (
     register_user, authenticate, load_user, save_user,
@@ -403,43 +403,36 @@ if not logged_in or page == "Entrar":
         with st.expander("Olvidé mi contraseña"):
             rec_id = st.text_input("Tu usuario o email de recuperación", key="forgot_id")
             if st.button("Enviar enlace de recuperación", key="forgot_btn"):
-                target_user = None
-                if rec_id:
-                    try:
-                        _ = load_user(rec_id)
-                        target_user = rec_id
-                    except Exception:
-                        pass
-                if not target_user:
-                    import glob, json
-                    from pathlib import Path as _P
-                    for pth in glob.glob(str((_P(".") / "usuarios_data" / "*.json").resolve())):
-                        try:
-                            d = json.load(open(pth, "r", encoding="utf-8"))
-                            if d.get("recovery_email") == rec_id or d.get("email") == rec_id:
-                                target_user = _P(pth).stem
-                                break
-                        except Exception:
-                            pass
+                target_user = resolve_login_identifier(rec_id) if rec_id else None
                 if not target_user:
                     st.info("Si existe, te llegará un correo con instrucciones.")
                 else:
-                    token = __import__("secrets").token_urlsafe(24)
-                    create_password_reset(target_user, token, ttl_seconds=3600)
-                    base_url = os.getenv("APP_BASE_URL", "")
-                    link = f"{base_url}?user={target_user}&reset_token={token}" if base_url else f"(Configura APP_BASE_URL) token: {token}"
-                    acc, rec = get_emails_for_user(target_user)
-                    to_email = rec or acc
-                    ok, msg = send_email(
-                        to_email,
-                        "Recuperación de contraseña",
-                        f"<p>Hola {target_user},</p><p>Enlace para restablecer (1h): <a href='{link}'>{link}</a></p><p>Código: <b>{token}</b></p>",
-                        text=f"Enlace: {link}\nCódigo: {token}",
-                    )
-                    if ok:
+                    payload = create_password_reset(target_user, ttl_seconds=3600)
+                    if not payload:
                         st.info("Si existe, te llegará un correo con instrucciones.")
                     else:
-                        st.warning("No se pudo enviar email. Usa este código en la app: " + token)
+                        token = payload["token"]
+                        base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+                        link = (
+                            f"{base_url}?user={target_user}&reset_token={token}"
+                            if base_url
+                            else f"(Configura APP_BASE_URL) token: {token}"
+                        )
+                        emails = get_emails_for_user(target_user)
+                        to_email = emails.get("recovery_email") or emails.get("email")
+                        if not to_email:
+                            st.warning("No hay email de recuperación. Usa este código: " + token)
+                        else:
+                            ok, msg = send_email(
+                                to_email,
+                                "Recuperación de contraseña",
+                                f"<p>Hola {target_user},</p><p>Enlace para restablecer (1h): <a href='{link}'>{link}</a></p><p>Código: <b>{token}</b></p>",
+                                text=f"Enlace: {link}\nCódigo: {token}",
+                            )
+                            if ok:
+                                st.info("Si existe, te llegará un correo con instrucciones.")
+                            else:
+                                st.warning("No se pudo enviar email. Usa este código en la app: " + token)
 
     with tab_reg:
         with st.form("register_form"):

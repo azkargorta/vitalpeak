@@ -241,6 +241,52 @@ def get_emails_for_user(username: str) -> dict:
     d = load_user(username) or {}
     return {"email": d.get("email"), "recovery_email": d.get("recovery_email")}
 
+
+def resolve_login_identifier(identifier: str) -> Optional[str]:
+    """Devuelve el username canónico a partir de usuario o email."""
+    ident = (identifier or "").strip()
+    if not ident:
+        return None
+    if load_user(ident):
+        sb = _sb()
+        if sb is not None:
+            return _canonical_username(sb, ident)
+        return ident
+
+    ident_l = ident.lower()
+    sb = _sb()
+    if sb is not None:
+        try:
+            res = sb.table(TABLE_USERS).select("username,data").execute()
+            for row in res.data or []:
+                data = row.get("data") or {}
+                emails = [
+                    str(data.get("email") or "").strip().lower(),
+                    str(data.get("recovery_email") or "").strip().lower(),
+                ]
+                if ident_l in emails:
+                    return str(row.get("username"))
+        except Exception:
+            return None
+        return None
+
+    ensure_base_dirs()
+    for p in USERS_DIR.glob("*.json"):
+        if p.name.endswith(".reset.json"):
+            continue
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        emails = [
+            str(d.get("email") or "").strip().lower(),
+            str(d.get("recovery_email") or "").strip().lower(),
+        ]
+        if ident_l in emails:
+            return p.stem
+    return None
+
+
 def set_profile(username: str, profile: dict) -> None:
     d = ensure_user(username)
     d["profile"] = profile or {}
@@ -265,7 +311,8 @@ def create_password_reset(username: str, *, ttl_seconds: int = 3600) -> dict | N
 def get_password_reset(username: str) -> dict | None:
     sb = _sb()
     if sb is not None:
-        res = sb.table(TABLE_RESETS).select("token,expires_at").eq("username", username).limit(1).execute()
+        key = _canonical_username(sb, username)
+        res = sb.table(TABLE_RESETS).select("token,expires_at").eq("username", key).limit(1).execute()
         rows = res.data or []
         return rows[0] if rows else None
     p = _reset_token_path(username)
@@ -279,7 +326,8 @@ def get_password_reset(username: str) -> dict | None:
 def clear_password_reset(username: str) -> None:
     sb = _sb()
     if sb is not None:
-        sb.table(TABLE_RESETS).delete().eq("username", username).execute()
+        key = _canonical_username(sb, username)
+        sb.table(TABLE_RESETS).delete().eq("username", key).execute()
         return
     p = _reset_token_path(username)
     if p.exists():
