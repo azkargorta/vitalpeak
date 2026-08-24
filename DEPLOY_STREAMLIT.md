@@ -47,9 +47,9 @@ Para pruebas internas puedes dejar el seed. Antes de usuarios reales: `VITALPEAK
 
 | Qué | En Cloud |
 |-----|----------|
-| Datos en `usuarios_data/` | Se pierden al reiniciar |
+| Datos en `usuarios_data/` | Se pierden al reiniciar **si no hay Supabase** |
 | GIFs / imágenes | Van con el repo (OK) |
-| Usuarios reales | Necesitas **Fase 2 — Supabase** |
+| Persistencia real | Ver `SUPABASE.md` (Fase 2) |
 
 ## 6. Si falla el deploy
 

@@ -1,11 +1,30 @@
 from __future__ import annotations
 import json, os, time, secrets, base64, hashlib, hmac
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
 BASE_DIR = Path(".")
 USERS_DIR = BASE_DIR / "usuarios_data"
 RESET_DIR = USERS_DIR
+
+TABLE_USERS = "user_accounts"
+TABLE_RESETS = "password_resets"
+
+
+def _sb():
+    """Cliente Supabase o None si no hay secrets / paquete."""
+    try:
+        from app.supabase_utils import get_supabase_client
+
+        return get_supabase_client()
+    except Exception:
+        return None
+
+
+def using_cloud_db() -> bool:
+    return _sb() is not None
+
 
 def ensure_base_dirs() -> None:
     USERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -16,7 +35,77 @@ def user_json_path(username: str) -> Path:
 def _reset_token_path(username: str) -> Path:
     return RESET_DIR / f"{username}.reset.json"
 
+
+def _empty_user(*, password: str = "", email: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "password": password,
+        "email": email,
+        "recovery_email": email,
+        "profile": {},
+        "entrenamientos": [],
+        "rutinas": [],
+        "custom_exercises": [],
+        "exercise_meta": {},
+        "weights": [],
+        "objetivos": {"dias_semana": 3, "peso_objetivo": None, "ejercicios": {}},
+    }
+
+
+def _load_user_sb(sb, username: str) -> Optional[Dict[str, Any]]:
+    try:
+        res = sb.table(TABLE_USERS).select("data").eq("username", username).limit(1).execute()
+        rows = res.data or []
+        if not rows:
+            res = (
+                sb.table(TABLE_USERS)
+                .select("data")
+                .eq("username_norm", username.lower())
+                .limit(1)
+                .execute()
+            )
+            rows = res.data or []
+        if not rows:
+            return None
+        data = rows[0].get("data")
+        return dict(data) if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _canonical_username(sb, username: str) -> str:
+    res = sb.table(TABLE_USERS).select("username").eq("username", username).limit(1).execute()
+    rows = res.data or []
+    if rows:
+        return str(rows[0]["username"])
+    res = (
+        sb.table(TABLE_USERS)
+        .select("username")
+        .eq("username_norm", username.lower())
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if rows:
+        return str(rows[0]["username"])
+    return username
+
+
+def _save_user_sb(sb, username: str, data: Dict[str, Any]) -> None:
+    key = _canonical_username(sb, username)
+    payload = {
+        "username": key,
+        "username_norm": key.lower(),
+        "data": data,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    sb.table(TABLE_USERS).upsert(payload, on_conflict="username").execute()
+
+
 def load_user(username: str) -> Optional[Dict[str, Any]]:
+    sb = _sb()
+    if sb is not None:
+        return _load_user_sb(sb, username)
+
     ensure_base_dirs()
     p = user_json_path(username)
     if not p.exists():
@@ -33,7 +122,12 @@ def load_user(username: str) -> Optional[Dict[str, Any]]:
         return None
 
 def save_user(username: str, data: Dict[str, Any]) -> None:
-    """Guarda JSON de usuario con reintentos (OneDrive a veces bloquea el archivo)."""
+    """Guarda el documento del usuario (Supabase si hay secrets; si no, JSON local)."""
+    sb = _sb()
+    if sb is not None:
+        _save_user_sb(sb, username, data)
+        return
+
     ensure_base_dirs()
     p = user_json_path(username)
     payload = json.dumps(data, ensure_ascii=False, indent=2)
@@ -66,25 +160,12 @@ def save_user(username: str, data: Dict[str, Any]) -> None:
         ) from (last_err or e)
 
 def ensure_user(username: str) -> Dict[str, Any]:
-    ensure_base_dirs()
-    p = user_json_path(username)
-    if not p.exists():
-        data = {
-            "password": "",
-            "email": None,
-            "recovery_email": None,
-            "profile": {},
-            "entrenamientos": [],
-            "rutinas": [],
-            "custom_exercises": [],
-            "exercise_meta": {},
-            "weights": [],
-            "objetivos": {"dias_semana": 3, "peso_objetivo": None, "ejercicios": {}},
-        }
-        save_user(username, data)
-        return data
-    d = load_user(username) or {}
-    return d
+    d = load_user(username)
+    if d:
+        return d
+    data = _empty_user()
+    save_user(username, data)
+    return data
 
 def _pbkdf2_hash(password: str, *, iterations: int = 310_000) -> str:
     salt = secrets.token_bytes(16)
@@ -139,22 +220,9 @@ def authenticate(username: str, password: str) -> bool:
     return stored == password
 
 def register_user(username: str, password: str, email: Optional[str]=None) -> bool:
-    ensure_base_dirs()
-    p = user_json_path(username)
-    if p.exists():
+    if load_user(username):
         return False
-    data = {
-        "password": _pbkdf2_hash(password),
-        "email": email,
-        "recovery_email": email,
-        "profile": {},
-        "entrenamientos": [],
-        "rutinas": [],
-        "custom_exercises": [],
-        "exercise_meta": {},
-        "weights": [],
-        "objetivos": {"dias_semana": 3, "peso_objetivo": None, "ejercicios": {}},
-    }
+    data = _empty_user(password=_pbkdf2_hash(password), email=email)
     save_user(username, data)
     return True
 
@@ -183,10 +251,23 @@ def create_password_reset(username: str, *, ttl_seconds: int = 3600) -> dict | N
         return None
     token = secrets.token_urlsafe(24)
     payload = {"token": token, "expires_at": int(time.time()) + ttl_seconds}
+    sb = _sb()
+    if sb is not None:
+        key = _canonical_username(sb, username)
+        sb.table(TABLE_RESETS).upsert(
+            {"username": key, "token": token, "expires_at": payload["expires_at"]},
+            on_conflict="username",
+        ).execute()
+        return payload
     _reset_token_path(username).write_text(json.dumps(payload), encoding="utf-8")
     return payload
 
 def get_password_reset(username: str) -> dict | None:
+    sb = _sb()
+    if sb is not None:
+        res = sb.table(TABLE_RESETS).select("token,expires_at").eq("username", username).limit(1).execute()
+        rows = res.data or []
+        return rows[0] if rows else None
     p = _reset_token_path(username)
     if not p.exists():
         return None
@@ -196,6 +277,10 @@ def get_password_reset(username: str) -> dict | None:
         return None
 
 def clear_password_reset(username: str) -> None:
+    sb = _sb()
+    if sb is not None:
+        sb.table(TABLE_RESETS).delete().eq("username", username).execute()
+        return
     p = _reset_token_path(username)
     if p.exists():
         p.unlink()

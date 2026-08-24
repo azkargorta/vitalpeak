@@ -57,24 +57,15 @@ OPENAI_MODEL = "gpt-4o-mini"
 
 ## Fase 2 — Guardar datos de verdad (prioridad)
 
-Objetivo: que cada usuario conserve entrenos, rutinas, peso y plan al reiniciar la app.
+Guía detallada: **`SUPABASE.md`**. SQL: **`sql/supabase_user_accounts.sql`**.
 
-1. Crear proyecto en [Supabase](https://supabase.com).
-2. Crear tablas (mínimo):
-   - `profiles` (usuario, email, perfil)
-   - `trainings` (series / sesiones)
-   - `routines` (plantillas)
-   - `routine_plan` (día → rutina)
-   - `weights`
-   - `goals`
-3. (Recomendado) Activar **Auth** de Supabase o migrar el login actual a guardar en Postgres.
-4. En el código VitalPeak:
-   - Adaptar `app/datastore.py` (y lo que use `load_user` / `save_user`) para leer/escribir en Supabase.
-   - Dejar de depender de `usuarios_data/*.json` en producción.
-5. Poner URL y keys en Streamlit Secrets.
-6. Probar: crear cuenta → guardar serie → refrescar / redeploy → los datos siguen.
+- [x] Código: `datastore.py` usa Supabase si hay secrets; si no, JSON local
+- [ ] Crear proyecto en [supabase.com](https://supabase.com)
+- [ ] Ejecutar el SQL en SQL Editor
+- [ ] Pegar URL + **service_role** en Streamlit Secrets
+- [ ] Reboot + probar: crear cuenta → guardar serie → reboot → los datos siguen
 
-Hasta que esto esté hecho, la web pública es solo demo.
+Hasta que los secrets estén puestos, la web pública sigue perdiendo datos al reiniciar.
 
 ---
 
@@ -114,8 +105,8 @@ Streamlit no es una app nativa; el camino barato es **web responsive + envoltori
 ## Notas del estado actual del proyecto
 
 - App: Streamlit (`streamlit_app.py`).
-- Datos locales: `usuarios_data/<user>.json` (vale en PC, no en Cloud).
-- Ya hay utilidades `app/supabase_utils.py` (usadas en posture); falta migrar el núcleo (`datastore`) a DB.
+- Datos locales: `usuarios_data/<user>.json` (vale en PC).
+- En Cloud: misma API `load_user`/`save_user` → tabla `user_accounts` si hay secrets (`SUPABASE.md`).
 - Menú actual: Hoy · Entrenar · Rutinas · Progreso · Cuenta (sin Técnica).
 - GIFs de movimiento viven en `exercise_images/`; asegúrate de que están en el repo o en storage si el deploy no los incluye.
 
@@ -123,8 +114,5 @@ Streamlit no es una app nativa; el camino barato es **web responsive + envoltori
 
 ## Siguiente acción concreta
 
-Cuando digas “empezamos”, el primer trabajo de código debería ser:
-
-1. Diseño de tablas Supabase.  
-2. Adaptar `datastore.py` a Postgres/Supabase.  
-3. Redeploy en Streamlit Cloud con secrets.
+Tú: crear proyecto Supabase + SQL + secrets (pasos 1–4 de `SUPABASE.md`).
+Luego: commit/push del código de datastore y reboot de Streamlit.
