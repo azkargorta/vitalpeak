@@ -345,15 +345,33 @@ hr {{
   .vp-hero .vp-brand {{ font-size: 2.6rem; }}
 }}
 
+/* Cabecera Streamlit: no tapar el contenido (menú ☰) */
+header[data-testid="stHeader"] {{
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(8px);
+}}
+div[data-testid="stToolbar"] {{
+  right: 0.5rem !important;
+}}
+
 /* —— Móvil / WebView (Camino A) —— */
 @media (max-width: 768px) {{
   .block-container {{
     padding-left: max(0.85rem, env(safe-area-inset-left)) !important;
     padding-right: max(0.85rem, env(safe-area-inset-right)) !important;
-    padding-top: 1rem !important;
+    /* Espacio para el botón ☰ del menú (no tape el hero) */
+    padding-top: 3.25rem !important;
     padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important;
     max-width: 100% !important;
   }}
+  .vp-hero {{
+    margin-top: 0 !important;
+  }}
+  /* Empuja el contenido bajo el toggle del sidebar */
+  section.main > div {{
+    padding-top: 0.25rem !important;
+  }}
+
 
   h1 {{ font-size: 1.85rem !important; }}
   h2 {{ font-size: 1.35rem !important; }}

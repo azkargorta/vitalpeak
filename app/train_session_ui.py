@@ -16,6 +16,27 @@ from app.training import add_training_set, last_values_for_exercise
 
 
 SESSION_KEY = "vp_train_session"
+SCROLL_KEY = "vp_train_scroll_exercises"
+
+
+def _scroll_to_exercises() -> None:
+    """Baja la vista hasta el bloque de ejercicios (móvil)."""
+    import streamlit.components.v1 as components
+
+    components.html(
+        """
+<script>
+(function () {
+  const doc = window.parent.document;
+  const el = doc.getElementById("vp-session-exercises");
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+})();
+</script>
+        """,
+        height=0,
+    )
 
 
 def parse_rest_seconds(value: Any, default: int = 90) -> int:
@@ -405,6 +426,7 @@ def _render_picker(username: str, day: date) -> None:
     pick = st.selectbox("Elegir rutina para hoy", names, key="train_pick_routine")
     if st.button("Empezar esta rutina", type="primary", use_container_width=True):
         st.session_state[SESSION_KEY] = init_session_from_routine(username, day, pick)
+        st.session_state[SCROLL_KEY] = True
         st.rerun()
 
 
@@ -426,6 +448,11 @@ def render_train_page(username: str) -> None:
         if st.button("Reiniciar sesión", use_container_width=True, key="reset_sess"):
             st.session_state.pop(SESSION_KEY, None)
             st.rerun()
+
+    # Ancla para scroll automático al elegir rutina
+    st.markdown('<div id="vp-session-exercises"></div>', unsafe_allow_html=True)
+    if st.session_state.pop(SCROLL_KEY, False):
+        _scroll_to_exercises()
 
     _render_progress(sess)
 

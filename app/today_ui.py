@@ -33,7 +33,7 @@ def _item_line(it: Dict[str, Any], idx: int) -> str:
 
 
 def _start_train(username: str, first_ex: Optional[str] = None) -> None:
-    from app.train_session_ui import SESSION_KEY, get_or_start_session
+    from app.train_session_ui import SESSION_KEY, SCROLL_KEY, get_or_start_session
 
     sess = get_or_start_session(username, date.today())
     if sess and sess.get("items") and first_ex:
@@ -46,6 +46,7 @@ def _start_train(username: str, first_ex: Optional[str] = None) -> None:
                 sess["phase"] = "logging"
                 break
         st.session_state[SESSION_KEY] = sess
+    st.session_state[SCROLL_KEY] = True
     _goto("Entrenar")
 
 
@@ -141,10 +142,17 @@ def render_today_page(username: str) -> None:
             _goto("Rutinas")
     else:
         st.markdown("### Nada asignado")
-        st.caption("Elige una plantilla o asigna una rutina al día de hoy.")
+        st.caption("Elige una rutina ya creada o planifica el día.")
+        if st.button(
+            "Ir a entrenar (elegir rutina)",
+            type="primary",
+            use_container_width=True,
+            key="hoy_go_train",
+        ):
+            _goto("Entrenar")
         b1, b2 = st.columns(2)
         with b1:
-            if st.button("Ver plantillas", type="primary", use_container_width=True, key="hoy_tpl"):
+            if st.button("Ver plantillas", use_container_width=True, key="hoy_tpl"):
                 st.session_state["rutinas_tab"] = "Plantillas"
                 _goto("Rutinas")
         with b2:
