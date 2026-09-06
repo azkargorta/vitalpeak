@@ -1,5 +1,5 @@
-const CACHE = "vitalpeak-mobile-v2";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon-cover.png"];
+const CACHE = "vitalpeak-mobile-v3";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./catalog-data.js", "./app.js", "./manifest.webmanifest", "./icon-cover.png"];
 
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", event => event.waitUntil(self.clients.claim()));
