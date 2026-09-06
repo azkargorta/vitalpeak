@@ -30,7 +30,7 @@ const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp
 const dateLabel = value => new Intl.DateTimeFormat("es-ES", { weekday:"long", day:"numeric", month:"long" }).format(new Date(`${value}T12:00:00`));
 const today = () => new Date().toISOString().slice(0, 10);
 function toast(message) { const el = document.querySelector("#toast"); el.textContent = message; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 2600); }
-function hero(kicker, title, text) { return `<header class="hero"><div class="eyebrow">${kicker}</div><h1>${title}</h1><p>${text}</p></header>`; }
+function hero(kicker, title, text) { return `<header class="hero"><div class="app-brand"><img src="./icon-cover.png" alt="VitalPeak" /><div class="wordmark">Vital<span>Peak</span></div></div><div class="eyebrow">${kicker}</div><h1>${title}</h1><p>${text}</p></header>`; }
 function sessionsThisWeek() { const start = new Date(); start.setHours(0,0,0,0); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); return state.sessions.filter(s => new Date(`${s.date}T12:00:00`) >= start); }
 function renderToday() {
   const week = sessionsThisWeek();
