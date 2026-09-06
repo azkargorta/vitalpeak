@@ -1,0 +1,48 @@
+name: Publicar VitalPeak móvil en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - "exercise_images/sequences/**"
+      - ".github/workflows/deploy-vitalpeak-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: vitalpeak-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Preparar la app y sus GIFs
+        run: |
+          mkdir -p _site
+          cp -R mobile/. _site/
+          mkdir -p _site/exercise-gifs
+          cp -R exercise_images/sequences/. _site/exercise-gifs/
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir la aplicación
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
