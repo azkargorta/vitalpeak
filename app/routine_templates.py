@@ -786,6 +786,97 @@ def _build_templates() -> List[Dict[str, Any]]:
             )
         )
 
+    # —— Grupo principal + secundario ——
+    # Alternativa para quien prefiere una sesión muy clara por parejas de
+    # músculos, en lugar de full body, Upper/Lower o PPL.
+    combo_3_base = [
+        _day("Pecho + tríceps", "Principal: pecho · secundario: tríceps", [
+            _item("Press con barra en banco horizontal", 4, 8, rest_sec=150),
+            _item("Press de banco con mancuernas, 30º de inclinación", 3, 10),
+            _item("Apertura de pecho sentado", 3, 12, rest_sec=75),
+            _item("Jalón de triceps en polea alta con cuerda", 3, 12, rest_sec=75),
+            _item("Extensiones de triceps acostado con mancuernas", 2, 12, rest_sec=75),
+        ]),
+        _day("Espalda + bíceps", "Principal: espalda · secundario: bíceps", [
+            _item("Jalón vertical con polea alta y agarre cerrado", 4, 10, rest_sec=120),
+            _item("Remo con polea de agarre cerrado", 4, 10, rest_sec=120),
+            _item("Remo de un brazo con mancuerna", 3, 10),
+            _item("Curl alterno de biceps con mancuerna", 3, 12, rest_sec=75),
+            _item("Curl de biceps estilo martillo con mancuernas", 2, 12, rest_sec=75),
+        ]),
+        _day("Pierna + hombro", "Principal: pierna · secundario: hombro", [
+            _item("Sentadillas en máquina Smith", 4, 8, rest_sec=150),
+            _item("Prensa de piernas en posición ancha", 3, 10, rest_sec=120),
+            _item("Curls de pierna sentado", 3, 12, rest_sec=90),
+            _item("Press de hombro en máquina", 3, 10, rest_sec=90),
+            _item("Elevaciones laterales con mancuernas de pies", 3, 12, rest_sec=60),
+            _item("Elevaciones de pantorrilla en máquina", 3, 12, rest_sec=60),
+        ]),
+    ]
+    combo_4_base = [
+        _day("Pecho + tríceps", "Principal: pecho · secundario: tríceps", [
+            _item("Press con barra en banco horizontal", 4, 8, rest_sec=150),
+            _item("Press inclinado de pecho en máquina", 3, 10),
+            _item("Cruce parado en polea alta con manija", 3, 12, rest_sec=75),
+            _item("Jalón de triceps en polea alta con cuerda", 3, 12, rest_sec=75),
+            _item("Fondos de triceps en máquina", 2, 10, rest_sec=75),
+        ]),
+        _day("Espalda + bíceps", "Principal: espalda · secundario: bíceps", [
+            _item("Jalón al frente en máquina martillo", 4, 10, rest_sec=120),
+            _item("Remo inclinado con barra T agarre ancho", 3, 10, rest_sec=120),
+            _item("Remo a un brazo en máquina sentado", 3, 12),
+            _item("Curl predicador con barra Z", 3, 10, rest_sec=75),
+            _item("Curl de biceps estilo martillo con mancuernas", 2, 12, rest_sec=75),
+        ]),
+        _day("Cuádriceps + gemelo", "Principal: cuádriceps · secundario: gemelo", [
+            _item("Sentadillas con barra con las piernas separadas", 4, 8, rest_sec=150),
+            _item("Prensa de piernas en posición ancha", 4, 10, rest_sec=120),
+            _item("Extensiones de piernas sentado", 3, 12, rest_sec=75),
+            _item("Elevaciones de pantorrilla en máquina", 4, 12, rest_sec=60),
+        ]),
+        _day("Isquios + hombro", "Principal: isquios y glúteo · secundario: hombro", [
+            _item("Peso muerto de sumo", 4, 8, rest_sec=150),
+            _item("Curl de piernas en pronación", 3, 12, rest_sec=90),
+            _item("Estocada con paso adelante con pesos", 3, 10, rest_sec=90),
+            _item("Press con mancuernas sentado", 3, 10, rest_sec=90),
+            _item("Elevación lateral en máquina", 3, 15, rest_sec=60),
+            _item("Vuelo posterior sentado en máquina", 3, 15, rest_sec=60),
+        ]),
+    ]
+    for level, duration_3, duration_4 in [
+        ("principiante", 45, 45),
+        ("intermedio", 60, 60),
+        ("avanzado", 70, 70),
+    ]:
+        if level == "principiante":
+            days_3 = [_day(d["name"], d["focus"], _scale(d["items"][:4], sets_delta=-1, reps=10)) for d in combo_3_base]
+            days_4 = [_day(d["name"], d["focus"], _scale(d["items"][:4], sets_delta=-1, reps=10)) for d in combo_4_base]
+        elif level == "avanzado":
+            days_3 = [_day(d["name"], d["focus"], _scale(d["items"], sets_delta=1)) for d in combo_3_base]
+            days_4 = [_day(d["name"], d["focus"], _scale(d["items"], sets_delta=1)) for d in combo_4_base]
+        else:
+            days_3 = deepcopy(combo_3_base)
+            days_4 = deepcopy(combo_4_base)
+
+        t.append(
+            _tpl(
+                f"parejas_3d_{level}",
+                f"Grupos principales + secundarios 3 días · {level}",
+                "Split semanal", level, "hipertrofia", 3, duration_3,
+                "Pecho/tríceps, espalda/bíceps y pierna/hombro. Cada día tiene un foco principal y uno secundario.",
+                days_3,
+            )
+        )
+        t.append(
+            _tpl(
+                f"parejas_4d_{level}",
+                f"Grupos principales + secundarios 4 días · {level}",
+                "Split semanal", level, "hipertrofia", 4, duration_4,
+                "Pecho/tríceps, espalda/bíceps, cuádriceps/gemelo e isquios/hombro.",
+                days_4,
+            )
+        )
+
     return t
 
 
