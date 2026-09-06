@@ -358,6 +358,132 @@ def _tpl(
 def _build_templates() -> List[Dict[str, Any]]:
     t: List[Dict[str, Any]] = []
 
+    # —— Programas generales por disponibilidad semanal ——
+    # Estos planes son el punto de partida recomendado: trabajan todo el cuerpo
+    # con una frecuencia y un volumen que sí encajan con los días disponibles.
+    one_day = {
+        "principiante": _day(
+            "Full Body esencial",
+            "Patrones básicos, máquinas y técnica",
+            [
+                _item("Prensa de piernas en posición ancha", 3, 10, rest_sec=120),
+                _item("Press inclinado de pecho en máquina", 3, 10, rest_sec=90),
+                _item("Jalón vertical con polea alta y agarre cerrado", 3, 10, rest_sec=90),
+                _item("Curls de pierna sentado", 2, 12, rest_sec=75),
+                _item("Elevaciones laterales con mancuernas de pies", 2, 12, rest_sec=60),
+            ],
+        ),
+        "intermedio": _day(
+            "Full Body completo",
+            "Pierna, empuje y tirón con volumen equilibrado",
+            [
+                _item("Sentadillas en máquina Smith", 4, 8, rest_sec=150),
+                _item("Press con barra en banco horizontal", 4, 8, rest_sec=150),
+                _item("Remo con polea de agarre cerrado", 4, 10, rest_sec=120),
+                _item("Peso muerto de sumo", 3, 8, rest_sec=150),
+                _item("Press de hombro en máquina", 3, 10, rest_sec=90),
+                _item("Curl alterno de biceps con mancuerna", 2, 12, rest_sec=60),
+                _item("Jalón de triceps en polea alta con cuerda", 2, 12, rest_sec=60),
+            ],
+        ),
+        "avanzado": _day(
+            "Full Body intenso",
+            "Sesión única de alto estímulo; deja recuperación antes de repetir",
+            [
+                _item("Sentadillas con barra con las piernas separadas", 4, 6, rest_sec=180),
+                _item("Press con barra en banco horizontal", 4, 6, rest_sec=180),
+                _item("Dominadas en barra fija con agarre ancho", 4, 8, rest_sec=150),
+                _item("Peso muerto con barra", 3, 5, rest_sec=180),
+                _item("Press con mancuernas sentado", 3, 8, rest_sec=120),
+                _item("Elevación de pantorrilla sentado", 3, 12, rest_sec=60),
+            ],
+        ),
+    }
+    for level, day in one_day.items():
+        t.append(
+            _tpl(
+                f"general_1d_{level}",
+                f"Full Body 1 día · {level}",
+                "Full body",
+                level,
+                "mixto",
+                1,
+                45 if level == "principiante" else 65,
+                "La opción más eficaz si solo puedes ir una vez: todo el cuerpo, sin dividir músculos.",
+                [day],
+            )
+        )
+
+    two_days = [
+        _tpl(
+            "general_2d_principiante",
+            "Full Body A/B 2 días · principiante",
+            "Full body", "principiante", "mixto", 2, 45,
+            "Dos días no consecutivos. Repite A y B alternándolos cada semana.",
+            [
+                _day("Full Body A", "Sentadilla, empuje y tirón", [
+                    _item("Sentadillas en máquina Smith", 3, 10, rest_sec=120),
+                    _item("Press inclinado de pecho en máquina", 3, 10),
+                    _item("Remo con polea de agarre cerrado", 3, 10),
+                    _item("Curls de pierna sentado", 2, 12),
+                    _item("Jalón de triceps en polea alta", 2, 12, rest_sec=60),
+                ]),
+                _day("Full Body B", "Prensa, espalda y hombro", [
+                    _item("Prensa de piernas en posición ancha", 3, 12, rest_sec=120),
+                    _item("Jalón vertical con polea alta y agarre cerrado", 3, 10),
+                    _item("Press de pecho con mancuernas en banco horizontal", 3, 10),
+                    _item("Elevaciones laterales con mancuernas de pies", 2, 12, rest_sec=60),
+                    _item("Curl de biceps con máquina", 2, 12, rest_sec=60),
+                ]),
+            ],
+        ),
+        _tpl(
+            "general_2d_intermedio",
+            "Torso / Pierna 2 días · intermedio",
+            "Split semanal", "intermedio", "mixto", 2, 60,
+            "Para quien ya domina la técnica y prefiere concentrar más trabajo en cada sesión.",
+            [
+                _day("Torso", "Pecho, espalda, hombro y brazos", [
+                    _item("Press con barra en banco horizontal", 4, 8, rest_sec=150),
+                    _item("Remo de un brazo con mancuerna", 4, 10, rest_sec=120),
+                    _item("Press de banco con mancuernas, 30º de inclinación", 3, 10),
+                    _item("Jalón vertical con polea alta y agarre cerrado", 3, 10),
+                    _item("Elevaciones laterales con mancuernas de pies", 3, 12, rest_sec=60),
+                    _item("Curl alterno de biceps con mancuerna", 2, 12, rest_sec=60),
+                    _item("Jalón de triceps en polea alta con cuerda", 2, 12, rest_sec=60),
+                ]),
+                _day("Pierna", "Cuádriceps, isquios y gemelo", [
+                    _item("Sentadillas en máquina Smith", 4, 8, rest_sec=150),
+                    _item("Peso muerto de sumo", 3, 8, rest_sec=150),
+                    _item("Prensa de piernas en posición ancha", 3, 10, rest_sec=120),
+                    _item("Curl de piernas en pronación", 3, 12),
+                    _item("Elevaciones de pantorrilla en máquina", 4, 12, rest_sec=60),
+                ]),
+            ],
+        ),
+        _tpl(
+            "general_2d_avanzado_fuerza",
+            "Dos días de fuerza · avanzado",
+            "Fuerza", "avanzado", "fuerza", 2, 70,
+            "Dos sesiones exigentes con básicos. Deja al menos dos días antes de repetir el mismo patrón.",
+            [
+                _day("Fuerza A", "Sentadilla y banca", [
+                    _item("Sentadillas con barra con las piernas separadas", 5, 5, rest_sec=180),
+                    _item("Press con barra en banco horizontal", 5, 5, rest_sec=180),
+                    _item("Remo con polea de agarre cerrado", 4, 8, rest_sec=120),
+                    _item("Elevaciones laterales con mancuernas de pies", 3, 12, rest_sec=60),
+                ]),
+                _day("Fuerza B", "Peso muerto y press", [
+                    _item("Peso muerto con barra", 5, 5, rest_sec=180),
+                    _item("Press con barra en banco inclinado", 4, 6, rest_sec=150),
+                    _item("Dominadas en barra fija con agarre ancho", 4, 6, rest_sec=150),
+                    _item("Prensa de piernas en posición ancha", 3, 8, rest_sec=120),
+                ]),
+            ],
+        ),
+    ]
+    t.extend(two_days)
+
     # —— Full body ——
     for level, goal, dur, desc in [
         ("principiante", "mixto", 45, "Tres sesiones completas, ideal para empezar."),
@@ -478,6 +604,51 @@ def _build_templates() -> List[Dict[str, Any]]:
                 ],
             )
         )
+
+    # —— 5 días: frecuencia alta sin meter dos piernas pesadas seguidas ——
+    for level, dur in [("intermedio", 60), ("avanzado", 70)]:
+        t.append(
+            _tpl(
+                f"hibrido_5d_{level}",
+                f"Upper / Lower + PPL 5 días · {level}",
+                "Split semanal",
+                level,
+                "hipertrofia",
+                5,
+                dur,
+                "Cinco días con dos estímulos de torso y pierna, sin convertir cada sesión en un maratón.",
+                [
+                    day_upper_a(level),
+                    day_legs_a(level),
+                    day_push_b(level),
+                    day_pull_b(level),
+                    day_legs_b(level),
+                ],
+            )
+        )
+
+    # —— 7 días: seis pesas y una recuperación. Siete sesiones pesadas no es recomendable. ——
+    t.append(
+        _tpl(
+            "ppl_7d_avanzado_recuperacion",
+            "PPL 6 días + recuperación · avanzado",
+            "Split semanal",
+            "avanzado",
+            "hipertrofia",
+            7,
+            60,
+            "Seis sesiones de pesas y un día de recuperación activa. El séptimo día es intencionalmente sin cargas.",
+            [
+                day_push_a("avanzado"),
+                day_pull_a("avanzado"),
+                day_legs_a("avanzado"),
+                day_push_b("avanzado"),
+                day_pull_b("avanzado"),
+                day_legs_b("avanzado"),
+                _day("Recuperación activa", "Caminar, movilidad suave y descanso. No añadas pesas a este día.", []),
+            ],
+        )
+    )
 
     # —— Bro split 5 días ——
     for level in ("intermedio", "avanzado"):
@@ -646,6 +817,38 @@ def get_template(template_id: str) -> Optional[Dict[str, Any]]:
 
 def instantiate_template(template_id: str) -> Optional[Dict[str, Any]]:
     return get_template(template_id)
+
+
+def recommend_templates(
+    *,
+    days_per_week: Optional[int] = None,
+    level: Optional[str] = None,
+    goal: Optional[str] = None,
+    limit: int = 3,
+) -> List[Dict[str, Any]]:
+    """Ordena plantillas por encaje con la disponibilidad y el nivel elegidos.
+
+    La disponibilidad manda: no propone un PPL de seis días a alguien que ha
+    marcado dos. Después prioriza nivel y objetivo, manteniendo alternativas
+    cercanas si no hay coincidencia exacta.
+    """
+    def score(tpl: Dict[str, Any]) -> int:
+        score_ = 0
+        if days_per_week is not None:
+            diff = abs(int(tpl.get("days_per_week") or 0) - int(days_per_week))
+            score_ += 80 if diff == 0 else max(0, 35 - diff * 15)
+        if level and tpl.get("level") == level:
+            score_ += 20
+        if goal and tpl.get("goal") == goal:
+            score_ += 12
+        # Prioriza programas globales sobre sesiones aisladas cuando se pide
+        # entrenar 1–7 días; las sesiones por grupo siguen disponibles en filtros.
+        if tpl.get("category") in {"Full body", "Split semanal", "Fuerza"}:
+            score_ += 5
+        return score_
+
+    ordered = sorted(TEMPLATES, key=lambda t: (-score(t), t["duration_min"], t["name"]))
+    return [deepcopy(t) for t in ordered[: max(1, limit)]]
 
 
 def day_to_routine_items(day: Dict[str, Any]) -> List[Dict[str, Any]]:

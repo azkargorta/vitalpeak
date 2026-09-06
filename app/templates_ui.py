@@ -11,6 +11,7 @@ from app.routine_templates import (
     day_to_routine_items,
     instantiate_template,
     list_templates,
+    recommend_templates,
 )
 from app.routines import add_routine, list_routines
 
@@ -101,23 +102,51 @@ def render_templates_page(*, embedded: bool = True) -> None:
         return st.session_state.get("tpl_editor")
 
     # Filtros compactos
-    fc1, fc2, fc3 = st.columns(3)
+    fc1, fc2 = st.columns(2)
     with fc1:
         cat = st.selectbox("Categoría", ["Todas"] + TEMPLATE_CATEGORIES, key="tpl_cat")
     with fc2:
         level = st.selectbox(
             "Nivel", ["Todos", "principiante", "intermedio", "avanzado"], key="tpl_level"
         )
+    fc3, fc4 = st.columns(2)
     with fc3:
         goal = st.selectbox(
             "Objetivo", ["Todos", "hipertrofia", "fuerza", "mixto"], key="tpl_goal"
         )
+    with fc4:
+        days_choice = st.selectbox(
+            "Días disponibles", ["Todos"] + list(range(1, 8)), key="tpl_days"
+        )
+
+    selected_days = None if days_choice == "Todos" else int(days_choice)
+    if selected_days is not None:
+        recommended = recommend_templates(
+            days_per_week=selected_days,
+            level=None if level == "Todos" else level,
+            goal=None if goal == "Todos" else goal,
+        )
+        st.markdown("### Recomendados para ti")
+        st.caption("Ordenados por días disponibles, nivel y objetivo. Puedes personalizarlos antes de guardarlos.")
+        rcols = st.columns(min(3, len(recommended)))
+        for i, rec in enumerate(recommended):
+            with rcols[i % len(rcols)]:
+                if st.button(
+                    f"{rec['name']}\n{rec['days_per_week']} días · {rec['duration_min']} min",
+                    key=f"recommended_tpl_{rec['id']}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    _ensure_editor(instantiate_template(rec["id"]))
+                    st.rerun()
 
     templates = list_templates(
         category=None if cat == "Todas" else cat,
         level=None if level == "Todos" else level,
         goal=None if goal == "Todos" else goal,
     )
+    if selected_days is not None:
+        templates = [t for t in templates if int(t.get("days_per_week") or 0) == selected_days]
     if not templates:
         st.info("No hay plantillas con esos filtros.")
         return
