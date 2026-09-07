@@ -15,13 +15,28 @@
     }[c]));
   }
 
+  function normalizeText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("es")
+      .trim();
+  }
+
   function allExercises() {
     const list = window.VITALPEAK_CATALOG?.exercises || [];
     return [...list].sort((a, b) => String(a.name).localeCompare(String(b.name), "es"));
   }
 
-  function exerciseOptions(selected = "") {
-    return `<option value="">Selecciona un ejercicio…</option>${allExercises().map(x =>
+  function filteredExercises(query = "") {
+    const q = normalizeText(query);
+    if (!q) return allExercises();
+    return allExercises().filter(x => normalizeText(`${x.name} ${x.group || ""}`).includes(q));
+  }
+
+  function exerciseOptions(selected = "", query = "") {
+    const list = filteredExercises(query);
+    return `<option value="">${list.length ? "Selecciona un ejercicio…" : "No hay resultados"}</option>${list.map(x =>
       `<option value="${esc(x.name)}" ${x.name === selected ? "selected" : ""}>${esc(x.name)} · ${esc(x.group || "Otro")}</option>`
     ).join("")}`;
   }
@@ -45,9 +60,12 @@
       .vp-day-builder{padding:14px 0;border-top:1px solid #d8e7e3}
       .vp-day-builder:first-of-type{border-top:0}
       .vp-day-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:10px}
-      .vp-day-head input,.vp-day-add select,.vp-custom-exercise-form input,.vp-custom-exercise-form select{width:100%;min-height:44px;border:1px solid #cddfda;border-radius:11px;background:#fbfefd;padding:9px;color:#102e38;font-size:14px}
-      .vp-day-add{display:grid;grid-template-columns:1fr auto;gap:8px;margin:10px 0}
-      .vp-day-add button{min-height:44px;padding:8px 12px;border-radius:11px;background:#e8f6f2;color:#176d61;font-weight:800}
+      .vp-day-head input,.vp-day-add select,.vp-day-add input,.vp-custom-exercise-form input,.vp-custom-exercise-form select{width:100%;min-height:44px;border:1px solid #cddfda;border-radius:11px;background:#fbfefd;padding:9px;color:#102e38;font-size:14px}
+      .vp-day-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:10px 0}
+      .vp-exercise-search-wrap{display:grid;gap:6px;min-width:0}
+      .vp-exercise-search{background:#fff!important}
+      .vp-exercise-result-count{font-size:11px;color:#6a7f84;padding-left:2px}
+      .vp-day-add button{min-height:44px;padding:8px 12px;border-radius:11px;background:#e8f6f2;color:#176d61;font-weight:800;align-self:end}
       .vp-builder-exercises{display:grid;gap:8px}
       .vp-builder-exercise{padding:10px;border:1px solid #d8e7e3;border-radius:12px;background:#fff}
       .vp-builder-exercise-name{display:flex;justify-content:space-between;gap:8px;align-items:start;margin-bottom:8px}
@@ -65,7 +83,7 @@
       .vp-custom-exercise-form button{grid-column:1/-1}
       .vp-my-exercises{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
       .vp-my-exercise{padding:6px 9px;border-radius:99px;background:#edf8f5;color:#176d61;font-size:11px;font-weight:750}
-      @media(max-width:480px){.vp-builder-top,.vp-custom-exercise-form{grid-template-columns:1fr}.vp-builder-values{grid-template-columns:repeat(3,minmax(0,1fr))}}
+      @media(max-width:480px){.vp-builder-top,.vp-custom-exercise-form{grid-template-columns:1fr}.vp-builder-values{grid-template-columns:repeat(3,minmax(0,1fr))}.vp-day-add{grid-template-columns:1fr}.vp-day-add button{width:100%}}
     `;
     document.head.appendChild(style);
   }
@@ -129,7 +147,11 @@
             </div>`).join("") : `<div class="vp-empty-day">Añade al menos un ejercicio a este día.</div>`}
         </div>
         <div class="vp-day-add">
-          <select data-vp-exercise-select="${dayIndex}">${exerciseOptions()}</select>
+          <div class="vp-exercise-search-wrap">
+            <input class="vp-exercise-search" type="search" inputmode="search" autocomplete="off" placeholder="Buscar ejercicio…" data-vp-exercise-search="${dayIndex}">
+            <select data-vp-exercise-select="${dayIndex}">${exerciseOptions()}</select>
+            <span class="vp-exercise-result-count" data-vp-exercise-count="${dayIndex}">${allExercises().length} ejercicios disponibles</span>
+          </div>
           <button type="button" data-vp-action="add-exercise" data-day="${dayIndex}">+ Añadir</button>
         </div>
       </section>`).join("");
@@ -229,6 +251,19 @@
     if (e.target.matches("[data-vp-day-name]")) {
       const i = Number(e.target.dataset.vpDayName);
       if (draft.days[i]) draft.days[i].name = e.target.value;
+      return;
+    }
+    if (e.target.matches("[data-vp-exercise-search]")) {
+      const dayIndex = Number(e.target.dataset.vpExerciseSearch);
+      const select = document.querySelector(`[data-vp-exercise-select="${dayIndex}"]`);
+      const count = document.querySelector(`[data-vp-exercise-count="${dayIndex}"]`);
+      const matches = filteredExercises(e.target.value);
+      if (select) {
+        const previous = select.value;
+        select.innerHTML = exerciseOptions(previous, e.target.value);
+        if (matches.length === 1) select.value = matches[0].name;
+      }
+      if (count) count.textContent = `${matches.length} resultado${matches.length === 1 ? "" : "s"}`;
     }
   });
 
@@ -238,7 +273,7 @@
       const dayIndex = Number(add.dataset.day);
       const select = document.querySelector(`[data-vp-exercise-select="${dayIndex}"]`);
       const name = select?.value;
-      if (!name) return;
+      if (!name) return alert("Busca o selecciona un ejercicio antes de añadirlo.");
       draft.days[dayIndex].items.push({ exercise: name, sets: 3, reps: 10, rest_sec: 90, weight: 0 });
       renderDays();
       return;
