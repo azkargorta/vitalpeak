@@ -25,19 +25,41 @@ def key(value: str) -> str:
 
 
 def animation_index() -> dict[str, dict]:
+    """Indexa todos los GIF disponibles, tengan o no meta.json."""
     result: dict[str, dict] = {}
-    for metadata in SEQUENCES.glob("*/meta.json"):
-        try:
-            info = json.loads(metadata.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+    if not SEQUENCES.is_dir():
+        return result
+
+    for folder in SEQUENCES.iterdir():
+        if not folder.is_dir():
             continue
-        gif = metadata.parent / "movimiento.gif"
-        if not gif.exists():
+        gif = folder / "movimiento.gif"
+        if not gif.is_file():
             continue
-        result[key(info.get("label", metadata.parent.name))] = {
-            "path": f"exercise-gifs/{metadata.parent.name}/movimiento.gif",
+
+        info: dict = {}
+        metadata = folder / "meta.json"
+        if metadata.is_file():
+            try:
+                info = json.loads(metadata.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                info = {}
+
+        animation = {
+            "path": f"exercise-gifs/{folder.name}/movimiento.gif",
             "steps": info.get("steps", []),
         }
+        result[key(folder.name)] = animation
+        label = info.get("label")
+        if label:
+            result[key(label)] = animation
+
+    # Alias legacy utilizado por la versión original de VitalPeak.
+    press_banca = result.get(key("press_banca"))
+    if press_banca:
+        result[key("Press con barra en banco horizontal")] = press_banca
+        result[key("Press banca")] = press_banca
+
     return result
 
 
@@ -65,12 +87,14 @@ def main() -> None:
             "cues": generic_cues(name, group),
             "animation": animation,
         })
+
     payload = {"templates": TEMPLATES, "exercises": exercises}
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
         f"window.VITALPEAK_CATALOG = {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))};\n",
         encoding="utf-8",
     )
+    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con GIF.")
 
 
 if __name__ == "__main__":
