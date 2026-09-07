@@ -91,7 +91,24 @@ def main() -> None:
     payload = {"templates": TEMPLATES, "exercises": exercises}
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
-        f"window.VITALPEAK_CATALOG = {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))};\n",
+        f"window.VITALPEAK_CATALOG = {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))};\n"
+        "try {\n"
+        "  const custom = JSON.parse(localStorage.getItem('vitalpeak-custom-exercises') || '[]');\n"
+        "  if (Array.isArray(custom)) {\n"
+        "    const names = new Set(window.VITALPEAK_CATALOG.exercises.map(x => String(x.name).toLocaleLowerCase('es')));\n"
+        "    for (const item of custom) {\n"
+        "      const name = String(item?.name || '').trim();\n"
+        "      if (name && !names.has(name.toLocaleLowerCase('es'))) {\n"
+        "        window.VITALPEAK_CATALOG.exercises.push(item);\n"
+        "        names.add(name.toLocaleLowerCase('es'));\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "} catch {}\n"
+        "const vpEnhancementScript = document.createElement('script');\n"
+        "vpEnhancementScript.src = './routine-enhancements.js?v=18';\n"
+        "vpEnhancementScript.defer = true;\n"
+        "document.head.appendChild(vpEnhancementScript);\n",
         encoding="utf-8",
     )
     print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con GIF.")
