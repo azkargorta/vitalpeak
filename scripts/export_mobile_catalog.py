@@ -108,7 +108,7 @@ def main() -> None:
         "vpRepairScript.src = './state-repair.js?v=23';\n"
         "vpRepairScript.onload = () => {\n"
         "  const vpRecoveryScript = document.createElement('script');\n"
-        "  vpRecoveryScript.src = './recovery.js?v=23';\n"
+        "  vpRecoveryScript.src = './recovery.js?v=24';\n"
         "  document.head.appendChild(vpRecoveryScript);\n"
         "};\n"
         "document.head.appendChild(vpRepairScript);\n"
