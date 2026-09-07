@@ -114,10 +114,11 @@ def main() -> None:
         "  const fixed = text.replace('template:renderTemplate', 'template:renderRoutines');\n"
         "  return new Response(fixed, { status: response.status, statusText: response.statusText, headers: response.headers });\n"
         "};\n"
-        "for (const src of ['./routine-enhancements.js?v=30', './calendar-mobile.js?v=30']) {\n"
+        "for (const src of ['./routine-enhancements.js?v=31', './calendar-mobile.js?v=31', './training-intelligence.js?v=31']) {\n"
         "  const script = document.createElement('script');\n"
         "  script.src = src;\n"
         "  script.defer = true;\n"
+        "  script.onerror = () => console.warn('VitalPeak: mejora opcional no cargada', src);\n"
         "  document.head.appendChild(script);\n"
         "}\n",
         encoding="utf-8",
