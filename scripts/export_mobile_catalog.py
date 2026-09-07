@@ -8,7 +8,6 @@ import sys
 import unicodedata
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -25,18 +24,15 @@ def key(value: str) -> str:
 
 
 def animation_index() -> dict[str, dict]:
-    """Indexa todos los GIF disponibles, tengan o no meta.json."""
     result: dict[str, dict] = {}
     if not SEQUENCES.is_dir():
         return result
-
     for folder in SEQUENCES.iterdir():
         if not folder.is_dir():
             continue
         gif = folder / "movimiento.gif"
         if not gif.is_file():
             continue
-
         info: dict = {}
         metadata = folder / "meta.json"
         if metadata.is_file():
@@ -44,22 +40,14 @@ def animation_index() -> dict[str, dict]:
                 info = json.loads(metadata.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 info = {}
-
-        animation = {
-            "path": f"exercise-gifs/{folder.name}/movimiento.gif",
-            "steps": info.get("steps", []),
-        }
+        animation = {"path": f"exercise-gifs/{folder.name}/movimiento.gif", "steps": info.get("steps", [])}
         result[key(folder.name)] = animation
-        label = info.get("label")
-        if label:
-            result[key(label)] = animation
-
-    # Alias legacy utilizado por la versión original de VitalPeak.
+        if info.get("label"):
+            result[key(info["label"])] = animation
     press_banca = result.get(key("press_banca"))
     if press_banca:
         result[key("Press con barra en banco horizontal")] = press_banca
         result[key("Press banca")] = press_banca
-
     return result
 
 
@@ -80,35 +68,55 @@ def main() -> None:
     exercises = []
     for name in load_base_exercises():
         group = get_grupo(name)
-        animation = animations.get(key(name), {})
-        exercises.append({
-            "name": name,
-            "group": group,
-            "cues": generic_cues(name, group),
-            "animation": animation,
-        })
+        exercises.append({"name": name, "group": group, "cues": generic_cues(name, group), "animation": animations.get(key(name), {})})
 
     payload = {"templates": TEMPLATES, "exercises": exercises}
+    bootstrap = r'''
+try {
+  const custom = JSON.parse(localStorage.getItem('vitalpeak-custom-exercises') || '[]');
+  if (Array.isArray(custom)) {
+    const names = new Set(window.VITALPEAK_CATALOG.exercises.map(x => String(x.name).toLocaleLowerCase('es')));
+    for (const item of custom) {
+      const name = String(item?.name || '').trim();
+      if (name && !names.has(name.toLocaleLowerCase('es'))) {
+        window.VITALPEAK_CATALOG.exercises.push(item);
+        names.add(name.toLocaleLowerCase('es'));
+      }
+    }
+  }
+} catch {}
+
+window.VP_VIEW_TEMPLATE_ID = null;
+window.VP_VIEW_DAY = 0;
+document.addEventListener('click', event => {
+  const template = event.target.closest?.('[data-action="view-template"]');
+  if (template) { window.VP_VIEW_TEMPLATE_ID = template.dataset.template; window.VP_VIEW_DAY = 0; }
+  const day = event.target.closest?.('[data-action="select-template-day"]');
+  if (day) window.VP_VIEW_DAY = Number(day.dataset.day || 0);
+}, true);
+
+function renderTemplate() {
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const cat = window.VITALPEAK_CATALOG || {templates:[]};
+  const t = cat.templates.find(x => x.id === window.VP_VIEW_TEMPLATE_ID) || cat.templates[0];
+  if (!t) return '<div class="card empty">No hay rutinas disponibles.</div>';
+  const day = Math.min(Number(window.VP_VIEW_DAY || 0), Math.max(0, (t.days || []).length - 1));
+  const d = t.days?.[day] || {};
+  const list = d.items || [];
+  return `<header class="hero"><div class="app-brand"><img src="./apple-touch-icon.png" alt="VitalPeak"><div class="wordmark">Vital<span>Peak</span></div></div><div class="eyebrow">RUTINA</div><h1>${esc(t.name)}</h1><p>${esc(t.description || 'Consulta los días y ejercicios de la rutina.')}</p></header><div class="session-picker">${(t.days || []).map((x,i)=>`<button class="${i===day?'selected':''}" data-action="select-template-day" data-day="${i}">${esc(x.name || `Día ${i+1}`)}</button>`).join('')}</div><div class="card"><h2>${esc(d.name || `Día ${day+1}`)}</h2><div class="planned-workout-list">${list.map((x,i)=>`<div class="planned-exercise"><div><b>${i+1}. ${esc(x.exercise)}</b><div class="muted small">${x.sets || 3} × ${x.reps || 10} · descanso ${x.rest_sec || 90}s</div></div><button class="secondary" data-action="exercise-detail" data-exercise="${esc(x.exercise)}">Ver</button></div>`).join('')}</div></div><button class="primary wide" data-action="activate-template" data-id="${esc(t.id)}">Guardar esta rutina</button><button class="secondary wide" data-route="routines">Volver a rutinas</button>`;
+}
+
+for (const src of ['./routine-enhancements.js?v=25', './progress-enhancements.js?v=25']) {
+  const script = document.createElement('script');
+  script.src = src;
+  script.defer = true;
+  document.head.appendChild(script);
+}
+'''
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
         f"window.VITALPEAK_CATALOG = {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))};\n"
-        "try {\n"
-        "  const custom = JSON.parse(localStorage.getItem('vitalpeak-custom-exercises') || '[]');\n"
-        "  if (Array.isArray(custom)) {\n"
-        "    const names = new Set(window.VITALPEAK_CATALOG.exercises.map(x => String(x.name).toLocaleLowerCase('es')));\n"
-        "    for (const item of custom) {\n"
-        "      const name = String(item?.name || '').trim();\n"
-        "      if (name && !names.has(name.toLocaleLowerCase('es'))) {\n"
-        "        window.VITALPEAK_CATALOG.exercises.push(item);\n"
-        "        names.add(name.toLocaleLowerCase('es'));\n"
-        "      }\n"
-        "    }\n"
-        "  }\n"
-        "} catch {}\n"
-        "const vpEnhancementScript = document.createElement('script');\n"
-        "vpEnhancementScript.src = './routine-enhancements.js?v=18';\n"
-        "vpEnhancementScript.defer = true;\n"
-        "document.head.appendChild(vpEnhancementScript);\n",
+        + bootstrap,
         encoding="utf-8",
     )
     print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con GIF.")
