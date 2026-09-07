@@ -11,6 +11,10 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .calendar-entry{background:var(--entry-color,#2f6f76)!important;border-color:var(--entry-color,#2f6f76)!important;color:#fff!important}
+      .calendar-entry button{color:#fff!important}
+    </style>
     <title>VitalPeak</title>
   </head>
   <body>
@@ -24,6 +28,35 @@
     </nav>
     <div id="toast" class="toast" role="status"></div>
     <script src="./catalog-data.js"></script>
-    <script type="module" src="./app.js"></script>
+    <script type="module">
+      const response = await fetch('./app.js?v=9');
+      let source = await response.text();
+
+      source = source.replace(
+        'const today = () => new Date().toISOString().slice(0, 10);',
+        'const localISODate = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;\nconst today = () => localISODate(new Date());'
+      );
+      source = source.replace(
+        'function isoDate(d) { return new Date(d).toISOString().slice(0,10); }',
+        'function isoDate(d) { return localISODate(new Date(d)); }'
+      );
+      source = source.replace(
+        'function plannedRoutine(iso=today()) { const list=plannedRoutines(iso),index=Math.min(Number(state.todaySessionIndex||0),Math.max(0,list.length-1));return list[index]||null; }',
+        'function plannedRoutine(iso=today()) { const list=plannedRoutines(iso),index=Math.min(Number(state.todaySessionIndex||0),Math.max(0,list.length-1));return list[index]||null; }\nfunction sessionRoutine(draft=state._draft){if(draft?.routineId){const r=routineById(draft.routineId);if(r){const day=Number(String(draft.routineKey||"").split("::")[1]||0);return {...r,activeDay:day}}}return plannedRoutine(draft?.date||today())||activeRoutine()}\nfunction sessionItems(draft=state._draft){return items(sessionRoutine(draft))}\nconst CALENDAR_COLORS=["#2f6f76","#7a5c9e","#b46a55","#4f7d4f","#9b6a2f","#446f9e","#8a5468","#4f8580"];\nfunction calendarColor(value){let h=0;for(const c of String(value||""))h=((h<<5)-h)+c.charCodeAt(0)|0;return CALENDAR_COLORS[Math.abs(h)%CALENDAR_COLORS.length]}'
+      );
+      source = source.replace(
+        'function currentDraft() { const r=plannedRoutine()||activeRoutine(), key=`${r?.id||"free"}::${r?.activeDay||0}`;if(!state._draft||state._draft.routineKey!==key) state._draft={routineId:r?.id,routineKey:key,date:today(),routineName:r?.name||"Entrenamiento libre",exerciseIndex:0,sets:[],restEndsAt:null}; return state._draft; }',
+        'function currentDraft() { const r=plannedRoutine()||activeRoutine(), key=`${r?.id||"free"}::${r?.activeDay||0}`, date=today();if(!state._draft||state._draft.routineKey!==key||state._draft.date!==date) state._draft={routineId:r?.id,routineKey:key,date,routineName:r?.name||"Entrenamiento libre",exerciseIndex:0,sets:[],restEndsAt:null}; return state._draft; }'
+      );
+      source = source.replace('const count=items().length;', 'const count=sessionItems(draft).length;');
+      source = source.replace('const draft=currentDraft(), list=items(r), index=Math.min(draft.exerciseIndex,Math.max(0,list.length-1)), ex=list[index];', 'const draft=currentDraft(), list=sessionItems(draft), index=Math.min(draft.exerciseIndex,Math.max(0,list.length-1)), ex=list[index];');
+      source = source.replace('if(route==="train"){const d=currentDraft(),ex=items()[d.exerciseIndex],info=ex&&exercise(ex.exercise);', 'if(route==="train"){const d=currentDraft(),ex=sessionItems(d)[d.exerciseIndex],info=ex&&exercise(ex.exercise);');
+      source = source.replace('if(f.id==="set-form"){const draft=currentDraft(),ex=items()[draft.exerciseIndex];', 'if(f.id==="set-form"){const draft=currentDraft(),ex=sessionItems(draft)[draft.exerciseIndex];');
+      source = source.replace('return `<span class="calendar-entry">${esc(name)}<button aria-label="Quitar ${esc(name)}" data-action="remove-plan-entry" data-date="${iso}" data-value="${esc(value)}">×</button></span>`', 'return `<span class="calendar-entry" style="--entry-color:${calendarColor(value)}">${esc(name)}<button aria-label="Quitar ${esc(name)}" data-action="remove-plan-entry" data-date="${iso}" data-value="${esc(value)}">×</button></span>`');
+
+      const blob = new Blob([source], {type:'text/javascript'});
+      const url = URL.createObjectURL(blob);
+      try { await import(url); } finally { URL.revokeObjectURL(url); }
+    </script>
   </body>
 </html>
