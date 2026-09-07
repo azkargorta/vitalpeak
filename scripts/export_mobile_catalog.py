@@ -54,7 +54,6 @@ def animation_index() -> dict[str, dict]:
         if label:
             result[key(label)] = animation
 
-    # Alias legacy utilizado por la versión original de VitalPeak.
     press_banca = result.get(key("press_banca"))
     if press_banca:
         result[key("Press con barra en banco horizontal")] = press_banca
@@ -106,8 +105,6 @@ def main() -> None:
         "  }\n"
         "} catch {}\n"
         "// Reparación de arranque: app.js referencia renderTemplate pero la función no existe.\n"
-        "// Interceptamos únicamente la carga de app.js y usamos renderRoutines como fallback para esa ruta,\n"
-        "// evitando que falle todo el módulo antes de pintar la pantalla inicial.\n"
         "const vpOriginalFetch = window.fetch.bind(window);\n"
         "window.fetch = async (...args) => {\n"
         "  const response = await vpOriginalFetch(...args);\n"
@@ -117,10 +114,12 @@ def main() -> None:
         "  const fixed = text.replace('template:renderTemplate', 'template:renderRoutines');\n"
         "  return new Response(fixed, { status: response.status, statusText: response.statusText, headers: response.headers });\n"
         "};\n"
-        "const vpEnhancementScript = document.createElement('script');\n"
-        "vpEnhancementScript.src = './routine-enhancements.js?v=18';\n"
-        "vpEnhancementScript.defer = true;\n"
-        "document.head.appendChild(vpEnhancementScript);\n",
+        "for (const src of ['./routine-enhancements.js?v=29', './calendar-mobile.js?v=29']) {\n"
+        "  const script = document.createElement('script');\n"
+        "  script.src = src;\n"
+        "  script.defer = true;\n"
+        "  document.head.appendChild(script);\n"
+        "}\n",
         encoding="utf-8",
     )
     print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con GIF.")
