@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   let running = false;
+  const DB_NAME='vitalpeak-mobile', STORE='state';
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize = value => String(value || '')
@@ -34,6 +35,9 @@
       .vp-section-filters input,.vp-section-filters select{width:100%;min-height:44px;border:1px solid #cddfda;border-radius:11px;background:#fbfefd;padding:9px;color:#102e38;font-size:14px}
       .vp-filter-count{grid-column:1/-1;font-size:11px;color:#6b8085;margin-top:-2px}
       .vp-filter-empty{padding:16px;border-radius:12px;background:#f4f8f7;color:#687d82;text-align:center;font-size:13px}
+      .vp-personal-routines-list{display:grid;gap:9px}
+      .vp-personal-routine-card{width:100%;display:grid;text-align:left;gap:4px;padding:13px 14px;border:1px solid #d8e7e3;border-radius:13px;background:#fbfefd;color:#173b42}
+      .vp-personal-routine-card b{font-size:14px}.vp-personal-routine-card span{font-size:11px;color:#687e84}.vp-personal-routine-card .template-meta{color:#168b78;font-weight:850}
       @media(max-width:480px){
         .vp-routine-section>summary{min-height:56px;padding:14px;font-size:15px}
         .vp-routine-section-content{padding:12px}
@@ -42,6 +46,9 @@
     `;
     document.head.appendChild(style);
   }
+
+  function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+  async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),g=tx.objectStore(STORE).get('user');g.onsuccess=()=>resolve(g.result||{});g.onerror=()=>reject(g.error)})}
 
   function sectionHead(app, text) {
     return [...app.querySelectorAll('.section-head')].find(x => x.querySelector('h2')?.textContent.trim() === text) || null;
@@ -164,7 +171,33 @@
     apply();
   }
 
-  function enhance() {
+  function personalDetails(state) {
+    const personal = (state.routines || []).filter(r => r?.source === 'custom-builder');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'vp-personal-routines-list';
+    wrapper.innerHTML = personal.length ? personal.map(r => {
+      const days = Array.isArray(r.days) ? r.days : [];
+      const exerciseCount = days.reduce((n,d)=>n+(d.items?.length||0),0);
+      return `<button type="button" class="vp-personal-routine-card" data-vp-action="view-personal-routine" data-id="${esc(r.id)}"><span class="template-meta">${String(state.activeRoutineId)===String(r.id)?'RUTINA ACTIVA':'RUTINA PERSONAL'}</span><b>${esc(r.name||'Rutina sin nombre')}</b><span>${days.length} día${days.length===1?'':'s'} · ${exerciseCount} ejercicio${exerciseCount===1?'':'s'} · pulsa para ver todos los días</span></button>`;
+    }).join('') : `<div class="vp-filter-empty">Todavía no has creado ninguna rutina personal.</div>`;
+    return makeDetails(`Rutinas personales${personal.length ? ` · ${personal.length}` : ''}`, [wrapper], 'personal-routines');
+  }
+
+  function tidyActiveRoutine(app, state) {
+    const activeHead = sectionHead(app, 'Tu rutina activa');
+    const activeBlock = activeHead?.nextElementSibling;
+    if (!activeBlock) return {activeHead,activeBlock};
+    const buttons = [...activeBlock.querySelectorAll('[data-action="activate-routine"]')];
+    buttons.forEach(button => {
+      if (String(button.dataset.id) !== String(state.activeRoutineId)) button.remove();
+    });
+    if (!activeBlock.querySelector('[data-action="activate-routine"]')) {
+      activeBlock.innerHTML = `<div class="card empty">Aún no has seleccionado una rutina.</div>`;
+    }
+    return {activeHead,activeBlock};
+  }
+
+  async function enhance() {
     if (running) return;
     const app = document.querySelector('#app');
     if (!app || !app.textContent.includes('RUTINAS') || app.querySelector('#vp-routines-accordion')) return;
@@ -180,6 +213,8 @@
     running = true;
     try {
       ensureStyles();
+      const state = await readState().catch(()=>({routines:[]}));
+      const {activeBlock} = tidyActiveRoutine(app, state);
 
       const customCard = customBuilder.closest('.card');
       const predefinedNodes = collectUntilNextHead(predefinedHead);
@@ -191,11 +226,13 @@
       accordion.id = 'vp-routines-accordion';
       accordion.className = 'vp-routines-accordion';
 
+      const personal = personalDetails(state);
       const customDetails = makeDetails('Crea tu propia rutina', [customCard], 'custom');
       const predefinedDetails = makeDetails('Rutinas predefinidas', predefinedNodes, 'predefined-routines');
       const exerciseDetails = makeDetails('Ejercicios predefinidos', exerciseNodes, 'predefined-exercises');
       const addExerciseDetails = makeDetails('Añade tu ejercicio', [customExerciseBlock], 'add-exercise');
 
+      accordion.appendChild(personal);
       accordion.appendChild(customDetails);
       accordion.appendChild(predefinedDetails);
       accordion.appendChild(exerciseDetails);
@@ -205,8 +242,6 @@
       predefinedHead.remove();
       exercisesHead.remove();
 
-      const activeHead = sectionHead(app, 'Tu rutina activa');
-      const activeBlock = activeHead?.nextElementSibling;
       if (activeBlock) activeBlock.insertAdjacentElement('afterend', accordion);
       else app.querySelector('.hero')?.insertAdjacentElement('afterend', accordion);
 
