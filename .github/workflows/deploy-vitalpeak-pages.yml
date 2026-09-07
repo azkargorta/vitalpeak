@@ -6,6 +6,10 @@ on:
     paths:
       - "mobile/**"
       - "exercise_images/sequences/**"
+      - "app/routine_templates.py"
+      - "app/exercise_catalog.py"
+      - "data/base_exercises.txt"
+      - "scripts/export_mobile_catalog.py"
       - ".github/workflows/deploy-vitalpeak-pages.yml"
   workflow_dispatch:
 
@@ -27,6 +31,12 @@ jobs:
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
+
+      - name: Regenerar catálogo móvil
+        run: |
+          python scripts/export_mobile_catalog.py
+          test -s mobile/catalog-data.js
+          grep -q "window.VITALPEAK_CATALOG" mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
         run: |
