@@ -54,7 +54,6 @@ def animation_index() -> dict[str, dict]:
         if label:
             result[key(label)] = animation
 
-    # Alias legacy utilizado por la versión original de VitalPeak.
     press_banca = result.get(key("press_banca"))
     if press_banca:
         result[key("Press con barra en banco horizontal")] = press_banca
@@ -105,6 +104,10 @@ def main() -> None:
         "    }\n"
         "  }\n"
         "} catch {}\n"
+        "const vpRecoveryScript = document.createElement('script');\n"
+        "vpRecoveryScript.src = './recovery.js?v=22';\n"
+        "vpRecoveryScript.defer = true;\n"
+        "document.head.appendChild(vpRecoveryScript);\n"
         "const vpEnhancementScript = document.createElement('script');\n"
         "vpEnhancementScript.src = './routine-enhancements.js?v=18';\n"
         "vpEnhancementScript.defer = true;\n"
