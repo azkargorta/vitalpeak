@@ -106,7 +106,7 @@ function renderTemplate() {
   return `<header class="hero"><div class="app-brand"><img src="./apple-touch-icon.png" alt="VitalPeak"><div class="wordmark">Vital<span>Peak</span></div></div><div class="eyebrow">RUTINA</div><h1>${esc(t.name)}</h1><p>${esc(t.description || 'Consulta los días y ejercicios de la rutina.')}</p></header><div class="session-picker">${(t.days || []).map((x,i)=>`<button class="${i===day?'selected':''}" data-action="select-template-day" data-day="${i}">${esc(x.name || `Día ${i+1}`)}</button>`).join('')}</div><div class="card"><h2>${esc(d.name || `Día ${day+1}`)}</h2><div class="planned-workout-list">${list.map((x,i)=>`<div class="planned-exercise"><div><b>${i+1}. ${esc(x.exercise)}</b><div class="muted small">${x.sets || 3} × ${x.reps || 10} · descanso ${x.rest_sec || 90}s</div></div><button class="secondary" data-action="exercise-detail" data-exercise="${esc(x.exercise)}">Ver</button></div>`).join('')}</div></div><button class="primary wide" data-action="activate-template" data-id="${esc(t.id)}">Guardar esta rutina</button><button class="secondary wide" data-route="routines">Volver a rutinas</button>`;
 }
 
-for (const src of ['./routine-enhancements.js?v=25', './progress-enhancements.js?v=25']) {
+for (const src of ['./routine-enhancements.js?v=26', './progress-enhancements.js?v=26', './calendar-enhancements.js?v=26']) {
   const script = document.createElement('script');
   script.src = src;
   script.defer = true;
