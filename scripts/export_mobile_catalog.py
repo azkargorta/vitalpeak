@@ -114,7 +114,7 @@ def main() -> None:
         "  const fixed = text.replace('template:renderTemplate', 'template:renderRoutines');\n"
         "  return new Response(fixed, { status: response.status, statusText: response.statusText, headers: response.headers });\n"
         "};\n"
-        "for (const src of ['./routine-enhancements.js?v=29', './calendar-mobile.js?v=29']) {\n"
+        "for (const src of ['./routine-enhancements.js?v=30', './calendar-mobile.js?v=30']) {\n"
         "  const script = document.createElement('script');\n"
         "  script.src = src;\n"
         "  script.defer = true;\n"
