@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v35";
+const CACHE = "vitalpeak-mobile-v36";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./catalog-data.js", "./app.js", "./routine-enhancements.js", "./routine-muscle-filter.js", "./calendar-mobile.js", "./training-intelligence.js", "./routine-navigation-fix.js", "./routines-accordion.js", "./manifest.webmanifest", "./icon-cover.png", "./icons/icon-192.svg", "./apple-touch-icon.png"];
 
 self.addEventListener("install", event => event.waitUntil(
