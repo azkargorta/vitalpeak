@@ -2,6 +2,13 @@
   'use strict';
   let running = false;
 
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = value => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim();
+
   function ensureStyles() {
     if (document.querySelector('#vp-routines-accordion-styles')) return;
     const style = document.createElement('style');
@@ -21,9 +28,16 @@
       .vp-routine-section-content>.vp-custom-exercises>p{display:none!important}
       .vp-routine-section-content>.filter-row{margin-top:0}
       .vp-routine-section-content>.exercise-grid{margin-top:0}
+      .vp-section-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+      .vp-section-filters.one{grid-template-columns:1fr}
+      .vp-section-filters label{display:grid;gap:5px;font-size:11px;font-weight:850;color:#60777d}
+      .vp-section-filters input,.vp-section-filters select{width:100%;min-height:44px;border:1px solid #cddfda;border-radius:11px;background:#fbfefd;padding:9px;color:#102e38;font-size:14px}
+      .vp-filter-count{grid-column:1/-1;font-size:11px;color:#6b8085;margin-top:-2px}
+      .vp-filter-empty{padding:16px;border-radius:12px;background:#f4f8f7;color:#687d82;text-align:center;font-size:13px}
       @media(max-width:480px){
         .vp-routine-section>summary{min-height:56px;padding:14px;font-size:15px}
         .vp-routine-section-content{padding:12px}
+        .vp-section-filters{grid-template-columns:1fr}
       }
     `;
     document.head.appendChild(style);
@@ -43,13 +57,111 @@
     return nodes;
   }
 
-  function makeDetails(title, nodes) {
+  function makeDetails(title, nodes, key) {
     const details = document.createElement('details');
     details.className = 'vp-routine-section';
+    details.dataset.vpSection = key || '';
     details.innerHTML = `<summary>${title}</summary><div class="vp-routine-section-content"></div>`;
     const body = details.querySelector('.vp-routine-section-content');
     nodes.forEach(node => body.appendChild(node));
     return details;
+  }
+
+  function templateById(id) {
+    return (window.VITALPEAK_CATALOG?.templates || []).find(x => String(x.id) === String(id)) || null;
+  }
+
+  function setupRoutineLevelFilter(details) {
+    const body = details?.querySelector('.vp-routine-section-content');
+    if (!body || body.querySelector('[data-vp-routine-level]')) return;
+
+    const levels = [...new Set((window.VITALPEAK_CATALOG?.templates || []).map(x => String(x.level || '')).filter(Boolean))];
+    const preferred = ['principiante','intermedio','avanzado'];
+    levels.sort((a,b) => {
+      const ia=preferred.indexOf(normalize(a)), ib=preferred.indexOf(normalize(b));
+      if(ia>=0||ib>=0) return (ia<0?99:ia)-(ib<0?99:ib);
+      return a.localeCompare(b,'es');
+    });
+
+    const filters = document.createElement('div');
+    filters.className = 'vp-section-filters one';
+    filters.innerHTML = `<label>Nivel<select data-vp-routine-level><option value="">Todos los niveles</option>${levels.map(level=>`<option value="${esc(level)}">${esc(level.charAt(0).toUpperCase()+level.slice(1))}</option>`).join('')}</select></label><span class="vp-filter-count" data-vp-routine-count></span>`;
+
+    const existingFilter = body.querySelector('.filter-row');
+    if (existingFilter) existingFilter.insertAdjacentElement('afterend', filters);
+    else body.insertAdjacentElement('afterbegin', filters);
+
+    const apply = () => {
+      const level = filters.querySelector('[data-vp-routine-level]').value;
+      const buttons = [...body.querySelectorAll('[data-action="view-template"]')];
+      let visible = 0;
+      buttons.forEach(button => {
+        const template = templateById(button.dataset.template);
+        const show = !level || String(template?.level || '') === level;
+        button.hidden = !show;
+        if (show) visible += 1;
+      });
+      filters.querySelector('[data-vp-routine-count]').textContent = `${visible} rutina${visible===1?'':'s'} visible${visible===1?'':'s'}`;
+      let empty = body.querySelector('.vp-filter-empty[data-kind="routines"]');
+      if (!visible) {
+        if (!empty) {
+          empty = document.createElement('div');
+          empty.className = 'vp-filter-empty';
+          empty.dataset.kind = 'routines';
+          empty.textContent = 'No hay rutinas con este nivel y los días seleccionados.';
+          body.appendChild(empty);
+        }
+      } else empty?.remove();
+    };
+    filters.querySelector('[data-vp-routine-level]').addEventListener('change', apply);
+    apply();
+  }
+
+  function exerciseGroup(card) {
+    return card.querySelector('span')?.textContent?.trim() || 'Otro';
+  }
+
+  function setupExerciseFilters(details) {
+    const body = details?.querySelector('.vp-routine-section-content');
+    const grid = body?.querySelector('.exercise-grid');
+    if (!body || !grid || body.querySelector('[data-vp-exercise-catalog-search]')) return;
+
+    const cards = [...grid.querySelectorAll('.exercise-card')];
+    const groups = [...new Set(cards.map(exerciseGroup).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+    const filters = document.createElement('div');
+    filters.className = 'vp-section-filters';
+    filters.innerHTML = `<label>Grupo muscular<select data-vp-exercise-catalog-group><option value="">Todos los grupos</option>${groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('')}</select></label><label>Buscar ejercicio<input type="search" inputmode="search" autocomplete="off" placeholder="Escribe press, remo, curl…" data-vp-exercise-catalog-search></label><span class="vp-filter-count" data-vp-exercise-catalog-count></span>`;
+    grid.insertAdjacentElement('beforebegin', filters);
+
+    const apply = () => {
+      const group = filters.querySelector('[data-vp-exercise-catalog-group]').value;
+      const query = normalize(filters.querySelector('[data-vp-exercise-catalog-search]').value);
+      let visible = 0;
+      cards.forEach(card => {
+        const name = card.dataset.exercise || card.querySelector('b')?.textContent || '';
+        const cardGroup = exerciseGroup(card);
+        const groupOk = !group || cardGroup === group;
+        const textOk = !query || normalize(`${name} ${cardGroup}`).includes(query);
+        const show = groupOk && textOk;
+        card.hidden = !show;
+        if (show) visible += 1;
+      });
+      filters.querySelector('[data-vp-exercise-catalog-count]').textContent = `${visible} ejercicio${visible===1?'':'s'} visible${visible===1?'':'s'}`;
+      let empty = body.querySelector('.vp-filter-empty[data-kind="exercises"]');
+      if (!visible) {
+        if (!empty) {
+          empty = document.createElement('div');
+          empty.className = 'vp-filter-empty';
+          empty.dataset.kind = 'exercises';
+          empty.textContent = 'No hay ejercicios que coincidan con estos filtros.';
+          grid.insertAdjacentElement('afterend', empty);
+        }
+      } else empty?.remove();
+    };
+
+    filters.querySelector('[data-vp-exercise-catalog-group]').addEventListener('change', apply);
+    filters.querySelector('[data-vp-exercise-catalog-search]').addEventListener('input', apply);
+    apply();
   }
 
   function enhance() {
@@ -73,19 +185,22 @@
       const predefinedNodes = collectUntilNextHead(predefinedHead);
       const exerciseNodes = collectUntilNextHead(exercisesHead);
 
-      // Extraemos "Mis ejercicios" del constructor para convertirlo en un apartado independiente.
       customExerciseBlock.remove();
 
       const accordion = document.createElement('div');
       accordion.id = 'vp-routines-accordion';
       accordion.className = 'vp-routines-accordion';
 
-      accordion.appendChild(makeDetails('Crea tu propia rutina', [customCard]));
-      accordion.appendChild(makeDetails('Rutinas predefinidas', predefinedNodes));
-      accordion.appendChild(makeDetails('Ejercicios predefinidos', exerciseNodes));
-      accordion.appendChild(makeDetails('Añade tu ejercicio', [customExerciseBlock]));
+      const customDetails = makeDetails('Crea tu propia rutina', [customCard], 'custom');
+      const predefinedDetails = makeDetails('Rutinas predefinidas', predefinedNodes, 'predefined-routines');
+      const exerciseDetails = makeDetails('Ejercicios predefinidos', exerciseNodes, 'predefined-exercises');
+      const addExerciseDetails = makeDetails('Añade tu ejercicio', [customExerciseBlock], 'add-exercise');
 
-      // Los títulos originales ya no son necesarios una vez agrupado el contenido.
+      accordion.appendChild(customDetails);
+      accordion.appendChild(predefinedDetails);
+      accordion.appendChild(exerciseDetails);
+      accordion.appendChild(addExerciseDetails);
+
       customHead.remove();
       predefinedHead.remove();
       exercisesHead.remove();
@@ -93,10 +208,10 @@
       const activeHead = sectionHead(app, 'Tu rutina activa');
       const activeBlock = activeHead?.nextElementSibling;
       if (activeBlock) activeBlock.insertAdjacentElement('afterend', accordion);
-      else {
-        const hero = app.querySelector('.hero');
-        hero?.insertAdjacentElement('afterend', accordion);
-      }
+      else app.querySelector('.hero')?.insertAdjacentElement('afterend', accordion);
+
+      setupRoutineLevelFilter(predefinedDetails);
+      setupExerciseFilters(exerciseDetails);
     } finally {
       running = false;
     }
