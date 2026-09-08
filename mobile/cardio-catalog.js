@@ -6,20 +6,22 @@
   catalog.templates = Array.isArray(catalog.templates) ? catalog.templates : [];
 
   const cardioExercises = [
-    { name:'Cinta de correr', group:'Cardio', cardio:true, cardioType:'treadmill', cues:['Empieza con unos minutos suaves antes de subir el ritmo.','Mantén una zancada natural y evita agarrarte a la consola salvo necesidad.'], animation:{} },
-    { name:'Caminata en cinta con inclinación', group:'Cardio', cardio:true, cardioType:'treadmill', cues:['Mantén el tronco erguido y una inclinación que puedas sostener con buena técnica.','Ajusta velocidad e inclinación para controlar la intensidad sin tener que correr.'], animation:{} },
-    { name:'Bicicleta estática', group:'Cardio', cardio:true, cardioType:'bike', cues:['Ajusta el sillín para que la rodilla quede ligeramente flexionada abajo.','Pedalea de forma fluida y controla la resistencia sin perder cadencia.'], animation:{} },
-    { name:'Bicicleta de aire', group:'Cardio', cardio:true, cardioType:'air-bike', cues:['Empuja y tira con brazos mientras mantienes un pedaleo constante.','En intervalos intensos prioriza una postura estable antes que la velocidad máxima.'], animation:{} },
-    { name:'Bicicleta elíptica', group:'Cardio', cardio:true, cardioType:'elliptical', cues:['Mantén el apoyo completo del pie y el tronco estable.','Aumenta resistencia antes de acelerar si buscas más intensidad con menos impacto.'], animation:{} },
-    { name:'Remo ergómetro', group:'Cardio', cardio:true, cardioType:'rower', cues:['Empuja primero con las piernas, después acompaña con tronco y brazos.','En la vuelta recupera brazos, tronco y finalmente piernas.'], animation:{} },
-    { name:'Escaladora', group:'Cardio', cardio:true, cardioType:'stair-climber', cues:['Evita descargar el peso sobre las manos.','Usa pasos controlados y regula el ritmo para mantener la intensidad objetivo.'], animation:{} },
-    { name:'Saltar a la comba', group:'Cardio', cardio:true, cardioType:'jump-rope', cues:['Haz saltos bajos y suaves, principalmente desde los tobillos.','Mantén los codos cerca del cuerpo y mueve la cuerda con las muñecas.'], animation:{} },
-    { name:'Carrera exterior', group:'Cardio', cardio:true, cardioType:'running', cues:['Empieza suave y aumenta progresivamente el ritmo.','Adapta el esfuerzo al terreno y a las condiciones del día.'], animation:{} },
-    { name:'Caminata rápida', group:'Cardio', cardio:true, cardioType:'walking', cues:['Busca un paso vivo que puedas mantener sin perder postura.','Usa el movimiento natural de brazos para acompañar el ritmo.'], animation:{} }
+    { name:'Cinta de correr', group:'Cardio', cardio:true, cardioType:'treadmill', cues:['Empieza con unos minutos suaves antes de subir el ritmo.','Mantén una zancada natural y evita agarrarte a la consola salvo necesidad.'], animation:{path:'./cardio-media/cinta-de-correr.svg'} },
+    { name:'Caminata en cinta con inclinación', group:'Cardio', cardio:true, cardioType:'treadmill', cues:['Mantén el tronco erguido y una inclinación que puedas sostener con buena técnica.','Ajusta velocidad e inclinación para controlar la intensidad sin tener que correr.'], animation:{path:'./cardio-media/caminata-cinta-inclinacion.svg'} },
+    { name:'Bicicleta estática', group:'Cardio', cardio:true, cardioType:'bike', cues:['Ajusta el sillín para que la rodilla quede ligeramente flexionada abajo.','Pedalea de forma fluida y controla la resistencia sin perder cadencia.'], animation:{path:'./cardio-media/bicicleta-estatica.svg'} },
+    { name:'Bicicleta de aire', group:'Cardio', cardio:true, cardioType:'air-bike', cues:['Empuja y tira con brazos mientras mantienes un pedaleo constante.','En intervalos intensos prioriza una postura estable antes que la velocidad máxima.'], animation:{path:'./cardio-media/bicicleta-aire.svg'} },
+    { name:'Bicicleta elíptica', group:'Cardio', cardio:true, cardioType:'elliptical', cues:['Mantén el apoyo completo del pie y el tronco estable.','Aumenta resistencia antes de acelerar si buscas más intensidad con menos impacto.'], animation:{path:'./cardio-media/bicicleta-eliptica.svg'} },
+    { name:'Remo ergómetro', group:'Cardio', cardio:true, cardioType:'rower', cues:['Empuja primero con las piernas, después acompaña con tronco y brazos.','En la vuelta recupera brazos, tronco y finalmente piernas.'], animation:{path:'./cardio-media/remo-ergometro.svg'} },
+    { name:'Escaladora', group:'Cardio', cardio:true, cardioType:'stair-climber', cues:['Evita descargar el peso sobre las manos.','Usa pasos controlados y regula el ritmo para mantener la intensidad objetivo.'], animation:{path:'./cardio-media/escaladora.svg'} },
+    { name:'Saltar a la comba', group:'Cardio', cardio:true, cardioType:'jump-rope', cues:['Haz saltos bajos y suaves, principalmente desde los tobillos.','Mantén los codos cerca del cuerpo y mueve la cuerda con las muñecas.'], animation:{path:'./cardio-media/saltar-comba.svg'} },
+    { name:'Carrera exterior', group:'Cardio', cardio:true, cardioType:'running', cues:['Empieza suave y aumenta progresivamente el ritmo.','Adapta el esfuerzo al terreno y a las condiciones del día.'], animation:{path:'./cardio-media/carrera-exterior.svg'} },
+    { name:'Caminata rápida', group:'Cardio', cardio:true, cardioType:'walking', cues:['Busca un paso vivo que puedas mantener sin perder postura.','Usa el movimiento natural de brazos para acompañar el ritmo.'], animation:{path:'./cardio-media/caminata-rapida.svg'} }
   ];
 
   for (const ex of cardioExercises) {
-    if (!catalog.exercises.some(x => String(x.name).toLocaleLowerCase('es') === ex.name.toLocaleLowerCase('es'))) catalog.exercises.push(ex);
+    const existing = catalog.exercises.find(x => String(x.name).toLocaleLowerCase('es') === ex.name.toLocaleLowerCase('es'));
+    if (existing) Object.assign(existing, ex);
+    else catalog.exercises.push(ex);
   }
 
   const item = (exercise, duration_min, intensity='Moderada', extra={}) => ({
