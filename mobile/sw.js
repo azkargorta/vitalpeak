@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v42";
+const CACHE = "vitalpeak-mobile-v43";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./cardio-training.js", "./cardio-ui-polish.js", "./app.js", "./routine-enhancements.js", "./routine-muscle-filter.js", "./calendar-mobile.js", "./training-intelligence.js", "./routine-navigation-fix.js", "./routines-accordion.js", "./training-set-editor.js", "./manifest.webmanifest", "./icon-cover.png", "./icons/icon-192.svg", "./apple-touch-icon.png",
   "./cardio-media/cinta-de-correr.svg",
@@ -10,7 +10,13 @@ const APP_SHELL = [
   "./cardio-media/escaladora.svg",
   "./cardio-media/saltar-comba.svg",
   "./cardio-media/carrera-exterior.svg",
-  "./cardio-media/caminata-rapida.svg"
+  "./cardio-media/caminata-rapida.svg",
+  "./cardio-media/cinta-de-correr.webp",
+  "./cardio-media/caminata-cinta-inclinacion.webp",
+  "./cardio-media/bicicleta-estatica.webp",
+  "./cardio-media/bicicleta-aire.webp",
+  "./cardio-media/bicicleta-eliptica.webp",
+  "./cardio-media/remo-ergometro.webp"
 ];
 
 self.addEventListener("install", event => event.waitUntil(
