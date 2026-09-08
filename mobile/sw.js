@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v46";
+const CACHE = "vitalpeak-mobile-v47";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./cardio-training.js", "./cardio-ui-polish.js", "./app.js", "./routine-enhancements.js", "./routine-muscle-filter.js", "./calendar-mobile.js", "./training-intelligence.js", "./routine-navigation-fix.js", "./routines-accordion.js", "./routine-filter-persistence.js", "./training-set-editor.js", "./manifest.webmanifest", "./icon-cover.png", "./icons/icon-192.svg", "./apple-touch-icon.png",
   "./cardio-media/cinta-de-correr.svg",
