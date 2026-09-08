@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  if(!window.__VITALPEAK_CARDIO_POLISH__){window.__VITALPEAK_CARDIO_POLISH__=true;const s=document.createElement('script');s.src='./cardio-ui-polish.js?v=1';document.head.appendChild(s)}
+  if(!window.__VITALPEAK_CARDIO_POLISH__){window.__VITALPEAK_CARDIO_POLISH__=true;const s=document.createElement('script');s.src='./cardio-ui-polish.js?v=2';document.head.appendChild(s)}
   const DB_NAME='vitalpeak-mobile', STORE='state';
   let busy=false;
 
