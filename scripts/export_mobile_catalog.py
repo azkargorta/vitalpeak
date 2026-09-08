@@ -18,6 +18,19 @@ from app.routine_templates import TEMPLATES
 SEQUENCES = ROOT / "exercise_images" / "sequences"
 OUTPUT = ROOT / "mobile" / "catalog-data.js"
 
+CARDIO_EXERCISES = [
+    {"name": "Cinta de correr", "group": "Cardio", "cardio": True, "cardioType": "treadmill", "cues": ["Empieza con unos minutos suaves antes de subir el ritmo.", "Mantén una zancada natural y evita agarrarte a la consola salvo necesidad."], "animation": {"path": "cardio-media/cinta-de-correr.webp"}},
+    {"name": "Caminata en cinta con inclinación", "group": "Cardio", "cardio": True, "cardioType": "treadmill", "cues": ["Mantén el tronco erguido y una inclinación que puedas sostener con buena técnica.", "Ajusta velocidad e inclinación para controlar la intensidad sin tener que correr."], "animation": {"path": "cardio-media/caminata-cinta-inclinacion.webp"}},
+    {"name": "Bicicleta estática", "group": "Cardio", "cardio": True, "cardioType": "bike", "cues": ["Ajusta el sillín para que la rodilla quede ligeramente flexionada abajo.", "Pedalea de forma fluida y controla la resistencia sin perder cadencia."], "animation": {"path": "cardio-media/bicicleta-estatica.webp"}},
+    {"name": "Bicicleta de aire", "group": "Cardio", "cardio": True, "cardioType": "air-bike", "cues": ["Empuja y tira con brazos mientras mantienes un pedaleo constante.", "En intervalos intensos prioriza una postura estable antes que la velocidad máxima."], "animation": {"path": "cardio-media/bicicleta-aire.webp"}},
+    {"name": "Bicicleta elíptica", "group": "Cardio", "cardio": True, "cardioType": "elliptical", "cues": ["Mantén el apoyo completo del pie y el tronco estable.", "Aumenta resistencia antes de acelerar si buscas más intensidad con menos impacto."], "animation": {"path": "cardio-media/bicicleta-eliptica.webp"}},
+    {"name": "Remo ergómetro", "group": "Cardio", "cardio": True, "cardioType": "rower", "cues": ["Empuja primero con las piernas, después acompaña con tronco y brazos.", "En la vuelta recupera brazos, tronco y finalmente piernas."], "animation": {"path": "cardio-media/remo-ergometro.webp"}},
+    {"name": "Escaladora", "group": "Cardio", "cardio": True, "cardioType": "stair-climber", "cues": ["Evita descargar el peso sobre las manos.", "Usa pasos controlados y regula el ritmo para mantener la intensidad objetivo."], "animation": {"path": "cardio-media/escaladora.svg"}},
+    {"name": "Saltar a la comba", "group": "Cardio", "cardio": True, "cardioType": "jump-rope", "cues": ["Haz saltos bajos y suaves, principalmente desde los tobillos.", "Mantén los codos cerca del cuerpo y mueve la cuerda con las muñecas."], "animation": {"path": "cardio-media/saltar-comba.svg"}},
+    {"name": "Carrera exterior", "group": "Cardio", "cardio": True, "cardioType": "running", "cues": ["Empieza suave y aumenta progresivamente el ritmo.", "Adapta el esfuerzo al terreno y a las condiciones del día."], "animation": {"path": "cardio-media/carrera-exterior.svg"}},
+    {"name": "Caminata rápida", "group": "Cardio", "cardio": True, "cardioType": "walking", "cues": ["Busca un paso vivo que puedas mantener sin perder postura.", "Usa el movimiento natural de brazos para acompañar el ritmo."], "animation": {"path": "cardio-media/caminata-rapida.svg"}},
+]
+
 
 def key(value: str) -> str:
     plain = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
@@ -87,6 +100,12 @@ def main() -> None:
             "animation": animation,
         })
 
+    existing_names = {key(item["name"]) for item in exercises}
+    for cardio in CARDIO_EXERCISES:
+        if key(cardio["name"]) not in existing_names:
+            exercises.append(cardio)
+            existing_names.add(key(cardio["name"]))
+
     payload = {"templates": TEMPLATES, "exercises": exercises}
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
@@ -123,7 +142,7 @@ def main() -> None:
         "}\n",
         encoding="utf-8",
     )
-    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con GIF.")
+    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {sum(bool(x['animation']) for x in exercises)} con recurso visual.")
 
 
 if __name__ == "__main__":
