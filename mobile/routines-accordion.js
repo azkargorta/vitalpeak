@@ -2,6 +2,8 @@
   'use strict';
   let running = false;
   const DB_NAME='vitalpeak-mobile', STORE='state';
+  const OPEN_STATE_KEY='vitalpeak:routines-open-sections';
+  let restoreScrollY = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize = value => String(value || '')
@@ -9,6 +11,31 @@
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('es')
     .trim();
+
+  function loadOpenSections(){
+    try { return new Set(JSON.parse(sessionStorage.getItem(OPEN_STATE_KEY)||'[]')); }
+    catch { return new Set(); }
+  }
+  function saveOpenSections(keys){
+    try { sessionStorage.setItem(OPEN_STATE_KEY, JSON.stringify([...keys])); } catch {}
+  }
+  function captureAccordionState(){
+    const accordion=document.querySelector('#vp-routines-accordion');
+    if(!accordion) return;
+    const open=new Set([...accordion.querySelectorAll('.vp-routine-section[open]')].map(x=>x.dataset.vpSection).filter(Boolean));
+    saveOpenSections(open);
+    restoreScrollY=window.scrollY;
+  }
+  function bindDetailsState(details){
+    const key=details.dataset.vpSection;
+    if(key && loadOpenSections().has(key)) details.open=true;
+    details.addEventListener('toggle',()=>{
+      if(!key) return;
+      const open=loadOpenSections();
+      if(details.open) open.add(key); else open.delete(key);
+      saveOpenSections(open);
+    });
+  }
 
   function ensureStyles() {
     if (document.querySelector('#vp-routines-accordion-styles')) return;
@@ -71,6 +98,7 @@
     details.innerHTML = `<summary>${title}</summary><div class="vp-routine-section-content"></div>`;
     const body = details.querySelector('.vp-routine-section-content');
     nodes.forEach(node => body.appendChild(node));
+    bindDetailsState(details);
     return details;
   }
 
@@ -247,10 +275,22 @@
 
       setupRoutineLevelFilter(predefinedDetails);
       setupExerciseFilters(exerciseDetails);
+
+      if(restoreScrollY!==null){
+        const y=restoreScrollY; restoreScrollY=null;
+        requestAnimationFrame(()=>window.scrollTo({top:y,left:0,behavior:'auto'}));
+      }
     } finally {
       running = false;
     }
   }
+
+  document.addEventListener('change',e=>{
+    if(e.target.closest('#vp-routines-accordion')) captureAccordionState();
+  },true);
+  document.addEventListener('input',e=>{
+    if(e.target.closest('#vp-routines-accordion')) captureAccordionState();
+  },true);
 
   let timer = null;
   const start = () => {
