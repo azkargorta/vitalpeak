@@ -1,5 +1,5 @@
-const CACHE = "vitalpeak-mobile-v39";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./app.js", "./routine-enhancements.js", "./routine-muscle-filter.js", "./calendar-mobile.js", "./training-intelligence.js", "./routine-navigation-fix.js", "./routines-accordion.js", "./training-set-editor.js", "./manifest.webmanifest", "./icon-cover.png", "./icons/icon-192.svg", "./apple-touch-icon.png"];
+const CACHE = "vitalpeak-mobile-v40";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./cardio-training.js", "./cardio-ui-polish.js", "./app.js", "./routine-enhancements.js", "./routine-muscle-filter.js", "./calendar-mobile.js", "./training-intelligence.js", "./routine-navigation-fix.js", "./routines-accordion.js", "./training-set-editor.js", "./manifest.webmanifest", "./icon-cover.png", "./icons/icon-192.svg", "./apple-touch-icon.png"];
 
 self.addEventListener("install", event => event.waitUntil(
   caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
