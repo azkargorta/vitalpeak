@@ -1,0 +1,51 @@
+name: Build final cardio assets
+
+on:
+  push:
+    branches: [cardio-assets-final]
+    paths:
+      - '.asset-upload/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cardio-assets-final
+          fetch-depth: 0
+      - name: Decode final images and update app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mobile/cardio-media
+          for name in saltar-comba carrera-exterior caminata-rapida cinta-de-correr; do
+            cat .asset-upload/${name}.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-media/${name}.webp
+            test -s mobile/cardio-media/${name}.webp
+          done
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('mobile/cardio-catalog.js')
+          s=p.read_text(encoding='utf-8')
+          names=['cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire','bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida']
+          for n in names:
+              s=s.replace(f'./cardio-media/{n}.svg', f'./cardio-media/{n}.webp')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('mobile/sw.js')
+          s=p.read_text(encoding='utf-8').replace('vitalpeak-mobile-v43','vitalpeak-mobile-v44')
+          anchor='  "./cardio-media/remo-ergometro.webp"\n'
+          if '"./cardio-media/escaladora.webp"' not in s:
+              s=s.replace(anchor, anchor.rstrip('\n')+',\n  "./cardio-media/escaladora.webp",\n  "./cardio-media/saltar-comba.webp",\n  "./cardio-media/carrera-exterior.webp",\n  "./cardio-media/caminata-rapida.webp"\n')
+          p.write_text(s,encoding='utf-8')
+          PY
+          rm -rf .asset-upload
+          rm -f .github/workflows/build-cardio-assets.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/cardio-media mobile/cardio-catalog.js mobile/sw.js .asset-upload .github/workflows/build-cardio-assets.yml
+          git commit -m 'Instala imágenes definitivas de cardio en alta calidad'
+          git push origin HEAD:cardio-assets-final
