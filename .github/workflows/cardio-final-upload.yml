@@ -1,0 +1,45 @@
+name: Instalar cardio definitivo
+
+on:
+  push:
+    branches: [cardio-final-upload]
+    paths:
+      - 'mobile/cardio-upload/_READY'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cardio-final-upload
+          fetch-depth: 0
+      - name: Instalar imágenes y renovar caché
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat mobile/cardio-upload/part-* | tr -d '\n\r ' > /tmp/cardio.b64
+          base64 -d /tmp/cardio.b64 > /tmp/cardio.tar.gz
+          mkdir -p mobile/cardio-images
+          tar -xzf /tmp/cardio.tar.gz -C mobile/cardio-images
+          test -s mobile/cardio-images/cinta-de-correr.webp
+          test -s mobile/cardio-images/bicicleta-estatica.webp
+          test -s mobile/cardio-images/caminata-cinta-inclinacion.webp
+          test -s mobile/cardio-images/bicicleta-aire.webp
+          test -s mobile/cardio-images/bicicleta-eliptica.webp
+          test -s mobile/cardio-images/remo-ergometro.webp
+          test -s mobile/cardio-images/escaladora.webp
+          test -s mobile/cardio-images/saltar-comba.webp
+          test -s mobile/cardio-images/carrera-exterior.webp
+          test -s mobile/cardio-images/caminata-rapida.webp
+          sed -i 's/vitalpeak-mobile-v54/vitalpeak-mobile-v55/g' mobile/sw.js
+          rm -rf mobile/cardio-upload
+          rm -f .github/workflows/cardio-final-upload.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/cardio-images mobile/sw.js mobile/cardio-upload .github/workflows/cardio-final-upload.yml
+          git commit -m 'Sustituye imágenes cardio por recursos válidos'
+          git push origin HEAD:cardio-final-upload
