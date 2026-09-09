@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v52";
+const CACHE = "vitalpeak-mobile-v53";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -25,10 +25,10 @@ const APP_SHELL = [
   "./cardio-images/bicicleta-aire.webp",
   "./cardio-images/bicicleta-eliptica.webp",
   "./cardio-images/remo-ergometro.webp",
-  "./cardio-images/escaladora.svg",
-  "./cardio-images/saltar-comba.svg",
-  "./cardio-images/carrera-exterior.svg",
-  "./cardio-images/caminata-rapida.svg"
+  "./cardio-images/escaladora.webp",
+  "./cardio-images/saltar-comba.webp",
+  "./cardio-images/carrera-exterior.webp",
+  "./cardio-images/caminata-rapida.webp"
 ];
 
 self.addEventListener("install", event => event.waitUntil(
