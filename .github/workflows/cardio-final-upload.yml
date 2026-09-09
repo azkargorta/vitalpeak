@@ -4,7 +4,7 @@ on:
   push:
     branches: [cardio-final-upload]
     paths:
-      - 'mobile/cardio-upload/_READY2'
+      - 'mobile/cardio-upload/_READY3'
 
 permissions:
   contents: write
@@ -21,9 +21,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          base64 -d mobile/cardio-upload/cardio-final.tar.gz > /tmp/cardio-final.tar.gz
           rm -rf mobile/cardio-images
           mkdir -p mobile/cardio-images
-          tar -xzf mobile/cardio-upload/cardio-final.tar.gz -C mobile/cardio-images
+          tar -xzf /tmp/cardio-final.tar.gz -C mobile/cardio-images
           for name in cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro escaladora saltar-comba carrera-exterior caminata-rapida; do
             test -s "mobile/cardio-images/${name}.jpg"
           done
