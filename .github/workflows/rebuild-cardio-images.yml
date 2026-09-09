@@ -24,41 +24,45 @@ jobs:
           rm -rf mobile/cardio-images
           mkdir -p mobile/cardio-images
 
-          # Reutiliza los WebP válidos ya generados a partir de las imágenes originales.
+          # Crea una carpeta nueva y estable. Los 6 recursos fotográficos válidos
+          # se copian como WebP; los 4 restantes se copian como SVG existentes.
           for name in cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro; do
             cp "mobile/cardio-media/${name}.webp" "mobile/cardio-images/${name}.webp"
+            test -s "mobile/cardio-images/${name}.webp"
+            file "mobile/cardio-images/${name}.webp" | grep -qi webp
           done
-
-          # Reconstruye los recursos que antes no estaban instalados como imagen real.
-          cat .asset-upload/caminata-rapida.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/caminata-rapida.webp
-          cat .asset-upload/carrera-exterior.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/carrera-exterior.webp
-          cat .asset-upload/saltar-comba.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/saltar-comba.webp
-          cat .asset-upload/escaladora-new.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/escaladora.webp
-
-          for f in mobile/cardio-images/*.webp; do
-            test -s "$f"
-            file "$f" | grep -qi webp
+          for name in escaladora saltar-comba carrera-exterior caminata-rapida; do
+            cp "mobile/cardio-media/${name}.svg" "mobile/cardio-images/${name}.svg"
+            test -s "mobile/cardio-images/${name}.svg"
           done
 
           python - <<'PY'
           from pathlib import Path
-          names = [
-              'cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire',
-              'bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida'
-          ]
+          import re
+
+          paths = {
+              'cinta-de-correr': 'cardio-images/cinta-de-correr.webp',
+              'caminata-cinta-inclinacion': 'cardio-images/caminata-cinta-inclinacion.webp',
+              'bicicleta-estatica': 'cardio-images/bicicleta-estatica.webp',
+              'bicicleta-aire': 'cardio-images/bicicleta-aire.webp',
+              'bicicleta-eliptica': 'cardio-images/bicicleta-eliptica.webp',
+              'remo-ergometro': 'cardio-images/remo-ergometro.webp',
+              'escaladora': 'cardio-images/escaladora.svg',
+              'saltar-comba': 'cardio-images/saltar-comba.svg',
+              'carrera-exterior': 'cardio-images/carrera-exterior.svg',
+              'caminata-rapida': 'cardio-images/caminata-rapida.svg',
+          }
 
           p = Path('scripts/export_mobile_catalog.py')
           s = p.read_text(encoding='utf-8')
-          for n in names:
-              import re
-              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp)', f'cardio-images/{n}.webp', s)
+          for n, dest in paths.items():
+              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp|png|jpg)', dest, s)
           p.write_text(s, encoding='utf-8')
 
           p = Path('mobile/cardio-catalog.js')
           s = p.read_text(encoding='utf-8')
-          for n in names:
-              import re
-              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp)', f'cardio-images/{n}.webp', s)
+          for n, dest in paths.items():
+              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp|png|jpg)', dest, s)
           s = s.replace("animation:{path:'cardio-images/", "animation:{kind:'image',path:'cardio-images/")
           p.write_text(s, encoding='utf-8')
 
@@ -78,13 +82,12 @@ jobs:
 
           p = Path('mobile/sw.js')
           s = p.read_text(encoding='utf-8')
-          import re
           s = re.sub(r'const CACHE = "vitalpeak-mobile-v\d+";', 'const CACHE = "vitalpeak-mobile-v51";', s)
           lines = s.splitlines()
           lines = [line for line in lines if 'cardio-media/' not in line and 'cardio-ui-polish.js' not in line]
           s = '\n'.join(lines)
           anchor = '  "./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./cardio-training.js", "./app.js",'
-          assets = ''.join(f'\n  "./cardio-images/{n}.webp",' for n in names)
+          assets = ''.join(f'\n  "./{path}",' for path in paths.values())
           if anchor in s:
               s = s.replace(anchor, anchor + assets)
           p.write_text(s + '\n', encoding='utf-8')
