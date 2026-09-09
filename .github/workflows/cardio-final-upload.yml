@@ -21,37 +21,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat mobile/cardio-upload/part-* | tr -d '\n\r ' > /tmp/cardio.b64
-          base64 -d /tmp/cardio.b64 > /tmp/cardio.tar.gz
           rm -rf mobile/cardio-images
           mkdir -p mobile/cardio-images
-          tar -xzf /tmp/cardio.tar.gz -C mobile/cardio-images
+          tar -xzf mobile/cardio-upload/cardio300.tar.gz -C mobile/cardio-images
           for name in cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro escaladora saltar-comba carrera-exterior caminata-rapida; do
             test -s "mobile/cardio-images/${name}.jpg"
           done
           python - <<'PY'
           from pathlib import Path
-          targets = [
-              Path('scripts/export_mobile_catalog.py'),
-              Path('mobile/sw.js'),
-              Path('mobile/cardio-catalog.js'),
-          ]
-          for p in targets:
+          names = ['cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire','bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida']
+          for filename in ['scripts/export_mobile_catalog.py','mobile/sw.js','mobile/cardio-catalog.js']:
+              p=Path(filename)
               if not p.exists():
                   continue
-              s = p.read_text(encoding='utf-8')
-              s = s.replace('cardio-images/cinta-de-correr.webp','cardio-images/cinta-de-correr.jpg')
-              s = s.replace('cardio-images/caminata-cinta-inclinacion.webp','cardio-images/caminata-cinta-inclinacion.jpg')
-              s = s.replace('cardio-images/bicicleta-estatica.webp','cardio-images/bicicleta-estatica.jpg')
-              s = s.replace('cardio-images/bicicleta-aire.webp','cardio-images/bicicleta-aire.jpg')
-              s = s.replace('cardio-images/bicicleta-eliptica.webp','cardio-images/bicicleta-eliptica.jpg')
-              s = s.replace('cardio-images/remo-ergometro.webp','cardio-images/remo-ergometro.jpg')
-              s = s.replace('cardio-images/escaladora.webp','cardio-images/escaladora.jpg')
-              s = s.replace('cardio-images/saltar-comba.webp','cardio-images/saltar-comba.jpg')
-              s = s.replace('cardio-images/carrera-exterior.webp','cardio-images/carrera-exterior.jpg')
-              s = s.replace('cardio-images/caminata-rapida.webp','cardio-images/caminata-rapida.jpg')
-              s = s.replace('vitalpeak-mobile-v54','vitalpeak-mobile-v55')
-              p.write_text(s, encoding='utf-8')
+              s=p.read_text(encoding='utf-8')
+              for n in names:
+                  s=s.replace(f'cardio-images/{n}.webp', f'cardio-images/{n}.jpg')
+              s=s.replace('vitalpeak-mobile-v54','vitalpeak-mobile-v55')
+              p.write_text(s,encoding='utf-8')
           PY
           rm -rf mobile/cardio-upload
           rm -f .github/workflows/cardio-final-upload.yml
