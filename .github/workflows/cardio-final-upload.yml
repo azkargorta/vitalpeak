@@ -4,7 +4,7 @@ on:
   push:
     branches: [cardio-final-upload]
     paths:
-      - 'mobile/cardio-upload/_READY'
+      - 'mobile/cardio-upload/_READY2'
 
 permissions:
   contents: write
@@ -17,23 +17,22 @@ jobs:
         with:
           ref: cardio-final-upload
           fetch-depth: 0
-      - name: Instalar imágenes JPG y renovar caché
+      - name: Instalar imágenes definitivas y renovar caché
         shell: bash
         run: |
           set -euo pipefail
           rm -rf mobile/cardio-images
           mkdir -p mobile/cardio-images
-          tar -xzf mobile/cardio-upload/cardio300.tar.gz -C mobile/cardio-images
+          tar -xzf mobile/cardio-upload/cardio-final.tar.gz -C mobile/cardio-images
           for name in cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro escaladora saltar-comba carrera-exterior caminata-rapida; do
             test -s "mobile/cardio-images/${name}.jpg"
           done
           python - <<'PY'
           from pathlib import Path
-          names = ['cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire','bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida']
+          names=['cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire','bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida']
           for filename in ['scripts/export_mobile_catalog.py','mobile/sw.js','mobile/cardio-catalog.js']:
               p=Path(filename)
-              if not p.exists():
-                  continue
+              if not p.exists(): continue
               s=p.read_text(encoding='utf-8')
               for n in names:
                   s=s.replace(f'cardio-images/{n}.webp', f'cardio-images/{n}.jpg')
