@@ -1,0 +1,102 @@
+name: Rebuild cardio images cleanly
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rebuild-cardio-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebuild cardio image layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mobile/cardio-images
+          mkdir -p mobile/cardio-images
+
+          # Reutiliza los WebP válidos ya generados a partir de las imágenes originales.
+          for name in cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro; do
+            cp "mobile/cardio-media/${name}.webp" "mobile/cardio-images/${name}.webp"
+          done
+
+          # Reconstruye los recursos que antes no estaban instalados como imagen real.
+          cat .asset-upload/caminata-rapida.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/caminata-rapida.webp
+          cat .asset-upload/carrera-exterior.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/carrera-exterior.webp
+          cat .asset-upload/saltar-comba.*.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/saltar-comba.webp
+          cat .asset-upload/escaladora-new.b64 | tr -d '\n\r ' | base64 -d > mobile/cardio-images/escaladora.webp
+
+          for f in mobile/cardio-images/*.webp; do
+            test -s "$f"
+            file "$f" | grep -qi webp
+          done
+
+          python - <<'PY'
+          from pathlib import Path
+          names = [
+              'cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire',
+              'bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida'
+          ]
+
+          p = Path('scripts/export_mobile_catalog.py')
+          s = p.read_text(encoding='utf-8')
+          for n in names:
+              import re
+              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp)', f'cardio-images/{n}.webp', s)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('mobile/cardio-catalog.js')
+          s = p.read_text(encoding='utf-8')
+          for n in names:
+              import re
+              s = re.sub(rf'cardio-media/{re.escape(n)}\.(?:svg|webp)', f'cardio-images/{n}.webp', s)
+          s = s.replace("animation:{path:'cardio-images/", "animation:{kind:'image',path:'cardio-images/")
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('mobile/cardio-training.js')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("  if(!window.__VITALPEAK_CARDIO_POLISH__){window.__VITALPEAK_CARDIO_POLISH__=true;const s=document.createElement('script');s.src='./cardio-ui-polish.js?v=2';document.head.appendChild(s)}\n", "")
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('mobile/app.js')
+          s = p.read_text(encoding='utf-8')
+          old = "${catalog.exercises.map(x=>`<button class=\"exercise-card\" data-action=\"exercise-detail\" data-exercise=\"${esc(x.name)}\"><span>${esc(x.group)}</span><b>${esc(x.name)}</b>${x.animation?.path?`<small>Movimiento guiado</small>`:\"\"}</button>`).join(\"\")}"
+          new = "${catalog.exercises.map(x=>`<button class=\"exercise-card\" data-action=\"exercise-detail\" data-exercise=\"${esc(x.name)}\">${(x.cardio||x.group===\"Cardio\")&&x.animation?.path?`<img src=\"./${encodeURI(x.animation.path)}\" alt=\"Imagen de ${esc(x.name)}\" loading=\"lazy\" style=\"width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;margin-bottom:8px\">`:\"\"}<span>${esc(x.group)}</span><b>${esc(x.name)}</b>${x.animation?.path?`<small>${x.cardio||x.group===\"Cardio\"?\"Imagen de referencia\":\"Movimiento guiado\"}</small>`:\"\"}</button>`).join(\"\")}"
+          if old in s:
+              s = s.replace(old, new)
+          s = s.replace('<b>Movimiento guiado</b><span>El GIF queda disponible sin conexión después de verlo una vez.</span>', '<b>${x.cardio||x.group===\"Cardio\"?\"Imagen del ejercicio\":\"Movimiento guiado\"}</b><span>${x.cardio||x.group===\"Cardio\"?\"Referencia visual del ejercicio de cardio.\":\"GIF animado de técnica del ejercicio.\"}</span>')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('mobile/sw.js')
+          s = p.read_text(encoding='utf-8')
+          import re
+          s = re.sub(r'const CACHE = "vitalpeak-mobile-v\d+";', 'const CACHE = "vitalpeak-mobile-v51";', s)
+          lines = s.splitlines()
+          lines = [line for line in lines if 'cardio-media/' not in line and 'cardio-ui-polish.js' not in line]
+          s = '\n'.join(lines)
+          anchor = '  "./", "./index.html", "./styles.css", "./catalog-data.js", "./cardio-catalog.js", "./cardio-training.js", "./app.js",'
+          assets = ''.join(f'\n  "./cardio-images/{n}.webp",' for n in names)
+          if anchor in s:
+              s = s.replace(anchor, anchor + assets)
+          p.write_text(s + '\n', encoding='utf-8')
+          PY
+
+          rm -rf mobile/cardio-media .asset-upload
+          rm -f mobile/cardio-ui-polish.js
+          rm -f .github/workflows/build-cardio-assets.yml
+          rm -f .github/workflows/rebuild-cardio-images.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Reinstala imágenes de cardio y separa la capa visual'
+          git push origin main
