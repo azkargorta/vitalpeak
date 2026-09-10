@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -31,6 +31,36 @@ jobs:
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materializar imágenes cardio definitivas
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          staged=(mobile/cardio-images/*.webp.base64-tmp)
+          if ((${#staged[@]})); then
+            for src in "${staged[@]}"; do
+              dst="${src%.base64-tmp}"
+              base64 --decode "$src" > "$dst"
+              test -s "$dst"
+              file "$dst" | grep -qi "web/p"
+            done
+
+            rm -f mobile/cardio-images/*.webp.base64-tmp
+            rm -f mobile/cardio-images/bicicleta-aire.jpg.b64
+            rm -f mobile/cardio-images/.probe.txt
+            rm -f mobile/cardio-images/*.svg
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add mobile/cardio-images
+            if ! git diff --cached --quiet; then
+              git commit -m "Materializa imágenes cardio definitivas"
+              git push origin HEAD:main
+            fi
+          fi
 
       - name: Regenerar catálogo móvil
         run: |
