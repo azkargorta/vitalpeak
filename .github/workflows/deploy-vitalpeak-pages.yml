@@ -41,11 +41,24 @@ jobs:
           shopt -s nullglob
           staged=(mobile/cardio-images/*.webp.base64-tmp)
           if ((${#staged[@]})); then
-            for src in "${staged[@]}"; do
-              dst="${src%.base64-tmp}"
-              base64 --decode "$src" > "$dst"
-              test -s "$dst"
-              file "$dst" | grep -qi "web/p"
+            python - <<'PY'
+          from pathlib import Path
+          import base64
+
+          for src in sorted(Path('mobile/cardio-images').glob('*.webp.base64-tmp')):
+              raw = ''.join(src.read_text(encoding='utf-8').split())
+              raw += '=' * (-len(raw) % 4)
+              data = base64.b64decode(raw, validate=False)
+              dst = Path(str(src).removesuffix('.base64-tmp'))
+              dst.write_bytes(data)
+              if len(data) < 1000 or data[:4] != b'RIFF' or data[8:12] != b'WEBP':
+                  raise SystemExit(f'Imagen WebP inválida: {src.name}')
+              print(f'{src.name} -> {dst.name}: {len(data)} bytes')
+          PY
+
+            for img in mobile/cardio-images/*.webp; do
+              test -s "$img"
+              file "$img" | grep -qi "web/p"
             done
 
             rm -f mobile/cardio-images/*.webp.base64-tmp
