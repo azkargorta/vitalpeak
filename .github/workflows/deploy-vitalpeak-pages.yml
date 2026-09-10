@@ -9,6 +9,7 @@ on:
       - "app/routine_templates.py"
       - "app/exercise_catalog.py"
       - "data/base_exercises.txt"
+      - "data/exercise_metadata.json"
       - "scripts/export_mobile_catalog.py"
       - ".github/workflows/deploy-vitalpeak-pages.yml"
   workflow_dispatch:
