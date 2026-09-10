@@ -35,6 +35,7 @@
       .vp-editing-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:#fff5dc;color:#725313;font-size:12px;font-weight:750}
       .vp-editing-banner button{border:0;border-radius:9px;background:#fff;color:#725313;padding:6px 9px;font-weight:800}
       #set-form.vp-editing-set>button[type="submit"]{background:#176d61}
+      .vp-exercise-card-preview{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;margin-bottom:8px;display:block;background:#f2f6f5}
       @media(max-width:380px){.vp-set-actions{width:100%}.vp-set-action{flex:1}}
     `;
     document.head.appendChild(style);
@@ -46,6 +47,37 @@
   function currentExerciseName(){const form=document.querySelector('#set-form'),card=form?.closest('.card');return card?.querySelector('.row h2')?.textContent?.trim()||''}
   function indicesForExercise(state,exerciseName){const sets=state?._draft?.sets||[],indices=[];sets.forEach((set,index)=>{if(set.exercise===exerciseName)indices.push(index)});return indices}
   function toast(message){const el=document.querySelector('#toast');if(!el)return;el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
+
+  function exercisePreviewPath(exercise) {
+    if (!exercise || exercise.cardio || exercise.group === 'Cardio') return '';
+    const movement = String(exercise.animation?.path || '');
+    if (!movement) return '';
+    if (/movimiento\.gif(?:[?#].*)?$/i.test(movement)) {
+      return movement.replace(/movimiento\.gif(?=([?#].*)?$)/i, '01_inicio.png');
+    }
+    return '';
+  }
+
+  function decorateExerciseCards() {
+    ensureStyles();
+    const catalog = window.VITALPEAK_CATALOG?.exercises || [];
+    document.querySelectorAll('.exercise-card[data-exercise]').forEach(card => {
+      if (card.querySelector('img')) return;
+      const exercise = catalog.find(item => item.name === card.dataset.exercise);
+      const preview = exercisePreviewPath(exercise);
+      if (!preview) return;
+      const img = document.createElement('img');
+      img.className = 'vp-exercise-card-preview';
+      img.src = `./${encodeURI(preview)}`;
+      img.alt = `Imagen de ${exercise.name}`;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.addEventListener('error', () => img.remove(), { once:true });
+      card.prepend(img);
+      const caption = card.querySelector('small');
+      if (caption) caption.textContent = 'Imagen de referencia';
+    });
+  }
 
   async function decorateSets(){
     ensureStyles();
@@ -64,5 +96,6 @@
   document.addEventListener('click',async event=>{if(isCurrentCardio())return;const edit=event.target.closest('[data-vp-edit-set]');if(edit){event.preventDefault();event.stopImmediatePropagation();await startEdit(Number(edit.dataset.vpEditSet)).catch(()=>toast('No se ha podido abrir la serie para editar.'));return}const del=event.target.closest('[data-vp-delete-set]');if(del){event.preventDefault();event.stopImmediatePropagation();await deleteSet(Number(del.dataset.vpDeleteSet)).catch(()=>toast('No se ha podido eliminar la serie.'));return}if(event.target.closest('[data-vp-cancel-edit]')){event.preventDefault();event.stopImmediatePropagation();cancelEdit()}},true);
   document.addEventListener('submit',async event=>{if(event.target.id!=='set-form'||editingSetIndex===null||isCurrentCardio())return;event.preventDefault();event.stopImmediatePropagation();if(busy)return;busy=true;try{const form=event.target,data=new FormData(form),state=await readState(),draft=state?._draft,set=draft?.sets?.[editingSetIndex];if(!draft||!set)throw new Error('Serie no encontrada');set.weight=Number(data.get('weight'));set.reps=Number(data.get('reps'));set.heartRate=String(data.get('heartRate')||'').trim()?Number(data.get('heartRate')):null;set.notes=String(data.get('notes')||'');set.editedAt=new Date().toISOString();const remaining=draft.sets.filter(x=>x.exercise===set.exercise).length,targetText=form.closest('.card')?.querySelector('.muted')?.textContent||'',target=Number(targetText.match(/Objetivo:\s*(\d+)/i)?.[1]||0);draft.pendingChoice=Boolean(target&&remaining>=target);await writeState(state);editingSetIndex=null;location.reload()}catch{busy=false;toast('No se han podido guardar los cambios de la serie.')}},true);
 
-  let timer=null;const observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>decorateSets().catch(()=>{}),40)});const start=()=>{const app=document.querySelector('#app');if(!app)return setTimeout(start,50);observer.observe(app,{childList:true,subtree:true});decorateSets().catch(()=>{})};start();
+  let timer=null;const observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>{decorateSets().catch(()=>{});decorateExerciseCards()},40)});const start=()=>{const app=document.querySelector('#app');if(!app)return setTimeout(start,50);observer.observe(app,{childList:true,subtree:true});decorateSets().catch(()=>{});decorateExerciseCards()};start();
+  window.addEventListener('vitalpeak:catalog-updated', decorateExerciseCards);
 })();
