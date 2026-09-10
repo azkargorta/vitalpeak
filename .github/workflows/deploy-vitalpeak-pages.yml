@@ -87,6 +87,8 @@ jobs:
           grep -q '"volumeEngine"' mobile/catalog-data.js
           grep -q '"exerciseSelector"' mobile/catalog-data.js
           grep -q '"routineEngine"' mobile/catalog-data.js
+          printf '\n{ const s=document.createElement("script"); s.src="./routine-generator-ui.js?v=1"; s.defer=true; document.head.appendChild(s); }\n' >> mobile/catalog-data.js
+          grep -q 'routine-generator-ui.js' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
         run: |
