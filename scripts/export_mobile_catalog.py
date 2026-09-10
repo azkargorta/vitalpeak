@@ -16,6 +16,7 @@ from app.routine_templates import TEMPLATES
 
 SEQUENCES = ROOT / "exercise_images" / "sequences"
 OUTPUT = ROOT / "mobile" / "catalog-data.js"
+METADATA_FILE = ROOT / "data" / "exercise_metadata.json"
 
 CARDIO_EXERCISES = [
     {"name": "Cinta de correr", "group": "Cardio", "cardio": True, "cardioType": "treadmill", "cues": ["Empieza con unos minutos suaves antes de subir el ritmo.", "Mantén una zancada natural y evita agarrarte a la consola salvo necesidad."], "animation": {"path": "cardio-images/cinta-de-correr.webp", "kind": "image"}},
@@ -34,6 +35,16 @@ CARDIO_EXERCISES = [
 def key(value: str) -> str:
     plain = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "", plain.lower())
+
+
+def load_exercise_metadata() -> dict[str, dict]:
+    if not METADATA_FILE.is_file():
+        return {}
+    try:
+        raw = json.loads(METADATA_FILE.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def animation_index() -> dict[str, dict]:
@@ -78,21 +89,34 @@ def generic_cues(name: str, group: str) -> list[str]:
         "Hombro": ["Mantén el core firme y evita encoger los hombros.", "Sube con control y baja sin dejar caer la carga."],
         "Pierna": ["Apoya todo el pie y alinea rodillas con la punta de los pies.", "Controla el rango que puedas mantener con técnica."],
         "Brazo": ["Mantén el codo estable durante el recorrido.", "Evita usar impulso del tronco."],
+        "Core": ["Mantén el tronco estable y respira de forma controlada.", "Evita compensar con la zona lumbar."],
     }
     return cues.get(group, [f"Realiza {name} con un ritmo controlado.", *common])
 
 
 def main() -> None:
     animations = animation_index()
+    metadata = load_exercise_metadata()
     exercises = []
+    missing_metadata = []
+
     for name in load_base_exercises():
         group = get_grupo(name)
-        exercises.append({
+        item = {
             "name": name,
             "group": group,
             "cues": generic_cues(name, group),
             "animation": animations.get(key(name), {}),
-        })
+        }
+        advanced = metadata.get(name)
+        if isinstance(advanced, dict):
+            item["metadata"] = advanced
+        else:
+            missing_metadata.append(name)
+        exercises.append(item)
+
+    if missing_metadata:
+        raise SystemExit("Faltan metadatos para ejercicios base: " + ", ".join(missing_metadata))
 
     existing_names = {key(item["name"]) for item in exercises}
     for cardio in CARDIO_EXERCISES:
@@ -131,7 +155,7 @@ def main() -> None:
     visual_count = sum(bool(x["animation"]) for x in exercises)
     gif_count = sum(x.get("animation", {}).get("kind") == "gif" for x in exercises)
     image_count = sum(x.get("animation", {}).get("kind") == "image" for x in exercises)
-    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes).")
+    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes), {len(metadata)} con metadatos avanzados.")
 
 
 if __name__ == "__main__":
