@@ -1,0 +1,1440 @@
+{
+  "Extensión de triceps acostado con barra": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Barra",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Fondos de triceps en barras paralelas": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [
+      "Pectoral",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Peso corporal",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Fondos de triceps en máquina": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [
+      "Pectoral",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Jalón de triceps en polea alta": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Jalón de triceps en polea alta con cuerda": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Press de banco con barra y agarre estrecho": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [
+      "Pectoral",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Extensiones de triceps acostado con mancuernas": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Extensiones de triceps de pie, tras nuca, con polea": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Extensiones de triceps inclinado de pies": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Extensiones de triceps, tras nuca, en polea con cuerda": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Apertura de pecho sentado": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Aducción horizontal de hombro",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Cruce parado en polea alta con manija": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Aducción horizontal de hombro",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Fondo de pecho en barra paralela": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Peso corporal",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press con barra en banco horizontal": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press con barra en banco inclinado": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de banca con maquina Smith": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Máquina Smith",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de banco con mancuernas, 30º de inclinación": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de pecho en banco de maquina de fuerza de martillo": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press inclinado en máquina Smith": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Máquina Smith",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press inclinado de pecho en máquina": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de pecho con mancuernas en banco horizontal": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Dominadas en barra fija con agarre ancho": {
+    "primary_muscle": "Dorsal ancho",
+    "secondary_muscles": [
+      "Bíceps",
+      "Espalda media"
+    ],
+    "movement_pattern": "Tirón vertical",
+    "equipment": "Peso corporal",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Encogimiento de hombros con mancuernas": {
+    "primary_muscle": "Trapecio",
+    "secondary_muscles": [],
+    "movement_pattern": "Elevación escapular",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Jalón al frente en máquina martillo": {
+    "primary_muscle": "Dorsal ancho",
+    "secondary_muscles": [
+      "Bíceps",
+      "Espalda media"
+    ],
+    "movement_pattern": "Tirón vertical",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Jalón vertical con polea alta y agarre cerrado": {
+    "primary_muscle": "Dorsal ancho",
+    "secondary_muscles": [
+      "Bíceps",
+      "Espalda media"
+    ],
+    "movement_pattern": "Tirón vertical",
+    "equipment": "Polea",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo a un brazo en máquina sentado": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo a dos manos con mancuernas en banco inclinado": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo con polea de agarre cerrado": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Polea",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo de un brazo con mancuerna": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo en máquina Smith con agarre prono": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Máquina Smith",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Remo inclinado con barra T agarre ancho": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Barra T",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Elevaciones laterales con mancuernas de pies": {
+    "primary_muscle": "Deltoide lateral",
+    "secondary_muscles": [],
+    "movement_pattern": "Abducción de hombro",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Elevación lateral de un brazo con polea baja": {
+    "primary_muscle": "Deltoide lateral",
+    "secondary_muscles": [],
+    "movement_pattern": "Abducción de hombro",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Elevación lateral en máquina": {
+    "primary_muscle": "Deltoide lateral",
+    "secondary_muscles": [],
+    "movement_pattern": "Abducción de hombro",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Press con mancuernas sentado": {
+    "primary_muscle": "Deltoide anterior",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide lateral"
+    ],
+    "movement_pattern": "Empuje vertical",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de hombro en máquina": {
+    "primary_muscle": "Deltoide anterior",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide lateral"
+    ],
+    "movement_pattern": "Empuje vertical",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press de hombro en máquina Smith": {
+    "primary_muscle": "Deltoide anterior",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide lateral"
+    ],
+    "movement_pattern": "Empuje vertical",
+    "equipment": "Máquina Smith",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Vuelo posterior sentado en máquina": {
+    "primary_muscle": "Deltoide posterior",
+    "secondary_muscles": [
+      "Trapecio",
+      "Manguito rotador"
+    ],
+    "movement_pattern": "Abducción horizontal / retracción escapular",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Curl de pierna parado con polea": {
+    "primary_muscle": "Isquiosurales",
+    "secondary_muscles": [
+      "Gemelos"
+    ],
+    "movement_pattern": "Flexión de rodilla",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl de piernas en pronación": {
+    "primary_muscle": "Isquiosurales",
+    "secondary_muscles": [
+      "Gemelos"
+    ],
+    "movement_pattern": "Flexión de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curls de pierna sentado": {
+    "primary_muscle": "Isquiosurales",
+    "secondary_muscles": [
+      "Gemelos"
+    ],
+    "movement_pattern": "Flexión de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Elevaciones de pantorrilla en máquina": {
+    "primary_muscle": "Gemelos",
+    "secondary_muscles": [
+      "Sóleo"
+    ],
+    "movement_pattern": "Flexión plantar",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Elevación de pantorrilla sentado": {
+    "primary_muscle": "Gemelos",
+    "secondary_muscles": [
+      "Sóleo"
+    ],
+    "movement_pattern": "Flexión plantar",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Entrenamiento de aductores": {
+    "primary_muscle": "Aductores",
+    "secondary_muscles": [],
+    "movement_pattern": "Aducción de cadera",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Estocada con paso adelante con pesos": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Extensiones de piernas sentado": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Peso muerto con barra": {
+    "primary_muscle": "Cadena posterior",
+    "secondary_muscles": [
+      "Glúteos",
+      "Isquiosurales",
+      "Erectores espinales",
+      "Espalda"
+    ],
+    "movement_pattern": "Bisagra de cadera",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "fuerza",
+      "hipertrofia"
+    ]
+  },
+  "Peso muerto de sumo": {
+    "primary_muscle": "Glúteos",
+    "secondary_muscles": [
+      "Isquiosurales",
+      "Cuádriceps",
+      "Aductores",
+      "Erectores espinales"
+    ],
+    "movement_pattern": "Bisagra de cadera",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "fuerza",
+      "hipertrofia"
+    ]
+  },
+  "Prensa de piernas en posición ancha": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores",
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Sentadilla de Hack con postura amplia": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores",
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Sentadillas en máquina Smith": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Máquina Smith",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Sentadillas con barra con las piernas separadas": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores",
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Curl alterno de biceps con mancuerna": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl con giro con mancuernas": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl de biceps con máquina": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl de biceps estilo martillo con mancuernas": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial",
+      "Braquiorradial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl del predicador de un brazo con mancuernas": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Mancuernas",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl predicador con barra Z": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Barra Z",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Curl parado a una mano con polea": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Sentadilla trasera con barra": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Sentadilla frontal con barra": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Sentadilla búlgara con mancuernas": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Zancada hacia atrás con mancuernas": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Peso muerto rumano con barra": {
+    "primary_muscle": "Isquiosurales",
+    "secondary_muscles": [
+      "Glúteos",
+      "Erectores espinales"
+    ],
+    "movement_pattern": "Bisagra de cadera",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Peso muerto rumano con mancuernas": {
+    "primary_muscle": "Isquiosurales",
+    "secondary_muscles": [
+      "Glúteos",
+      "Erectores espinales"
+    ],
+    "movement_pattern": "Bisagra de cadera",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Hip thrust con barra": {
+    "primary_muscle": "Glúteos",
+    "secondary_muscles": [
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Extensión de cadera",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Hip thrust en máquina": {
+    "primary_muscle": "Glúteos",
+    "secondary_muscles": [
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Extensión de cadera",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Patada de glúteo en polea": {
+    "primary_muscle": "Glúteos",
+    "secondary_muscles": [
+      "Isquiosurales"
+    ],
+    "movement_pattern": "Extensión de cadera",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Abducción de cadera en máquina": {
+    "primary_muscle": "Glúteo medio",
+    "secondary_muscles": [
+      "Glúteo menor"
+    ],
+    "movement_pattern": "Abducción de cadera",
+    "equipment": "Máquina",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Plancha abdominal": {
+    "primary_muscle": "Core",
+    "secondary_muscles": [
+      "Glúteos"
+    ],
+    "movement_pattern": "Antiextensión",
+    "equipment": "Peso corporal",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "low",
+    "goals": [
+      "salud general"
+    ]
+  },
+  "Plancha lateral": {
+    "primary_muscle": "Core",
+    "secondary_muscles": [
+      "Oblicuos",
+      "Glúteo medio"
+    ],
+    "movement_pattern": "Antiflexión lateral",
+    "equipment": "Peso corporal",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "low",
+    "goals": [
+      "salud general",
+      "hipertrofia"
+    ]
+  },
+  "Crunch abdominal en máquina": {
+    "primary_muscle": "Recto abdominal",
+    "secondary_muscles": [],
+    "movement_pattern": "Flexión de tronco",
+    "equipment": "Máquina",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Crunch en polea alta": {
+    "primary_muscle": "Recto abdominal",
+    "secondary_muscles": [],
+    "movement_pattern": "Flexión de tronco",
+    "equipment": "Polea",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Elevaciones de piernas colgado": {
+    "primary_muscle": "Recto abdominal",
+    "secondary_muscles": [
+      "Flexores de cadera"
+    ],
+    "movement_pattern": "Flexión de cadera / control pélvico",
+    "equipment": "Peso corporal",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Rueda abdominal": {
+    "primary_muscle": "Core",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Hombros"
+    ],
+    "movement_pattern": "Antiextensión",
+    "equipment": "Rueda abdominal",
+    "exercise_type": "core",
+    "laterality": "bilateral",
+    "difficulty": "advanced",
+    "fatigue": "medium",
+    "goals": [
+      "fuerza",
+      "salud general"
+    ]
+  },
+  "Remo con barra": {
+    "primary_muscle": "Espalda media",
+    "secondary_muscles": [
+      "Dorsal ancho",
+      "Bíceps",
+      "Deltoide posterior"
+    ],
+    "movement_pattern": "Tirón horizontal",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Jalón al pecho agarre ancho": {
+    "primary_muscle": "Dorsal ancho",
+    "secondary_muscles": [
+      "Bíceps",
+      "Espalda media"
+    ],
+    "movement_pattern": "Tirón vertical",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Dominadas agarre neutro": {
+    "primary_muscle": "Dorsal ancho",
+    "secondary_muscles": [
+      "Bíceps",
+      "Espalda media"
+    ],
+    "movement_pattern": "Tirón vertical",
+    "equipment": "Peso corporal",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Press militar con barra": {
+    "primary_muscle": "Deltoide anterior",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide lateral"
+    ],
+    "movement_pattern": "Empuje vertical",
+    "equipment": "Barra",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "high",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Face pull en polea": {
+    "primary_muscle": "Deltoide posterior",
+    "secondary_muscles": [
+      "Trapecio",
+      "Manguito rotador"
+    ],
+    "movement_pattern": "Abducción horizontal / retracción escapular",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia",
+      "salud general"
+    ]
+  },
+  "Press de banca declinado": {
+    "primary_muscle": "Pectoral",
+    "secondary_muscles": [
+      "Tríceps",
+      "Deltoide anterior"
+    ],
+    "movement_pattern": "Empuje horizontal",
+    "equipment": "Máquina",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Curl con barra recta": {
+    "primary_muscle": "Bíceps",
+    "secondary_muscles": [
+      "Braquial"
+    ],
+    "movement_pattern": "Flexión de codo",
+    "equipment": "Barra",
+    "exercise_type": "aislamiento",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Extensión unilateral de tríceps en polea": {
+    "primary_muscle": "Tríceps",
+    "secondary_muscles": [],
+    "movement_pattern": "Extensión de codo",
+    "equipment": "Polea",
+    "exercise_type": "aislamiento",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "hipertrofia"
+    ]
+  },
+  "Kettlebell swing": {
+    "primary_muscle": "Glúteos",
+    "secondary_muscles": [
+      "Isquiosurales",
+      "Core",
+      "Espalda"
+    ],
+    "movement_pattern": "Bisagra de cadera explosiva",
+    "equipment": "Kettlebell",
+    "exercise_type": "potencia",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "potencia",
+      "acondicionamiento",
+      "salud general"
+    ]
+  },
+  "Paseo del granjero": {
+    "primary_muscle": "Core",
+    "secondary_muscles": [
+      "Trapecio",
+      "Antebrazos",
+      "Glúteos"
+    ],
+    "movement_pattern": "Transporte cargado",
+    "equipment": "Mancuernas/Kettlebells",
+    "exercise_type": "compuesto",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "medium",
+    "goals": [
+      "fuerza",
+      "acondicionamiento",
+      "salud general"
+    ]
+  },
+  "Box jump": {
+    "primary_muscle": "Pierna completa",
+    "secondary_muscles": [
+      "Glúteos",
+      "Cuádriceps",
+      "Gemelos"
+    ],
+    "movement_pattern": "Salto vertical",
+    "equipment": "Cajón",
+    "exercise_type": "potencia",
+    "laterality": "bilateral",
+    "difficulty": "intermediate",
+    "fatigue": "low",
+    "goals": [
+      "potencia",
+      "salud general"
+    ]
+  },
+  "Step-up con mancuernas": {
+    "primary_muscle": "Cuádriceps",
+    "secondary_muscles": [
+      "Glúteos",
+      "Aductores"
+    ],
+    "movement_pattern": "Dominante de rodilla",
+    "equipment": "Mancuernas",
+    "exercise_type": "compuesto",
+    "laterality": "unilateral",
+    "difficulty": "intermediate",
+    "fatigue": "medium",
+    "goals": [
+      "hipertrofia",
+      "fuerza"
+    ]
+  },
+  "Empuje de trineo": {
+    "primary_muscle": "Pierna completa",
+    "secondary_muscles": [
+      "Glúteos",
+      "Cuádriceps",
+      "Gemelos",
+      "Core"
+    ],
+    "movement_pattern": "Locomoción / empuje",
+    "equipment": "Trineo",
+    "exercise_type": "acondicionamiento",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "high",
+    "goals": [
+      "acondicionamiento",
+      "potencia",
+      "pérdida de grasa"
+    ]
+  },
+  "Battle ropes": {
+    "primary_muscle": "Hombros",
+    "secondary_muscles": [
+      "Brazos",
+      "Core"
+    ],
+    "movement_pattern": "Acondicionamiento cíclico",
+    "equipment": "Cuerdas",
+    "exercise_type": "acondicionamiento",
+    "laterality": "bilateral",
+    "difficulty": "beginner",
+    "fatigue": "medium",
+    "goals": [
+      "acondicionamiento",
+      "pérdida de grasa",
+      "salud general"
+    ]
+  }
+}
