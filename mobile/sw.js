@@ -1,39 +1,24 @@
-const CACHE = "vitalpeak-mobile-v60";
+const CACHE = "vitalpeak-mobile-v61";
+
+// Solo precargamos lo imprescindible para que la interfaz aparezca rápido.
+// Los GIF e imágenes se guardan en caché cuando el usuario los abre.
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./catalog-data.js",
-  "./cardio-catalog.js",
-  "./cardio-training.js",
   "./app.js",
-  "./routine-enhancements.js",
   "./routine-generator-ui.js",
-  "./routine-muscle-filter.js",
-  "./calendar-mobile.js",
-  "./training-intelligence.js",
-  "./routine-navigation-fix.js",
-  "./routines-accordion.js",
-  "./routine-filter-persistence.js",
-  "./training-set-editor.js",
   "./manifest.webmanifest",
   "./icon-cover.png",
   "./icons/icon-192.svg",
-  "./apple-touch-icon.png",
-  "./cardio-images/cinta-de-correr.webp",
-  "./cardio-images/caminata-cinta-inclinacion.webp",
-  "./cardio-images/bicicleta-estatica.webp",
-  "./cardio-images/bicicleta-aire.webp",
-  "./cardio-images/bicicleta-eliptica.webp",
-  "./cardio-images/remo-ergometro.webp",
-  "./cardio-images/escaladora.webp",
-  "./cardio-images/saltar-comba.webp",
-  "./cardio-images/carrera-exterior.webp",
-  "./cardio-images/caminata-rapida.webp"
+  "./apple-touch-icon.png"
 ];
 
 self.addEventListener("install", event => event.waitUntil(
-  caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+  caches.open(CACHE)
+    .then(cache => cache.addAll(APP_SHELL))
+    .then(() => self.skipWaiting())
 ));
 
 self.addEventListener("activate", event => event.waitUntil(
@@ -42,17 +27,39 @@ self.addEventListener("activate", event => event.waitUntil(
     .then(() => self.clients.claim())
 ));
 
+function updateInBackground(request) {
+  fetch(request).then(response => {
+    if (!response || !response.ok) return;
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return;
+    caches.open(CACHE).then(cache => cache.put(request, response.clone()));
+  }).catch(() => {});
+}
+
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // App shell y recursos estáticos: responder inmediatamente desde caché
+  // y refrescar la copia en segundo plano. Evita esperar a la red móvil.
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response.ok && new URL(event.request.url).origin === location.origin) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
+    caches.match(event.request).then(cached => {
+      if (cached) {
+        event.waitUntil(Promise.resolve(updateInBackground(event.request)));
+        return cached;
+      }
+
+      return fetch(event.request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match("./index.html"));
+    })
   );
 });
