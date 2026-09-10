@@ -95,7 +95,9 @@ jobs:
           mkdir -p _site
           cp -R mobile/. _site/
           mkdir -p _site/exercise-gifs
-          cp -R exercise_images/sequences/. _site/exercise-gifs/
+          # Completa solo los recursos que falten; no sustituye los GIF
+          # optimizados incluidos en mobile/exercise-gifs.
+          cp -Rn exercise_images/sequences/. _site/exercise-gifs/
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
