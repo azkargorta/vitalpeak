@@ -15,6 +15,7 @@ from app.exercise_catalog import get_grupo, load_base_exercises
 from app.routine_templates import TEMPLATES
 from app.training_volume import public_volume_config
 from app.exercise_selector import public_selector_config
+from app.routine_engine import public_routine_engine_config
 
 SEQUENCES = ROOT / "exercise_images" / "sequences"
 OUTPUT = ROOT / "mobile" / "catalog-data.js"
@@ -66,11 +67,7 @@ def animation_index() -> dict[str, dict]:
                 info = json.loads(metadata.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 info = {}
-        animation = {
-            "path": f"exercise-gifs/{folder.name}/movimiento.gif",
-            "kind": "gif",
-            "steps": info.get("steps", []),
-        }
+        animation = {"path": f"exercise-gifs/{folder.name}/movimiento.gif", "kind": "gif", "steps": info.get("steps", [])}
         result[key(folder.name)] = animation
         label = info.get("label")
         if label:
@@ -104,12 +101,7 @@ def main() -> None:
 
     for name in load_base_exercises():
         group = get_grupo(name)
-        item = {
-            "name": name,
-            "group": group,
-            "cues": generic_cues(name, group),
-            "animation": animations.get(key(name), {}),
-        }
+        item = {"name": name, "group": group, "cues": generic_cues(name, group), "animation": animations.get(key(name), {})}
         advanced = metadata.get(name)
         if isinstance(advanced, dict):
             item["metadata"] = advanced
@@ -131,6 +123,7 @@ def main() -> None:
         "exercises": exercises,
         "volumeEngine": public_volume_config(),
         "exerciseSelector": public_selector_config(),
+        "routineEngine": public_routine_engine_config(),
     }
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
@@ -142,7 +135,6 @@ def main() -> None:
         "    for (const item of custom) { const name = String(item?.name || '').trim(); if (name && !names.has(name.toLocaleLowerCase('es'))) { window.VITALPEAK_CATALOG.exercises.push(item); names.add(name.toLocaleLowerCase('es')); } }\n"
         "  }\n"
         "} catch {}\n"
-        "// Las rutas relativas se resuelven desde la propia PWA; no se reescribe src en cada render.\n"
         "window.VITALPEAK_ASSET_URL = path => './' + String(path || '').replace(/^\\.\\//, '').replace(/^\\//, '');\n"
         "const vpOriginalFetch = window.fetch.bind(window);\n"
         "window.fetch = async (...args) => {\n"
@@ -162,7 +154,7 @@ def main() -> None:
     visual_count = sum(bool(x["animation"]) for x in exercises)
     gif_count = sum(x.get("animation", {}).get("kind") == "gif" for x in exercises)
     image_count = sum(x.get("animation", {}).get("kind") == "image" for x in exercises)
-    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes), {len(metadata)} con metadatos avanzados, motor de volumen y selector inteligente exportados.")
+    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes), motor de volumen, selector y motor de rutinas exportados.")
 
 
 if __name__ == "__main__":
