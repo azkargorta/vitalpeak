@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v59";
+const CACHE = "vitalpeak-mobile-v60";
 const APP_SHELL = [
   "./",
   "./index.html",
