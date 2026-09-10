@@ -50,12 +50,12 @@
 
   function exercisePreviewPath(exercise) {
     if (!exercise || exercise.cardio || exercise.group === 'Cardio') return '';
+    if (exercise.name === 'Press con barra en banco horizontal') {
+      return 'exercise-gifs/press_banca/02_pecho.png';
+    }
     const movement = String(exercise.animation?.path || '');
     if (!movement) return '';
     if (/movimiento\.gif(?:[?#].*)?$/i.test(movement)) {
-      if (/\/press_banca\/movimiento\.gif(?:[?#].*)?$/i.test(movement)) {
-        return movement.replace(/movimiento\.gif(?=([?#].*)?$)/i, '01_bloqueo.png');
-      }
       return movement.replace(/movimiento\.gif(?=([?#].*)?$)/i, '01_inicio.png');
     }
     return '';
