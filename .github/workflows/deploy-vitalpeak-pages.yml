@@ -9,6 +9,7 @@ on:
       - "app/routine_templates.py"
       - "app/exercise_catalog.py"
       - "app/training_volume.py"
+      - "app/exercise_selector.py"
       - "data/base_exercises.txt"
       - "data/exercise_metadata.json"
       - "scripts/export_mobile_catalog.py"
@@ -83,6 +84,7 @@ jobs:
           test -s mobile/catalog-data.js
           grep -q "window.VITALPEAK_CATALOG" mobile/catalog-data.js
           grep -q '"volumeEngine"' mobile/catalog-data.js
+          grep -q '"exerciseSelector"' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
         run: |
