@@ -53,6 +53,9 @@
     const movement = String(exercise.animation?.path || '');
     if (!movement) return '';
     if (/movimiento\.gif(?:[?#].*)?$/i.test(movement)) {
+      if (/\/press_banca\/movimiento\.gif(?:[?#].*)?$/i.test(movement)) {
+        return movement.replace(/movimiento\.gif(?=([?#].*)?$)/i, '01_bloqueo.png');
+      }
       return movement.replace(/movimiento\.gif(?=([?#].*)?$)/i, '01_inicio.png');
     }
     return '';
@@ -62,7 +65,7 @@
     ensureStyles();
     const catalog = window.VITALPEAK_CATALOG?.exercises || [];
     document.querySelectorAll('.exercise-card[data-exercise]').forEach(card => {
-      if (card.querySelector('img')) return;
+      if (card.querySelector('img') || card.dataset.vpPreviewFailed === '1') return;
       const exercise = catalog.find(item => item.name === card.dataset.exercise);
       const preview = exercisePreviewPath(exercise);
       if (!preview) return;
@@ -72,7 +75,11 @@
       img.alt = `Imagen de ${exercise.name}`;
       img.loading = 'lazy';
       img.decoding = 'async';
-      img.addEventListener('error', () => img.remove(), { once:true });
+      img.addEventListener('load', () => { card.dataset.vpPreviewLoaded = '1'; }, { once:true });
+      img.addEventListener('error', () => {
+        card.dataset.vpPreviewFailed = '1';
+        img.remove();
+      }, { once:true });
       card.prepend(img);
       const caption = card.querySelector('small');
       if (caption) caption.textContent = 'Imagen de referencia';
