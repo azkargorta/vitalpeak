@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from app.exercise_catalog import get_grupo, load_base_exercises
 from app.routine_templates import TEMPLATES
 from app.training_volume import public_volume_config
+from app.exercise_selector import public_selector_config
 
 SEQUENCES = ROOT / "exercise_images" / "sequences"
 OUTPUT = ROOT / "mobile" / "catalog-data.js"
@@ -129,6 +130,7 @@ def main() -> None:
         "templates": TEMPLATES,
         "exercises": exercises,
         "volumeEngine": public_volume_config(),
+        "exerciseSelector": public_selector_config(),
     }
     OUTPUT.write_text(
         "/* Archivo generado desde el catálogo de VitalPeak. No editar a mano. */\n"
@@ -160,7 +162,7 @@ def main() -> None:
     visual_count = sum(bool(x["animation"]) for x in exercises)
     gif_count = sum(x.get("animation", {}).get("kind") == "gif" for x in exercises)
     image_count = sum(x.get("animation", {}).get("kind") == "image" for x in exercises)
-    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes), {len(metadata)} con metadatos avanzados y motor de volumen exportado.")
+    print(f"Catálogo móvil: {len(TEMPLATES)} rutinas, {len(exercises)} ejercicios, {visual_count} con recurso visual ({gif_count} GIF, {image_count} imágenes), {len(metadata)} con metadatos avanzados, motor de volumen y selector inteligente exportados.")
 
 
 if __name__ == "__main__":
