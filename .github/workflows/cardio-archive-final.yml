@@ -1,0 +1,61 @@
+name: Instalar fotos cardio definitivas
+
+on:
+  push:
+    branches:
+      - cardio-archive-final
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cardio-archive-final
+          fetch-depth: 0
+      - name: Instalar fotos cardio
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cardio
+          mkdir -p /tmp/cardio
+          tar -xzf mobile/cardio-upload/cardio280.tar.gz -C /tmp/cardio
+          echo 'Contenido del paquete:'
+          find /tmp/cardio -maxdepth 2 -type f -print -exec file {} \;
+
+          names='cinta-de-correr caminata-cinta-inclinacion bicicleta-estatica bicicleta-aire bicicleta-eliptica remo-ergometro escaladora saltar-comba carrera-exterior caminata-rapida'
+          rm -rf mobile/cardio-images
+          mkdir -p mobile/cardio-images
+
+          for name in $names; do
+            src="$(find /tmp/cardio -maxdepth 2 -type f \( -iname "${name}.jpg" -o -iname "${name}.jpeg" \) | head -n1)"
+            test -n "$src"
+            test "$(file --mime-type -b "$src")" = 'image/jpeg'
+            cp "$src" "mobile/cardio-images/${name}.jpg"
+          done
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          names = ['cinta-de-correr','caminata-cinta-inclinacion','bicicleta-estatica','bicicleta-aire','bicicleta-eliptica','remo-ergometro','escaladora','saltar-comba','carrera-exterior','caminata-rapida']
+          for filename in ['scripts/export_mobile_catalog.py','mobile/cardio-catalog.js','mobile/sw.js']:
+              p = Path(filename)
+              s = p.read_text(encoding='utf-8')
+              for n in names:
+                  for ext in ('webp','jpeg','svg'):
+                      s = s.replace(f'cardio-images/{n}.{ext}', f'cardio-images/{n}.jpg')
+              if filename == 'mobile/sw.js':
+                  s = re.sub(r'vitalpeak-mobile-v\d+', 'vitalpeak-mobile-v56', s)
+              p.write_text(s, encoding='utf-8')
+          PY
+
+          rm -rf mobile/cardio-upload
+          rm -f .github/workflows/cardio-archive-final.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Instala las 10 fotos cardio definitivas'
+          git push origin HEAD:cardio-archive-final
