@@ -147,7 +147,7 @@ def main() -> None:
         "  fixed = fixed.replace('<b>Movimiento guiado</b><span>El GIF queda disponible sin conexión después de verlo una vez.</span>', '<b>${x.cardio||x.group===\"Cardio\"?\"Imagen del ejercicio\":\"Movimiento guiado\"}</b><span>${x.cardio||x.group===\"Cardio\"?\"Referencia visual del ejercicio de cardio.\":\"GIF animado de técnica del ejercicio.\"}</span>');\n"
         "  return new Response(fixed, { status: response.status, statusText: response.statusText, headers: response.headers });\n"
         "};\n"
-        "for (const src of ['./routine-enhancements.js?v=36', './routine-muscle-filter.js?v=36', './calendar-mobile.js?v=36', './training-intelligence.js?v=36', './routine-navigation-fix.js?v=36', './routines-accordion.js?v=36']) { const script = document.createElement('script'); script.src = src; script.defer = true; script.onerror = () => console.warn('VitalPeak: mejora opcional no cargada', src); document.head.appendChild(script); }\n",
+        "for (const src of ['./routine-enhancements.js?v=36', './routine-generator-ui.js?v=3', './routine-muscle-filter.js?v=36', './calendar-mobile.js?v=36', './training-intelligence.js?v=36', './routine-navigation-fix.js?v=36', './routines-accordion.js?v=36']) { const script = document.createElement('script'); script.src = src; script.defer = true; script.onerror = () => console.warn('VitalPeak: mejora opcional no cargada', src); document.head.appendChild(script); }\n",
         encoding="utf-8",
     )
 
