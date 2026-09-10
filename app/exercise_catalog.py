@@ -25,6 +25,7 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Extensiones de triceps de pie, tras nuca, con polea": "Brazo",
     "Extensiones de triceps inclinado de pies": "Brazo",
     "Extensiones de triceps, tras nuca, en polea con cuerda": "Brazo",
+    "Extensión unilateral de tríceps en polea": "Brazo",
     # Pecho
     "Apertura de pecho sentado": "Pecho",
     "Cruce parado en polea alta con manija": "Pecho",
@@ -37,6 +38,7 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Press inclinado en máquina Smith": "Pecho",
     "Press inclinado de pecho en máquina": "Pecho",
     "Press de pecho con mancuernas en banco horizontal": "Pecho",
+    "Press de banca declinado": "Pecho",
     # Espalda
     "Dominadas en barra fija con agarre ancho": "Espalda",
     "Encogimiento de hombros con mancuernas": "Espalda",
@@ -48,6 +50,9 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Remo de un brazo con mancuerna": "Espalda",
     "Remo en máquina Smith con agarre prono": "Espalda",
     "Remo inclinado con barra T agarre ancho": "Espalda",
+    "Remo con barra": "Espalda",
+    "Jalón al pecho agarre ancho": "Espalda",
+    "Dominadas agarre neutro": "Espalda",
     # Hombro
     "Elevaciones laterales con mancuernas de pies": "Hombro",
     "Elevación lateral de un brazo con polea baja": "Hombro",
@@ -56,6 +61,9 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Press de hombro en máquina": "Hombro",
     "Press de hombro en máquina Smith": "Hombro",
     "Vuelo posterior sentado en máquina": "Hombro",
+    "Press militar con barra": "Hombro",
+    "Face pull en polea": "Hombro",
+    "Battle ropes": "Hombro",
     # Pierna
     "Curl de pierna parado con polea": "Pierna",
     "Curl de piernas en pronación": "Pierna",
@@ -71,6 +79,20 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Sentadilla de Hack con postura amplia": "Pierna",
     "Sentadillas en máquina Smith": "Pierna",
     "Sentadillas con barra con las piernas separadas": "Pierna",
+    "Sentadilla trasera con barra": "Pierna",
+    "Sentadilla frontal con barra": "Pierna",
+    "Sentadilla búlgara con mancuernas": "Pierna",
+    "Zancada hacia atrás con mancuernas": "Pierna",
+    "Peso muerto rumano con barra": "Pierna",
+    "Peso muerto rumano con mancuernas": "Pierna",
+    "Hip thrust con barra": "Pierna",
+    "Hip thrust en máquina": "Pierna",
+    "Patada de glúteo en polea": "Pierna",
+    "Abducción de cadera en máquina": "Pierna",
+    "Kettlebell swing": "Pierna",
+    "Box jump": "Pierna",
+    "Step-up con mancuernas": "Pierna",
+    "Empuje de trineo": "Pierna",
     # Bíceps / brazo
     "Curl alterno de biceps con mancuerna": "Brazo",
     "Curl con giro con mancuernas": "Brazo",
@@ -79,6 +101,15 @@ DEFAULT_GROUPS: Dict[str, str] = {
     "Curl del predicador de un brazo con mancuernas": "Brazo",
     "Curl predicador con barra Z": "Brazo",
     "Curl parado a una mano con polea": "Brazo",
+    "Curl con barra recta": "Brazo",
+    # Core
+    "Plancha abdominal": "Core",
+    "Plancha lateral": "Core",
+    "Crunch abdominal en máquina": "Core",
+    "Crunch en polea alta": "Core",
+    "Elevaciones de piernas colgado": "Core",
+    "Rueda abdominal": "Core",
+    "Paseo del granjero": "Core",
 }
 
 # Sub-patrón para alternativas más afinadas (mismo movimiento)
@@ -90,14 +121,15 @@ _SUBPATTERN: Dict[str, List[str]] = {
     "jalon": ["jalón", "jalon", "dominad"],
     "remo": ["remo"],
     "elevacion_lateral": ["elevacion lateral", "elevación lateral", "elevaciones laterales"],
-    "press_hombro": ["press de hombro", "press con mancuernas sentado"],
-    "sentadilla": ["sentadilla", "sentadillas", "hack", "prensa"],
-    "peso_muerto": ["peso muerto"],
+    "press_hombro": ["press de hombro", "press con mancuernas sentado", "press militar"],
+    "sentadilla": ["sentadilla", "sentadillas", "hack", "prensa", "zancada", "step-up"],
+    "peso_muerto": ["peso muerto", "kettlebell swing", "hip thrust"],
     "curl_femoral": ["curl de pierna", "curls de pierna"],
     "extension_cuadriceps": ["extensiones de piernas"],
     "pantorrilla": ["pantorrilla"],
     "curl_biceps": ["curl", "biceps", "bíceps", "predicador", "martillo"],
     "triceps": ["triceps", "tríceps", "agarre estrecho"],
+    "core": ["plancha", "crunch", "rueda abdominal", "elevaciones de piernas", "paseo del granjero"],
 }
 
 
@@ -124,13 +156,13 @@ def infer_grupo(name: str) -> str:
         return "Pecho"
     if any(k in n for k in ("remo", "jalón", "jalon", "dominad", "encogimiento", "espalda")):
         return "Espalda"
-    if any(k in n for k in ("hombro", "lateral", "vuelo posterior", "deltoid")):
+    if any(k in n for k in ("hombro", "lateral", "vuelo posterior", "deltoid", "face pull", "battle ropes")):
         return "Hombro"
-    if any(k in n for k in ("sentadilla", "prensa", "peso muerto", "pierna", "femoral", "pantorrilla", "estocada", "aductor", "hack")):
+    if any(k in n for k in ("sentadilla", "prensa", "peso muerto", "pierna", "femoral", "pantorrilla", "estocada", "aductor", "hack", "zancada", "glúteo", "gluteo", "hip thrust", "abducción", "abduccion", "step-up", "box jump", "trineo", "kettlebell swing")):
         return "Pierna"
     if any(k in n for k in ("curl", "biceps", "bíceps", "triceps", "tríceps", "predicador")):
         return "Brazo"
-    if any(k in n for k in ("plancha", "crunch", "core", "abdominal")):
+    if any(k in n for k in ("plancha", "crunch", "core", "abdominal", "elevaciones de piernas", "paseo del granjero")):
         return "Core"
     return "Otro"
 
