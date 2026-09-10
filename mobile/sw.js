@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v62";
+const CACHE = "vitalpeak-mobile-v63";
 
 // Solo precargamos lo imprescindible para que la interfaz aparezca rápido.
 // Los GIF e imágenes se guardan en caché cuando el usuario los abre.
