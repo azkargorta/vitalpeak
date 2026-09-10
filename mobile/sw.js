@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v55";
+const CACHE = "vitalpeak-mobile-v56";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./cardio-training.js",
   "./app.js",
   "./routine-enhancements.js",
+  "./routine-generator-ui.js",
   "./routine-muscle-filter.js",
   "./calendar-mobile.js",
   "./training-intelligence.js",
