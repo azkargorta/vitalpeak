@@ -77,6 +77,10 @@ def animation_index() -> dict[str, dict]:
     if press_banca:
         result[key("Press con barra en banco horizontal")] = press_banca
         result[key("Press banca")] = press_banca
+
+    back_squat = result.get(key("Sentadillas con barra con las piernas separadas"))
+    if back_squat:
+        result[key("Sentadilla trasera con barra")] = back_squat
     return result
 
 
