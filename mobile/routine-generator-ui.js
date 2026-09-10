@@ -8,12 +8,8 @@
     ["potencia","Rendimiento / potencia"],["fitness_general","Estar en forma"]
   ];
   const TYPOLOGIES = [
-    ["auto","Automático (VitalPeak decide)"],
-    ["full_body","Full Body"],
-    ["upper_lower","Torso / Pierna"],
-    ["ppl","Push / Pull / Legs (PPL)"],
-    ["powerbuilding","Powerbuilding"],
-    ["bro_split","Bro split / por grupo muscular"]
+    ["auto","Automático (VitalPeak decide)"],["full_body","Full Body"],["upper_lower","Torso / Pierna"],
+    ["ppl","Push / Pull / Legs (PPL)"],["powerbuilding","Powerbuilding"],["bro_split","Bro split / por grupo muscular"]
   ];
   const MUSCLES = ["Pecho","Espalda","Cuádriceps","Isquios","Glúteos","Deltoide lateral","Deltoide posterior","Bíceps","Tríceps","Gemelos","Core"];
   const UPPER=["Pecho","Espalda","Deltoide lateral","Deltoide posterior","Bíceps","Tríceps"];
@@ -42,43 +38,34 @@
     return "";
   }
   function splitDays(type, days){
-    let list=[];
-    if(type==="full_body"){
-      list=Array.from({length:days},(_,i)=>({name:`Full Body ${String.fromCharCode(65+i)}`,muscles:[...UPPER,...LOWER],style:"normal"}));
-    } else if(type==="upper_lower"){
-      list=Array.from({length:days},(_,i)=>({name:`${i%2===0?"Upper":"Lower"} ${String.fromCharCode(65+Math.floor(i/2))}`,muscles:i%2===0?UPPER:LOWER,style:"normal"}));
-    } else if(type==="ppl"){
+    if(type==="full_body") return Array.from({length:days},(_,i)=>({name:`Full Body ${String.fromCharCode(65+i)}`,muscles:[...UPPER,...LOWER],style:"normal"}));
+    if(type==="upper_lower") return Array.from({length:days},(_,i)=>({name:`${i%2===0?"Upper":"Lower"} ${String.fromCharCode(65+Math.floor(i/2))}`,muscles:i%2===0?UPPER:LOWER,style:"normal"}));
+    if(type==="ppl"){
       const cycle=[{name:"Push",muscles:PUSH},{name:"Pull",muscles:PULL},{name:"Legs",muscles:LEGS}];
-      list=Array.from({length:days},(_,i)=>({...cycle[i%3],name:`${cycle[i%3].name}${days>3?` ${String.fromCharCode(65+Math.floor(i/3))}`:""}`,style:"normal"}));
-    } else if(type==="powerbuilding"){
-      const base=[
-        {name:"Upper fuerza",muscles:UPPER,style:"strength"},{name:"Lower fuerza",muscles:LOWER,style:"strength"},
-        {name:"Upper hipertrofia",muscles:UPPER,style:"hypertrophy"},{name:"Lower hipertrofia",muscles:LOWER,style:"hypertrophy"},
-        {name:"Accesorios / puntos débiles",muscles:[...UPPER,...LOWER],style:"hypertrophy"}
-      ]; list=base.slice(0,days);
-    } else if(type==="bro_split"){
-      const base=[
-        {name:"Pecho + tríceps",muscles:["Pecho","Tríceps"],style:"normal"},
-        {name:"Espalda + bíceps",muscles:["Espalda","Deltoide posterior","Bíceps"],style:"normal"},
-        {name:"Pierna",muscles:LEGS,style:"normal"},
-        {name:"Hombro",muscles:["Deltoide lateral","Deltoide posterior","Tríceps"],style:"normal"},
-        {name:"Brazos",muscles:["Bíceps","Tríceps"],style:"normal"},
-        {name:"Pierna / Core",muscles:["Cuádriceps","Isquios","Glúteos","Gemelos","Core"],style:"normal"}
-      ]; list=base.slice(0,days);
+      return Array.from({length:days},(_,i)=>({...cycle[i%3],name:`${cycle[i%3].name}${days>3?` ${String.fromCharCode(65+Math.floor(i/3))}`:""}`,style:"normal"}));
     }
-    return list;
+    if(type==="powerbuilding") return [
+      {name:"Upper fuerza",muscles:UPPER,style:"strength"},{name:"Lower fuerza",muscles:LOWER,style:"strength"},
+      {name:"Upper hipertrofia",muscles:UPPER,style:"hypertrophy"},{name:"Lower hipertrofia",muscles:LOWER,style:"hypertrophy"},
+      {name:"Accesorios / puntos débiles",muscles:[...UPPER,...LOWER],style:"hypertrophy"}
+    ].slice(0,days);
+    return [
+      {name:"Pecho + tríceps",muscles:["Pecho","Tríceps"],style:"normal"},
+      {name:"Espalda + bíceps",muscles:["Espalda","Deltoide posterior","Bíceps"],style:"normal"},
+      {name:"Pierna",muscles:LEGS,style:"normal"},
+      {name:"Hombro",muscles:["Deltoide lateral","Deltoide posterior","Tríceps"],style:"normal"},
+      {name:"Brazos",muscles:["Bíceps","Tríceps"],style:"normal"},
+      {name:"Pierna / Core",muscles:LEGS,style:"normal"}
+    ].slice(0,days);
   }
-  function sessionCap(minutes){ return minutes<=40?5:minutes<=60?7:minutes<=80?8:9; }
+  const sessionCap = minutes => minutes<=40?5:minutes<=60?7:minutes<=80?8:9;
   function weeklyVolume(goal, level, days, priorities){
     const base=(C.volumeEngine?.goals||{})[goal] || (C.volumeEngine?.goals||{}).fitness_general || {};
-    const lf=level==="principiante"?.70:level==="avanzado"?1.15:1;
-    const df=({2:.90,3:.95,4:1,5:1,6:1})[days]||1;
-    const limits=C.volumeEngine?.limits||{};
-    const p=new Set(priorities.map(norm));
-    const out={};
+    const lf=level==="principiante"?.70:level==="avanzado"?1.15:1, df=({2:.90,3:.95,4:1,5:1,6:1})[days]||1;
+    const limits=C.volumeEngine?.limits||{}, p=new Set(priorities.map(norm)), out={};
     for(const [m,b] of Object.entries(base)){
-      let v=Number(b)*lf*df*(p.has(norm(m))?1.20:1);
-      const lim=limits[m]||[2,20]; out[m]=Math.max(lim[0],Math.min(lim[1],Math.round(v)));
+      const lim=limits[m]||[2,20], v=Number(b)*lf*df*(p.has(norm(m))?1.20:1);
+      out[m]=Math.max(lim[0],Math.min(lim[1],Math.round(v)));
     }
     return out;
   }
@@ -101,10 +88,9 @@
     else if((m.secondary_muscles||[]).some(v=>muscleMatch(v,target))) s+=4; else return -999;
     const goals=(m.goals||[]).map(norm); if(goals.includes(norm(goal))) s+=4;
     else if(["recomposicion","perdida_grasa"].includes(goal)&&goals.includes("hipertrofia")) s+=2.5;
-    const rank={beginner:0,principiante:0,intermediate:1,intermedio:1,advanced:2,avanzado:2};
-    const ul=rank[level]??1, el=rank[norm(m.difficulty)]??1; if(el>ul) s-=8*(el-ul); else if(el===ul)s+=1.5;
-    const type=norm(m.exercise_type), equipment=norm(m.equipment), fatigue=norm(m.fatigue);
-    const effectiveGoal=style==="strength"?"fuerza":style==="hypertrophy"?"hipertrofia":goal;
+    const rank={beginner:0,principiante:0,intermediate:1,intermedio:1,advanced:2,avanzado:2}, ul=rank[level]??1, el=rank[norm(m.difficulty)]??1;
+    if(el>ul) s-=8*(el-ul); else if(el===ul)s+=1.5;
+    const type=norm(m.exercise_type), equipment=norm(m.equipment), fatigue=norm(m.fatigue), effectiveGoal=style==="strength"?"fuerza":style==="hypertrophy"?"hipertrofia":goal;
     if(effectiveGoal==="fuerza"){ if(type==="compuesto")s+=5; if(equipment.includes("barra"))s+=2; if(fatigue==="high")s+=1; }
     if(["hipertrofia","recomposicion","perdida_grasa"].includes(effectiveGoal)){ if(/maquina|polea|mancuer|smith/.test(equipment))s+=2; if(fatigue==="low")s+=1.5; if(fatigue==="high")s-=.5; }
     if(effectiveGoal==="potencia"&&/potencia|explosivo|acondicionamiento/.test(type))s+=6;
@@ -114,8 +100,7 @@
     return s;
   }
   function prescription(goal,meta,style){
-    const effectiveGoal=style==="strength"?"fuerza":style==="hypertrophy"?"hipertrofia":goal;
-    const compound=norm(meta.exercise_type)==="compuesto", high=norm(meta.fatigue)==="high";
+    const effectiveGoal=style==="strength"?"fuerza":style==="hypertrophy"?"hipertrofia":goal, compound=norm(meta.exercise_type)==="compuesto", high=norm(meta.fatigue)==="high";
     if(effectiveGoal==="fuerza") return {reps:compound?"3-6":"6-10",rir:2,rest_sec:compound?180:120};
     if(effectiveGoal==="potencia") return {reps:compound?"3-5":"5-8",rir:3,rest_sec:150};
     if(effectiveGoal==="resistencia") return {reps:"12-20",rir:2,rest_sec:60};
@@ -123,8 +108,7 @@
     return {reps:"8-12",rir:2,rest_sec:90};
   }
   function generate({goal,level,days,minutes,equipment,priorities,typology}){
-    const resolved=typology==="auto"?autoTypology(goal,level,days):typology;
-    const defs=splitDays(resolved,days), volume=weeklyVolume(goal,level,days,priorities), cap=sessionCap(minutes);
+    const resolved=typology==="auto"?autoTypology(goal,level,days):typology, defs=splitDays(resolved,days), volume=weeklyVolume(goal,level,days,priorities), cap=sessionCap(minutes);
     const sessions=defs.map(d=>({name:d.name,muscles:d.muscles,style:d.style||"normal",targetSets:{},items:[]}));
     for(const [m,total] of Object.entries(volume)){
       const eligible=sessions.map((d,i)=>d.muscles.includes(m)?i:-1).filter(i=>i>=0); if(!eligible.length)continue;
@@ -132,7 +116,7 @@
     }
     for(const s of sessions){
       const slots={}; Object.entries(s.targetSets).forEach(([m,n])=>{if(n>0)slots[m]=n>=5?2:1;});
-      while(Object.values(slots).reduce((a,b)=>a+b,0)>cap){ const two=Object.keys(slots).find(m=>slots[m]>1); if(two)slots[two]--; else {const sm=Object.keys(slots).sort((a,b)=>s.targetSets[a]-s.targetSets[b])[0]; delete slots[sm];} }
+      while(Object.values(slots).reduce((a,b)=>a+b,0)>cap){const two=Object.keys(slots).find(m=>slots[m]>1);if(two)slots[two]--;else delete slots[Object.keys(slots).sort((a,b)=>s.targetSets[a]-s.targetSets[b])[0]];}
       const used=new Set(),patterns={};
       for(const [muscle,count] of Object.entries(slots)) for(let n=0;n<count;n++){
         const ranked=C.exercises.filter(x=>x.metadata).map(x=>({x,score:scoreExercise(x,muscle,goal,level,patterns,used,equipment,s.style)})).filter(o=>o.score>-900).sort((a,b)=>b.score-a.score);
@@ -140,7 +124,7 @@
         s.items.push({exercise:ex.name,target_muscle:muscle,metadata:meta});
       }
       const grouped={}; s.items.forEach(it=>(grouped[it.target_muscle]??=[]).push(it));
-      for(const [m,list] of Object.entries(grouped)){ const total=Math.max(list.length*2,s.targetSets[m]||0),q=Math.floor(total/list.length),r=total%list.length; list.forEach((it,i)=>{const p=prescription(goal,it.metadata,s.style);it.sets=Math.max(2,Math.min(5,q+(i<r?1:0)));it.reps=p.reps;it.rir=p.rir;it.rest_sec=p.rest_sec;}); }
+      for(const [m,list] of Object.entries(grouped)){const total=Math.max(list.length*2,s.targetSets[m]||0),q=Math.floor(total/list.length),r=total%list.length;list.forEach((it,i)=>{const p=prescription(goal,it.metadata,s.style);it.sets=Math.max(2,Math.min(5,q+(i<r?1:0)));it.reps=p.reps;it.rir=p.rir;it.rest_sec=p.rest_sec;});}
       const typeOrder={potencia:0,explosivo:0,compuesto:1,aislamiento:2,core:3,acondicionamiento:4}; s.items.sort((a,b)=>(typeOrder[norm(a.metadata.exercise_type)]??2)-(typeOrder[norm(b.metadata.exercise_type)]??2));
     }
     return {goal,level,days,minutes,equipment,priorities,typology,resolvedTypology:resolved,split:typologyLabel(resolved),sessions,volume};
@@ -162,18 +146,30 @@
     setTimeout(()=>location.reload(),450);
   }
 
-  function sectionHTML(){
-    return `<section id="vp-smart-generator"><section class="section-head"><h2>Crear plan inteligente</h2><span class="pill">NUEVO</span></section><div class="card"><p class="muted">VitalPeak elegirá volumen y ejercicios según tus respuestas, respetando la tipología de entrenamiento que elijas.</p><form id="vp-smart-form" class="stack">
+  function formHTML(){
+    return `<div id="vp-smart-form-wrap" hidden><div class="vp-smart-form-head"><div><span class="template-meta">PLAN PERSONALIZADO</span><h3>Cuéntale a VitalPeak cómo quieres entrenar</h3></div><button type="button" class="vp-smart-close" data-vp-smart-close aria-label="Cerrar formulario">×</button></div><p class="muted">VitalPeak elegirá volumen y ejercicios según tus respuestas, respetando la tipología de entrenamiento que elijas.</p><form id="vp-smart-form" class="stack">
       <label class="field">Objetivo<select name="goal">${GOALS.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></label>
       <label class="field">Tipo de entrenamiento<select name="typology">${TYPOLOGIES.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select><small class="muted">Automático deja que VitalPeak elija la estructura más adecuada.</small></label>
       <div class="form-grid"><label class="field">Nivel<select name="level"><option value="principiante">Principiante</option><option value="intermedio" selected>Intermedio</option><option value="avanzado">Avanzado</option></select></label><label class="field">Días/semana<select name="days">${[2,3,4,5,6].map(n=>`<option value="${n}" ${n===4?"selected":""}>${n}</option>`).join("")}</select></label></div>
       <div class="form-grid"><label class="field">Duración<select name="minutes">${[40,50,60,75,90].map(n=>`<option value="${n}" ${n===60?"selected":""}>${n} min</option>`).join("")}</select></label><label class="field">Equipamiento<select name="equipment"><option value="gimnasio_completo">Gimnasio completo</option><option value="basico">Gimnasio básico</option><option value="casa">Casa / mancuernas</option></select></label></div>
       <fieldset class="vp-priority"><legend>Músculos prioritarios <small>(opcional)</small></legend><div class="vp-chips">${MUSCLES.map(m=>`<label><input type="checkbox" name="priority" value="${esc(m)}"><span>${esc(m)}</span></label>`).join("")}</div></fieldset>
-      <button class="primary wide" type="submit">Generar mi plan</button></form><div id="vp-smart-preview"></div></div></section>`;
+      <button class="primary wide" type="submit">Generar mi plan</button></form><div id="vp-smart-preview"></div></div>`;
   }
-  function addStyles(){ if(document.querySelector("#vp-smart-style"))return; const s=document.createElement("style");s.id="vp-smart-style";s.textContent=`#vp-smart-generator{margin-top:18px}.vp-priority{border:0;padding:0;margin:4px 0}.vp-priority legend{font-weight:800;margin-bottom:8px}.vp-priority legend small{font-weight:600;color:#6b7d82}.vp-chips{display:flex;flex-wrap:wrap;gap:7px}.vp-chips input{display:none}.vp-chips span{display:block;padding:8px 10px;border:1px solid #cfe0dc;border-radius:999px;background:#fff;font-size:12px;font-weight:700;cursor:pointer}.vp-chips input:checked+span{background:#dff5ef;border-color:#16a98e;color:#0c6d5b}.vp-smart-summary{margin:18px 0 10px;padding-top:14px;border-top:1px solid #e1ece9}.vp-smart-day{border:1px solid #d8e7e3;border-radius:14px;margin:8px 0;background:#fbfefd;overflow:hidden}.vp-smart-day summary{display:flex;justify-content:space-between;gap:10px;padding:12px;cursor:pointer}.vp-smart-day summary span{font-size:12px;color:#60757a}.vp-smart-ex{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid #e6efed;align-items:center}.vp-smart-ex div{min-width:0}.vp-smart-ex b{display:block;font-size:13px}.vp-smart-ex small{display:block;color:#60757a;margin-top:2px}.vp-smart-ex>span{font-size:12px;font-weight:800;white-space:nowrap}`;document.head.appendChild(s); }
+  function sectionHTML(){
+    return `<section id="vp-smart-generator"><div class="vp-smart-teaser"><div class="vp-smart-icon">✦</div><div class="vp-smart-copy"><span class="template-meta">VITALPEAK COACH</span><h2>Pídele a VitalPeak tu plan personalizado</h2><p>Elige tu objetivo, nivel, días y tipo de entrenamiento. VitalPeak preparará la rutina por ti.</p></div><button class="primary vp-smart-open" type="button" data-vp-smart-open>Crear plan</button></div><div class="card vp-smart-form-card">${formHTML()}</div></section>`;
+  }
+  function addStyles(){
+    if(document.querySelector("#vp-smart-style"))return; const s=document.createElement("style");s.id="vp-smart-style";
+    s.textContent=`#vp-smart-generator{margin-top:18px}.vp-smart-teaser{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:18px;border-radius:22px;background:linear-gradient(135deg,#173f48,#236d70);color:#fff;box-shadow:0 12px 30px rgba(16,46,56,.14)}.vp-smart-icon{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:rgba(255,255,255,.14);font-size:24px}.vp-smart-copy h2{margin:4px 0 5px;color:#fff;font-size:22px;line-height:1.08}.vp-smart-copy p{margin:0;color:rgba(255,255,255,.78);font-size:13px;line-height:1.4}.vp-smart-teaser .template-meta{color:#8df0dc}.vp-smart-open{white-space:nowrap;min-width:112px}.vp-smart-form-card{display:none;margin-top:12px}.vp-smart-form-card.open{display:block}.vp-smart-form-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:6px}.vp-smart-form-head h3{margin:4px 0 0}.vp-smart-close{width:40px;height:40px;border:0;border-radius:50%;background:#edf7f4;color:#163a43;font-size:26px;line-height:1}.vp-priority{border:0;padding:0;margin:4px 0}.vp-priority legend{font-weight:800;margin-bottom:8px}.vp-priority legend small{font-weight:600;color:#6b7d82}.vp-chips{display:flex;flex-wrap:wrap;gap:7px}.vp-chips input{display:none}.vp-chips span{display:block;padding:8px 10px;border:1px solid #cfe0dc;border-radius:999px;background:#fff;font-size:12px;font-weight:700;cursor:pointer}.vp-chips input:checked+span{background:#dff5ef;border-color:#16a98e;color:#0c6d5b}.vp-smart-summary{margin:18px 0 10px;padding-top:14px;border-top:1px solid #e1ece9}.vp-smart-day{border:1px solid #d8e7e3;border-radius:14px;margin:8px 0;background:#fbfefd;overflow:hidden}.vp-smart-day summary{display:flex;justify-content:space-between;gap:10px;padding:12px;cursor:pointer}.vp-smart-day summary span{font-size:12px;color:#60757a}.vp-smart-ex{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid #e6efed;align-items:center}.vp-smart-ex div{min-width:0}.vp-smart-ex b{display:block;font-size:13px}.vp-smart-ex small{display:block;color:#60757a;margin-top:2px}.vp-smart-ex>span{font-size:12px;font-weight:800;white-space:nowrap}@media(max-width:620px){.vp-smart-teaser{grid-template-columns:auto 1fr}.vp-smart-open{grid-column:1/-1;width:100%}.vp-smart-copy h2{font-size:20px}}`;
+    document.head.appendChild(s);
+  }
   function mount(){addStyles(); if(document.querySelector("#vp-smart-generator"))return; const h1=[...document.querySelectorAll("h1")].find(x=>x.textContent.includes("Planes y ejercicios")); if(!h1)return; const hero=h1.closest(".hero"); if(hero)hero.insertAdjacentHTML("afterend",sectionHTML());}
+
   document.addEventListener("submit",e=>{if(e.target?.id!=="vp-smart-form")return;e.preventDefault();const f=new FormData(e.target),days=Number(f.get("days")),typology=String(f.get("typology")||"auto"),problem=validateTypology(typology,days);if(problem){alert(problem);return;}preview=generate({goal:f.get("goal"),level:f.get("level"),days,minutes:Number(f.get("minutes")),equipment:f.get("equipment"),priorities:f.getAll("priority"),typology});document.querySelector("#vp-smart-preview").innerHTML=previewHTML(preview);document.querySelector("#vp-smart-preview").scrollIntoView({behavior:"smooth",block:"start"});});
-  document.addEventListener("click",e=>{if(e.target.closest("[data-vp-smart-save]"))savePlan().catch(()=>alert("No se pudo guardar el plan. Inténtalo de nuevo."));});
+  document.addEventListener("click",e=>{
+    if(e.target.closest("[data-vp-smart-open]")){const card=document.querySelector(".vp-smart-form-card"),wrap=document.querySelector("#vp-smart-form-wrap");if(card&&wrap){card.classList.add("open");wrap.hidden=false;card.scrollIntoView({behavior:"smooth",block:"start"});}return;}
+    if(e.target.closest("[data-vp-smart-close]")){const card=document.querySelector(".vp-smart-form-card"),wrap=document.querySelector("#vp-smart-form-wrap");if(card&&wrap){wrap.hidden=true;card.classList.remove("open");document.querySelector(".vp-smart-teaser")?.scrollIntoView({behavior:"smooth",block:"start"});}return;}
+    if(e.target.closest("[data-vp-smart-save]"))savePlan().catch(()=>alert("No se pudo guardar el plan. Inténtalo de nuevo."));
+  });
   new MutationObserver(mount).observe(document.body,{childList:true,subtree:true}); mount();
 })();
