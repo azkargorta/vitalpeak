@@ -3,17 +3,17 @@
   "steps": [
     {
       "title": "1 · Inicio",
-      "tip": "Pierna casi extendida, tobillera en polea baja.",
+      "tip": "Mantén la cadera y el muslo estables.",
       "file": "01_inicio.png"
     },
     {
-      "title": "2 · Curl",
-      "tip": "Talón al glúteo; solo flexiona la rodilla.",
+      "title": "2 · Flexión",
+      "tip": "Dobla la rodilla llevando el talón atrás con control.",
       "file": "02_fondo.png"
     },
     {
-      "title": "3 · Retorno",
-      "tip": "Extiende con control.",
+      "title": "3 · Regreso",
+      "tip": "Extiende la rodilla lentamente sin perder tensión.",
       "file": "03_empuje.png"
     }
   ]

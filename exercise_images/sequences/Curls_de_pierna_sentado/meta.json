@@ -3,17 +3,17 @@
   "steps": [
     {
       "title": "1 · Inicio",
-      "tip": "Colócate estable y prepara el movimiento.",
+      "tip": "Mantén la cadera y el muslo estables.",
       "file": "01_inicio.png"
     },
     {
-      "title": "2 · Contracción",
-      "tip": "Completa el recorrido con control y sin impulso.",
+      "title": "2 · Flexión",
+      "tip": "Dobla la rodilla llevando el talón atrás con control.",
       "file": "02_fondo.png"
     },
     {
       "title": "3 · Regreso",
-      "tip": "Vuelve despacio a la posición inicial.",
+      "tip": "Extiende la rodilla lentamente sin perder tensión.",
       "file": "03_empuje.png"
     }
   ]
