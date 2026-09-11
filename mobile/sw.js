@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v73";
+const CACHE = "vitalpeak-mobile-v74";
 
 const APP_SHELL = [
   "./",
@@ -61,6 +61,7 @@ self.addEventListener("fetch", event => {
     url.pathname.endsWith("/routines-accordion.js") ||
     url.pathname.endsWith("/training-notifications.js") ||
     url.pathname.endsWith("/push-config.js") ||
+    url.pathname.endsWith("/push-sw-refresh.js") ||
     url.pathname.endsWith("/account-progress-share-stable.js")
   ) {
     event.respondWith(networkFirst(event.request));
@@ -81,16 +82,19 @@ self.addEventListener("fetch", event => {
 
 self.addEventListener("push", event => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text?.() || "" }; }
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data?.text?.() || "" };
+  }
+
   const title = data.title || "VitalPeak";
   const options = {
     body: data.body || "Tienes una novedad en VitalPeak.",
-    icon: "./apple-touch-icon.png",
-    badge: "./apple-touch-icon.png",
     tag: data.tag || "vitalpeak-push",
-    renotify: false,
     data: { url: data.url || "./" }
   };
+
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
