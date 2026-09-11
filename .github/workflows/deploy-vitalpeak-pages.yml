@@ -103,7 +103,7 @@ jobs:
               "./progress-weight-stable.js?v=1",
               "./account-progress-share-stable.js?v=2",
               "./push-config.js?v=1",
-              "./training-notifications.js?v=3"
+              "./training-notifications.js?v=4"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
