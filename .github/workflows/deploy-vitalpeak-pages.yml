@@ -87,7 +87,28 @@ jobs:
           grep -q '"volumeEngine"' mobile/catalog-data.js
           grep -q '"exerciseSelector"' mobile/catalog-data.js
           grep -q '"routineEngine"' mobile/catalog-data.js
-          printf '\n{ const scripts=["./routine-generator-ui.js?v=1","./coach-anchor-fix.js?v=2","./routines-accordion.js?v=2","./routines-redesign.js?v=3","./personal-routines-actions.js?v=1"]; for (const src of scripts) { const s=document.createElement("script"); s.src=src; s.defer=true; document.head.appendChild(s); } }\n' >> mobile/catalog-data.js
+          cat >> mobile/catalog-data.js <<'JS'
+          
+          ;(async()=>{
+            const scripts=[
+              "./routine-generator-ui.js?v=1",
+              "./coach-anchor-fix.js?v=2",
+              "./routines-accordion.js?v=3",
+              "./routines-redesign.js?v=4",
+              "./personal-routines-actions.js?v=1"
+            ];
+            for(const src of scripts){
+              await new Promise((resolve,reject)=>{
+                const s=document.createElement("script");
+                s.src=src;
+                s.async=false;
+                s.onload=resolve;
+                s.onerror=()=>reject(new Error(`No se pudo cargar ${src}`));
+                document.head.appendChild(s);
+              });
+            }
+          })().catch(console.error);
+          JS
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
