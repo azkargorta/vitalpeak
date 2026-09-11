@@ -87,7 +87,7 @@ jobs:
           grep -q '"volumeEngine"' mobile/catalog-data.js
           grep -q '"exerciseSelector"' mobile/catalog-data.js
           grep -q '"routineEngine"' mobile/catalog-data.js
-          printf '\n{ const scripts=["./routine-generator-ui.js?v=1","./coach-anchor-fix.js?v=1","./routines-redesign.js?v=2"]; for (const src of scripts) { const s=document.createElement("script"); s.src=src; s.defer=true; document.head.appendChild(s); } }\n' >> mobile/catalog-data.js
+          printf '\n{ const scripts=["./routine-generator-ui.js?v=1","./coach-anchor-fix.js?v=2","./routines-redesign.js?v=2"]; for (const src of scripts) { const s=document.createElement("script"); s.src=src; s.defer=true; document.head.appendChild(s); } }\n' >> mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
