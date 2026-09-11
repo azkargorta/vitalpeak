@@ -103,7 +103,8 @@ jobs:
               "./progress-weight-stable.js?v=1",
               "./account-progress-share-stable.js?v=2",
               "./push-config.js?v=1",
-              "./training-notifications.js?v=4"
+              "./training-notifications.js?v=4",
+              "./training-notifications-fix.js?v=1"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
@@ -130,6 +131,7 @@ jobs:
           grep -q 'account-progress-share-stable.js' mobile/catalog-data.js
           grep -q 'push-config.js' mobile/catalog-data.js
           grep -q 'training-notifications.js' mobile/catalog-data.js
+          grep -q 'training-notifications-fix.js' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
         run: |
