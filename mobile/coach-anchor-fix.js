@@ -21,6 +21,14 @@
     document.head.appendChild(style);
   }
 
+  function fixAddExerciseIcon(){
+    const icon=document.querySelector('.vp-routine-section[data-vp-section="add-exercise"] .vp-section-icon');
+    if(!icon) return;
+    if(icon.dataset.vpIconVersion==='2') return;
+    icon.dataset.vpIconVersion='2';
+    icon.innerHTML='<svg viewBox="0 0 32 24" aria-hidden="true"><path d="M3 10v4m3-6v8m3-2h10m3-6v8m3-6v4"/><path d="M26 2.5v7m-3.5-3.5h7"/></svg>';
+  }
+
   function fix(){
     addStyles();
     const app=document.querySelector('#app');
@@ -29,13 +37,10 @@
     const teaser=document.querySelector('.vp-smart-teaser');
     if(!app||!hero||!generator||!teaser) return false;
 
-    // Mantener toda la funcionalidad de Coach dentro de un único componente.
     if(teaser.parentElement!==generator){
       generator.insertBefore(teaser,generator.firstChild);
     }
 
-    // El rediseño usa .vp-routines-coach como ancla. La clase debe vivir en
-    // el contenedor, nunca en la tarjeta interior, para que no se separe el botón.
     document.querySelectorAll('.vp-routines-coach').forEach(el=>{
       if(el!==generator) el.classList.remove('vp-routines-coach');
     });
@@ -45,10 +50,11 @@
       hero.insertAdjacentElement('afterend',generator);
     }
 
-    // Si algún render anterior dejó una copia sintética de Coach, eliminarla.
     [...app.querySelectorAll('.vp-routines-coach')].forEach(el=>{
       if(el!==generator) el.remove();
     });
+
+    fixAddExerciseIcon();
     return true;
   }
 
