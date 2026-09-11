@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v69";
+const CACHE = "vitalpeak-mobile-v70";
 
 // Solo precargamos lo imprescindible para que la interfaz aparezca rápido.
 // Los GIF e imágenes se guardan en caché cuando el usuario los abre.
@@ -6,8 +6,8 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
-  "./catalog-data.js?v=69",
-  "./app.js?v=69",
+  "./catalog-data.js?v=70",
+  "./app.js?v=70",
   "./routine-generator-ui.js",
   "./manifest.webmanifest",
   "./icon-cover.png",
@@ -26,7 +26,7 @@ self.addEventListener("activate", event => event.waitUntil(
     .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
     .then(() => self.clients.claim())
     // La PWA de iOS puede mantener abierto el HTML de una versión anterior.
-    // Al activar v69 navegamos una sola vez para cargar el catálogo actual.
+    // Al activar v70 navegamos una sola vez para cargar el catálogo actual.
     .then(() => self.clients.matchAll({ type: "window" }))
     .then(clients => Promise.all(clients.map(client => client.navigate(client.url).catch(() => undefined))))
 ));

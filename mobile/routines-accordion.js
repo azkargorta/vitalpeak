@@ -42,14 +42,18 @@
     const style = document.createElement('style');
     style.id = 'vp-routines-accordion-styles';
     style.textContent = `
-      .vp-routines-accordion{display:grid;gap:10px;margin-top:16px}
-      .vp-routine-section{border:1px solid #d8e7e3;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 5px 16px rgba(16,46,56,.04)}
-      .vp-routine-section>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:58px;padding:15px 16px;cursor:pointer;font-size:16px;font-weight:900;color:#163a43;user-select:none}
+      .vp-routine-dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 18px}.vp-routine-stat{padding:12px 10px;border:1px solid rgba(22,169,142,.16);border-radius:15px;background:linear-gradient(145deg,#f8fffd,#e9f8f4)}.vp-routine-stat b{display:block;font-size:19px;line-height:1;color:#123f45}.vp-routine-stat span{display:block;margin-top:5px;color:#668087;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+      .vp-active-head{margin-top:8px!important}.vp-active-head h2{font-size:13px!important;text-transform:uppercase;letter-spacing:.09em;color:#5c777d}.vp-active-block{position:relative}.vp-active-block .list-button{position:relative;overflow:hidden;min-height:118px;padding:19px 58px 18px 19px;border:0;border-radius:22px;background:linear-gradient(140deg,#123a45 0%,#17645f 62%,#1a8d7d 100%);color:#fff;box-shadow:0 16px 34px rgba(18,69,70,.22)}.vp-active-block .list-button:before{content:'';position:absolute;width:150px;height:150px;border-radius:50%;right:-72px;top:-78px;background:rgba(174,255,236,.13)}.vp-active-block .list-button:after{content:'›';position:absolute;right:18px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);font-size:28px;color:#bdf8e9}.vp-active-block .template-meta{color:#9cebdc}.vp-active-block .list-button b{position:relative;font-size:20px;letter-spacing:-.35px;margin:7px 0}.vp-active-block .list-button .muted{position:relative;color:#d4eeea}
+      .vp-routines-accordion{display:grid;gap:11px;margin-top:4px}
+      .vp-routine-section{border:1px solid rgba(35,96,96,.1);border-radius:19px;background:rgba(255,255,255,.92);overflow:hidden;box-shadow:0 8px 22px rgba(16,46,56,.055)}
+      .vp-routine-section>summary{list-style:none;display:grid;grid-template-columns:42px 1fr 30px;align-items:center;gap:11px;min-height:68px;padding:13px 15px;cursor:pointer;font-size:15px;font-weight:900;color:#163a43;user-select:none}
       .vp-routine-section>summary::-webkit-details-marker{display:none}
+      .vp-routine-section>summary::before{content:'•';display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#daf8f0,#edfdf9);color:#168b78;font-size:20px;box-shadow:inset 0 0 0 1px rgba(22,169,142,.1)}
+      .vp-routine-section[data-vp-section="routine-history"]>summary::before{content:'◷'}.vp-routine-section[data-vp-section="personal-routines"]>summary::before{content:'★'}.vp-routine-section[data-vp-section="custom"]>summary::before{content:'＋'}.vp-routine-section[data-vp-section="predefined-routines"]>summary::before{content:'▤'}.vp-routine-section[data-vp-section="predefined-exercises"]>summary::before{content:'●'}.vp-routine-section[data-vp-section="add-exercise"]>summary::before{content:'✦'}
       .vp-routine-section>summary::after{content:'⌄';display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#edf7f4;color:#176d61;font-size:18px;transition:transform .18s ease}
       .vp-routine-section[open]>summary::after{transform:rotate(180deg)}
-      .vp-routine-section[open]>summary{border-bottom:1px solid #e2ece9}
-      .vp-routine-section-content{padding:14px 14px 16px}
+      .vp-routine-section[open]>summary{border-bottom:1px solid #e2ece9;background:linear-gradient(90deg,#fbfffe,#f1faf7)}
+      .vp-routine-section-content{padding:15px 14px 17px;background:#fbfefd}
       .vp-routine-section-content>.section-head{display:none!important}
       .vp-routine-section-content>.vp-custom-exercises{margin-top:0!important;padding-top:0!important;border-top:0!important}
       .vp-routine-section-content>.vp-custom-exercises>h3,
@@ -63,11 +67,12 @@
       .vp-filter-count{grid-column:1/-1;font-size:11px;color:#6b8085;margin-top:-2px}
       .vp-filter-empty{padding:16px;border-radius:12px;background:#f4f8f7;color:#687d82;text-align:center;font-size:13px}
       .vp-personal-routines-list{display:grid;gap:9px}
-      .vp-personal-routine-card{width:100%;display:grid;text-align:left;gap:4px;padding:13px 14px;border:1px solid #d8e7e3;border-radius:13px;background:#fbfefd;color:#173b42}
+      .vp-personal-routine-card{width:100%;display:grid;text-align:left;gap:4px;padding:15px;border:1px solid #d8e7e3;border-radius:15px;background:#fff;color:#173b42;box-shadow:0 4px 13px rgba(16,46,56,.045)}
       .vp-personal-routine-card b{font-size:14px}.vp-personal-routine-card span{font-size:11px;color:#687e84}.vp-personal-routine-card .template-meta{color:#168b78;font-weight:850}
-      .vp-routine-history{display:grid;gap:8px}.vp-history-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:5px 12px;text-align:left;padding:12px 13px;border:1px solid #d8e7e3;border-radius:13px;background:#fbfefd;color:#173b42}.vp-history-card b{font-size:14px}.vp-history-card span{font-size:11px;color:#687e84}.vp-history-card time{grid-row:1/3;grid-column:2;align-self:center;font-size:11px;font-weight:850;color:#168b78}.vp-history-card[disabled]{cursor:default;opacity:.72}
+      .vp-routine-history{display:grid;gap:8px}.vp-history-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:5px 12px;text-align:left;padding:14px;border:1px solid #d8e7e3;border-radius:14px;background:#fff;color:#173b42}.vp-history-card b{font-size:14px}.vp-history-card span{font-size:11px;color:#687e84}.vp-history-card time{grid-row:1/3;grid-column:2;align-self:center;padding:5px 8px;border-radius:99px;background:#e4f7f2;font-size:10px;font-weight:850;color:#168b78}.vp-history-card[disabled]{cursor:default;opacity:.72}
+      .vp-routine-section-content .list-button{padding:15px;border-radius:15px;border-color:#dfeae7;background:#fff;box-shadow:0 4px 13px rgba(16,46,56,.04)}.vp-routine-section-content .list-button+.list-button{margin-top:8px}
       @media(max-width:480px){
-        .vp-routine-section>summary{min-height:56px;padding:14px;font-size:15px}
+        .vp-routine-dashboard{gap:6px}.vp-routine-stat{padding:11px 8px}.vp-routine-stat b{font-size:17px}.vp-routine-section>summary{min-height:62px;padding:11px 13px;font-size:14px}
         .vp-routine-section-content{padding:12px}
         .vp-section-filters{grid-template-columns:1fr}
       }
@@ -230,7 +235,14 @@
     if (!activeBlock.querySelector('[data-action="activate-routine"]')) {
       activeBlock.innerHTML = `<div class="card empty">Aún no has seleccionado una rutina.</div>`;
     }
+    activeHead?.classList.add('vp-active-head');activeBlock.classList.add('vp-active-block');
     return {activeHead,activeBlock};
+  }
+
+  function dashboard(state) {
+    const active=(state.routines||[]).find(r=>String(r.id)===String(state.activeRoutineId));
+    const days=active?.days?.length||0,exercises=(active?.days||[]).reduce((n,d)=>n+(d.items?.length||0),0),uses=(state.sessions||[]).filter(s=>String(s.routineId)===String(active?.id)||(!s.routineId&&String(s.routineName)===String(active?.name))).length;
+    const el=document.createElement('div');el.className='vp-routine-dashboard';el.innerHTML=`<div class="vp-routine-stat"><b>${days||'—'}</b><span>Días</span></div><div class="vp-routine-stat"><b>${exercises||'—'}</b><span>Ejercicios</span></div><div class="vp-routine-stat"><b>${uses}</b><span>Completadas</span></div>`;return el;
   }
 
   async function enhance() {
@@ -251,6 +263,7 @@
       ensureStyles();
       const state = await readState().catch(()=>({routines:[]}));
       const {activeBlock} = tidyActiveRoutine(app, state);
+      if(activeBlock)activeBlock.insertAdjacentElement('afterend',dashboard(state));
 
       const customCard = customBuilder.closest('.card');
       const predefinedNodes = collectUntilNextHead(predefinedHead);
@@ -280,7 +293,9 @@
       predefinedHead.remove();
       exercisesHead.remove();
 
-      if (activeBlock) activeBlock.insertAdjacentElement('afterend', accordion);
+      const stats=app.querySelector('.vp-routine-dashboard');
+      if (stats) stats.insertAdjacentElement('afterend', accordion);
+      else if (activeBlock) activeBlock.insertAdjacentElement('afterend', accordion);
       else app.querySelector('.hero')?.insertAdjacentElement('afterend', accordion);
 
       setupRoutineLevelFilter(predefinedDetails);
