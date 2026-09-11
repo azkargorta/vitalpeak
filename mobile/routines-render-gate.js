@@ -31,17 +31,12 @@
   }
 
   function cleanDuplicates(app, canonical){
-    // Nunca puede quedar más de un acordeón de Rutinas.
     [...app.querySelectorAll('#vp-routines-accordion')].forEach(acc => {
       if(acc !== canonical) acc.remove();
     });
-
-    // Quita cualquier sección generada fuera del acordeón definitivo.
     [...app.querySelectorAll('.vp-routine-section')].forEach(section => {
       if(!canonical.contains(section)) section.remove();
     });
-
-    // Quita restos visibles del layout antiguo que no hayan sido movidos al acordeón.
     [...app.querySelectorAll('.section-head')].forEach(head => {
       if(canonical.contains(head)) return;
       const title = (head.querySelector('h2')?.textContent || head.textContent || '').trim();
@@ -64,22 +59,14 @@
     const sections = REQUIRED.map(key => canonical.querySelector(`.vp-routine-section[data-vp-section="${key}"]`));
     if(sections.some(x => !x)) return false;
 
-    // El menú no se muestra hasta que el rediseño haya terminado de aplicar iconos/copys/chevrons.
-    const polished = sections.every(section => {
-      const summary = section.querySelector(':scope > summary');
-      return !!(summary?.querySelector('.vp-section-icon') && summary.querySelector('.vp-section-copy') && summary.querySelector('.vp-section-chevron'));
-    });
-    if(!polished) return false;
-
     const coach = app.querySelector('#vp-smart-generator.vp-routines-coach, .vp-routines-coach');
     const active = app.querySelector('.vp-routines-active');
     if(!coach || !active) return false;
 
     cleanDuplicates(app, canonical);
 
-    // Comprobación final: exactamente seis secciones, todas dentro del acordeón bueno.
-    const finalSections = [...app.querySelectorAll('.vp-routine-section')];
-    if(finalSections.length !== REQUIRED.length || finalSections.some(section => !canonical.contains(section))) return false;
+    const finalSections = REQUIRED.map(key => canonical.querySelector(`.vp-routine-section[data-vp-section="${key}"]`));
+    if(finalSections.some(x => !x)) return false;
 
     app.classList.remove('vp-routines-preparing');
     app.classList.add('vp-routines-ready');
@@ -110,7 +97,8 @@
     const app = APP();
     if(!app) return setTimeout(start, 25);
     new MutationObserver(schedule).observe(app,{childList:true,subtree:true,attributes:true,attributeFilter:['class','open']});
-    document.querySelector('.tabbar') && new MutationObserver(schedule).observe(document.querySelector('.tabbar'),{subtree:true,attributes:true,attributeFilter:['class']});
+    const tabbar=document.querySelector('.tabbar');
+    if(tabbar) new MutationObserver(schedule).observe(tabbar,{subtree:true,attributes:true,attributeFilter:['class']});
     evaluate();
   };
   start();
