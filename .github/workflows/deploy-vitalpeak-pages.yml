@@ -97,10 +97,9 @@ jobs:
               "./routines-accordion.js?v=4",
               "./routines-redesign.js?v=5",
               "./personal-routines-actions.js?v=2",
-              "./progress-redesign.js?v=2",
+              "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
-              "./progress-weight-actions.js?v=2",
-              "./progress-management.js?v=1"
+              "./progress-management.js?v=2"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
@@ -122,7 +121,6 @@ jobs:
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
-          grep -q 'progress-weight-actions.js' mobile/catalog-data.js
           grep -q 'progress-management.js' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
