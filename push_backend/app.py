@@ -55,7 +55,7 @@ class SubscribePayload(BaseModel):
     subscription: dict
     reminder_time: str = Field(pattern=r"^\d{2}:\d{2}$")
     timezone: str
-    training_dates: list[str] = []
+    training_dates: list[str] = Field(default_factory=list)
     enabled: bool = True
 
 
@@ -93,6 +93,10 @@ def subscribe(payload: SubscribePayload):
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(endpoint) DO UPDATE SET
             subscription_json=excluded.subscription_json,
+            last_sent_date=CASE
+                WHEN subscriptions.reminder_time <> excluded.reminder_time THEN NULL
+                ELSE subscriptions.last_sent_date
+            END,
             reminder_time=excluded.reminder_time,
             timezone=excluded.timezone,
             training_dates_json=excluded.training_dates_json,
@@ -156,13 +160,17 @@ def send_push(subscription):
             "tag": "vitalpeak-training",
         }
     )
-    webpush(
+    response = webpush(
         subscription_info=subscription,
         data=payload,
         vapid_private_key=VAPID_PRIVATE_KEY,
         vapid_claims={"sub": VAPID_SUBJECT},
         ttl=3600,
     )
+    status = getattr(response, "status_code", None)
+    if status is not None:
+        print(f"Web Push provider accepted notification with status {status}", flush=True)
+    return response
 
 
 def process_due():
@@ -190,7 +198,7 @@ def process_due():
                 removed += 1
             else:
                 errors += 1
-                print(f"Web Push error for {row['endpoint'][:48]}...: {exc}", flush=True)
+                print(f"Web Push error for {row['endpoint'][:48]}... status={status}: {exc}", flush=True)
         except Exception as exc:
             errors += 1
             print(f"Push scheduler error: {exc}", flush=True)
