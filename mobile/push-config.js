@@ -1,5 +1,3 @@
 window.VITALPEAK_PUSH_CONFIG = {
-  // Rellena apiBase cuando publiquemos el backend, por ejemplo:
-  // apiBase: "https://vitalpeak-push.example.com"
-  apiBase: ""
+  apiBase: "https://vitalpeak-push-api-v2-production.up.railway.app"
 };
