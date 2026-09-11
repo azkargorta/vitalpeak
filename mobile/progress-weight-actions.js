@@ -39,6 +39,13 @@
     const btn=document.querySelector('.tabbar button[data-route="progress"]');
     if(btn) btn.click();
   }
+  function focusInput(form){
+    const input=form?.querySelector('input[name="kg"]');
+    if(!input) return;
+    input.removeAttribute('readonly');
+    input.focus({preventScroll:true});
+    try{input.setSelectionRange(input.value.length,input.value.length)}catch{}
+  }
 
   document.addEventListener('click',e=>{
     const button=e.target.closest('.vp-progress-page [data-vp-toggle-weight]');
@@ -51,9 +58,19 @@
     form.classList.toggle('open',opening);
     if(opening){
       sessionStorage.setItem(OPEN_KEY,'1');
-      requestAnimationFrame(()=>form.querySelector('input[name="kg"]')?.focus());
+      focusInput(form);
     }else sessionStorage.removeItem(OPEN_KEY);
   },true);
+
+  document.addEventListener('touchend',e=>{
+    const button=e.target.closest('.vp-progress-page [data-vp-toggle-weight]');
+    if(!button) return;
+    const form=document.querySelector('.vp-progress-page .vp-weight-form');
+    if(!form) return;
+    form.classList.add('open');
+    sessionStorage.setItem(OPEN_KEY,'1');
+    focusInput(form);
+  },{capture:true,passive:true});
 
   document.addEventListener('submit',async e=>{
     const form=e.target.closest('.vp-progress-page .vp-weight-form');
@@ -62,7 +79,7 @@
     e.stopImmediatePropagation();
     const input=form.querySelector('input[name="kg"]');
     const kg=Number(input?.value);
-    if(!Number.isFinite(kg)||kg<=0){input?.focus();return;}
+    if(!Number.isFinite(kg)||kg<=0){focusInput(form);return;}
     try{
       const state=await readState();
       state.weights=Array.isArray(state.weights)?state.weights:[];
