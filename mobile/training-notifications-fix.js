@@ -7,6 +7,16 @@
   function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,2);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
   async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get('user');q.onsuccess=()=>resolve(q.result||{});q.onerror=()=>reject(q.error)})}
   function hasWorkout(state,date=today()){const raw=state.plan?.[date];return Array.isArray(raw)?raw.length>0:!!raw}
+
+  async function refreshPushWorker(){
+    if(!('serviceWorker' in navigator))return;
+    try{
+      const reg=await navigator.serviceWorker.register('./sw.js?v=74',{scope:'./',updateViaCache:'none'});
+      await reg.update().catch(()=>{});
+      await navigator.serviceWorker.ready;
+    }catch(err){console.warn('VitalPeak push worker update failed',err)}
+  }
+
   async function renderTodayStatus(){
     const card=document.getElementById('vp-training-notifications');
     if(!card)return;
@@ -17,6 +27,7 @@
     el.style.background=yes?'#eef8f5':'#fff7e8';
     el.style.color=yes?'#567178':'#8b6416';
   }
+
   document.addEventListener('change',e=>{
     if(e.target.closest('[data-vp-notify-time]')){
       localStorage.removeItem(SENT_KEY);
@@ -24,6 +35,9 @@
     }
     if(e.target.closest('[data-vp-notify-toggle]'))setTimeout(renderTodayStatus,50);
   },true);
-  const app=document.getElementById('app');if(app)new MutationObserver(()=>setTimeout(renderTodayStatus,60)).observe(app,{childList:true,subtree:true});
+
+  const app=document.getElementById('app');
+  if(app)new MutationObserver(()=>setTimeout(renderTodayStatus,60)).observe(app,{childList:true,subtree:true});
+  refreshPushWorker();
   setTimeout(renderTodayStatus,500);
 })();
