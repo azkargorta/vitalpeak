@@ -100,6 +100,7 @@ jobs:
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=3",
+              "./progress-weight-ui.js?v=1",
               "./account-progress-share.js?v=1"
             ];
             for(const src of scripts){
@@ -123,6 +124,7 @@ jobs:
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
           grep -q 'progress-management.js' mobile/catalog-data.js
+          grep -q 'progress-weight-ui.js' mobile/catalog-data.js
           grep -q 'account-progress-share.js' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
