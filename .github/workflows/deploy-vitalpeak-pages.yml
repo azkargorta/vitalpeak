@@ -100,8 +100,8 @@ jobs:
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=4",
-              "./progress-weight-ui.js?v=4",
-              "./account-progress-share.js?v=4"
+              "./progress-weight-stable.js?v=1",
+              "./account-progress-share-stable.js?v=1"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
@@ -124,8 +124,8 @@ jobs:
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
           grep -q 'progress-management.js' mobile/catalog-data.js
-          grep -q 'progress-weight-ui.js' mobile/catalog-data.js
-          grep -q 'account-progress-share.js' mobile/catalog-data.js
+          grep -q 'progress-weight-stable.js' mobile/catalog-data.js
+          grep -q 'account-progress-share-stable.js' mobile/catalog-data.js
 
       - name: Preparar la app y sus GIFs
         run: |
