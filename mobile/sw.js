@@ -1,4 +1,4 @@
-const CACHE = "vitalpeak-mobile-v70";
+const CACHE = "vitalpeak-mobile-v71";
 
 // Solo precargamos lo imprescindible para que la interfaz aparezca rápido.
 // Los GIF e imágenes se guardan en caché cuando el usuario los abre.
@@ -6,9 +6,6 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
-  "./catalog-data.js?v=70",
-  "./app.js?v=70",
-  "./routine-generator-ui.js",
   "./manifest.webmanifest",
   "./icon-cover.png",
   "./icons/icon-192.svg",
@@ -25,11 +22,20 @@ self.addEventListener("activate", event => event.waitUntil(
   caches.keys()
     .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
     .then(() => self.clients.claim())
-    // La PWA de iOS puede mantener abierto el HTML de una versión anterior.
-    // Al activar v70 navegamos una sola vez para cargar el catálogo actual.
-    .then(() => self.clients.matchAll({ type: "window" }))
-    .then(clients => Promise.all(clients.map(client => client.navigate(client.url).catch(() => undefined))))
 ));
+
+function cacheResponse(request, response) {
+  if (!response || !response.ok) return response;
+  const copy = response.clone();
+  caches.open(CACHE).then(cache => cache.put(request, copy)).catch(() => {});
+  return response;
+}
+
+function networkFirst(request, fallback) {
+  return fetch(request, { cache: "no-store" })
+    .then(response => cacheResponse(request, response))
+    .catch(() => caches.match(request).then(hit => hit || (fallback ? caches.match(fallback) : undefined)));
+}
 
 function updateInBackground(request) {
   fetch(request).then(response => {
@@ -46,26 +52,28 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Las navegaciones consultan primero la red para que una versión recién
-  // desplegada aparezca al abrir la PWA, conservando el HTML en caché como
-  // respaldo cuando el móvil está sin conexión.
+  // El HTML siempre intenta red primero. Si no hay conexión, usa la copia local.
   if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put("./index.html", copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
+    event.respondWith(networkFirst(event.request, "./index.html"));
     return;
   }
 
-  // App shell y recursos estáticos: responder inmediatamente desde caché
-  // y refrescar la copia en segundo plano. Evita esperar a la red móvil.
+  // Estos recursos contienen la lógica principal. No usamos stale-while-revalidate:
+  // una versión antigua de app.js/catalog-data.js combinada con un index nuevo puede
+  // dejar la interfaz visible pero sin navegación hasta la siguiente apertura.
+  if (
+    url.pathname.endsWith("/app.js") ||
+    url.pathname.endsWith("/catalog-data.js") ||
+    url.pathname.endsWith("/routine-generator-ui.js") ||
+    url.pathname.endsWith("/routines-redesign.js") ||
+    url.pathname.endsWith("/routine-navigation-fix.js") ||
+    url.pathname.endsWith("/routines-accordion.js")
+  ) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
+  // El resto de recursos estáticos puede responder de caché y actualizarse detrás.
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) {
@@ -74,13 +82,7 @@ self.addEventListener("fetch", event => {
       }
 
       return fetch(event.request)
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put(event.request, copy));
-          }
-          return response;
-        })
+        .then(response => cacheResponse(event.request, response))
         .catch(() => caches.match("./index.html"));
     })
   );
