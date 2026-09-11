@@ -1,6 +1,8 @@
 import json
 import os
 import sqlite3
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -16,6 +18,7 @@ VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:admin@example.com")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 ALLOWED_ORIGINS = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "*").split(",") if x.strip()]
+CHECK_INTERVAL_SECONDS = max(15, int(os.getenv("CHECK_INTERVAL_SECONDS", "30")))
 
 app = FastAPI(title="VitalPeak Push API")
 app.add_middleware(
@@ -29,7 +32,7 @@ app.add_middleware(
 
 def db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute(
         """
@@ -62,7 +65,11 @@ class UnsubscribePayload(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {
+        "ok": True,
+        "vapidConfigured": bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY),
+        "schedulerIntervalSeconds": CHECK_INTERVAL_SECONDS,
+    }
 
 
 @app.get("/api/push/public-key")
@@ -154,13 +161,11 @@ def send_push(subscription):
         data=payload,
         vapid_private_key=VAPID_PRIVATE_KEY,
         vapid_claims={"sub": VAPID_SUBJECT},
+        ttl=3600,
     )
 
 
-@app.post("/api/push/send-due")
-def send_due(x_cron_secret: str | None = Header(default=None)):
-    if CRON_SECRET and x_cron_secret != CRON_SECRET:
-        raise HTTPException(401, "Invalid cron secret")
+def process_due():
     conn = db()
     rows = conn.execute("SELECT * FROM subscriptions").fetchall()
     sent = 0
@@ -185,8 +190,34 @@ def send_due(x_cron_secret: str | None = Header(default=None)):
                 removed += 1
             else:
                 errors += 1
-        except Exception:
+                print(f"Web Push error for {row['endpoint'][:48]}...: {exc}", flush=True)
+        except Exception as exc:
             errors += 1
+            print(f"Push scheduler error: {exc}", flush=True)
     conn.commit()
     conn.close()
     return {"ok": True, "sent": sent, "removed": removed, "errors": errors}
+
+
+@app.post("/api/push/send-due")
+def send_due(x_cron_secret: str | None = Header(default=None)):
+    if CRON_SECRET and x_cron_secret != CRON_SECRET:
+        raise HTTPException(401, "Invalid cron secret")
+    return process_due()
+
+
+def scheduler_loop():
+    while True:
+        try:
+            result = process_due()
+            if result["sent"] or result["removed"] or result["errors"]:
+                print(f"Push scheduler: {result}", flush=True)
+        except Exception as exc:
+            print(f"Push scheduler loop error: {exc}", flush=True)
+        time.sleep(CHECK_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+def start_scheduler():
+    thread = threading.Thread(target=scheduler_loop, name="vitalpeak-push-scheduler", daemon=True)
+    thread.start()
