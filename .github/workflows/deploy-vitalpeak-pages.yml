@@ -99,8 +99,8 @@ jobs:
               "./personal-routines-actions.js?v=2",
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
-              "./progress-management.js?v=3",
-              "./progress-weight-ui.js?v=1",
+              "./progress-management.js?v=4",
+              "./progress-weight-ui.js?v=2",
               "./account-progress-share.js?v=1"
             ];
             for(const src of scripts){
@@ -132,8 +132,6 @@ jobs:
           mkdir -p _site
           cp -R mobile/. _site/
           mkdir -p _site/exercise-gifs
-          # Completa solo los recursos que falten; no sustituye los GIF
-          # optimizados incluidos en mobile/exercise-gifs.
           cp -Rn exercise_images/sequences/. _site/exercise-gifs/
 
       - name: Configurar GitHub Pages
