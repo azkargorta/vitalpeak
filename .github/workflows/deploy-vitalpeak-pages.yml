@@ -100,8 +100,8 @@ jobs:
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=4",
-              "./progress-weight-ui.js?v=2",
-              "./account-progress-share.js?v=3"
+              "./progress-weight-ui.js?v=3",
+              "./account-progress-share.js?v=4"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
