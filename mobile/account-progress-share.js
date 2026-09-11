@@ -7,6 +7,7 @@
   const STYLE_ID='vp-share-progress-style';
   const num=v=>Number(v||0);
   const today=()=>new Date().toISOString().slice(0,10);
+  const htmlEsc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
   async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get('user');q.onsuccess=()=>resolve(q.result||{});q.onerror=()=>reject(q.error)})}
@@ -39,28 +40,28 @@
     return {sessions,setRows,weights,progress};
   }
 
-  function renderPreview(state,from,to){const data=buildData(state,from,to),root=document.querySelector('#vp-share-preview');if(!root)return;root.innerHTML=`<div class="vp-share-summary"><div><b>${data.sessions.length}</b><span>entrenamientos</span></div><div><b>${data.setRows.length}</b><span>series</span></div><div><b>${data.progress.length}</b><span>ejercicios</span></div></div><p class="vp-share-note">El detalle completo se incluirá en tres tablas dentro del archivo: entrenamiento, progreso por ejercicio y peso corporal.</p>`;return data}
-  function csvEscape(v){const s=String(v??'');return /[;"\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
-  function row(values){return values.map(csvEscape).join(';')}
-  function makeCsv(data){
-    const out=[];
-    out.push('ENTRENAMIENTO');
-    out.push(row(['Fecha','Rutina','Ejercicio','Serie','Peso kg','Repeticiones','Notas']));
-    if(data.setRows.length)data.setRows.forEach(r=>out.push(row([r.date,r.routine,r.exercise,r.set,r.weight,r.reps,r.notes])));else out.push(row(['Sin datos','','','','','','']));
-    out.push('');
-    out.push('PROGRESO POR EJERCICIO');
-    out.push(row(['Ejercicio','Sesiones','Series','Mejor inicial kg','Mejor final kg','Cambio kg']));
-    if(data.progress.length)data.progress.forEach(r=>out.push(row([r.exercise,r.sessions,r.sets,r.firstBest,r.lastBest,r.change])));else out.push(row(['Sin datos','','','','','']));
-    out.push('');
-    out.push('PESO CORPORAL');
-    out.push(row(['Fecha','Peso kg','Cambio desde inicio kg']));
+  function renderPreview(state,from,to){const data=buildData(state,from,to),root=document.querySelector('#vp-share-preview');if(!root)return;root.innerHTML=`<div class="vp-share-summary"><div><b>${data.sessions.length}</b><span>entrenamientos</span></div><div><b>${data.setRows.length}</b><span>series</span></div><div><b>${data.progress.length}</b><span>ejercicios</span></div></div><p class="vp-share-note">El archivo compartido incluirá tres tablas separadas: Entrenamiento, Progreso por ejercicio y Peso corporal.</p>`;return data}
+
+  function makeHtmlReport(data,from,to){
+    const trainingRows=data.setRows.length?data.setRows.map(r=>`<tr><td>${htmlEsc(r.date)}</td><td>${htmlEsc(r.routine)}</td><td>${htmlEsc(r.exercise)}</td><td>${r.set}</td><td>${r.weight}</td><td>${r.reps}</td><td>${htmlEsc(r.notes||'')}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">Sin datos en este periodo.</td></tr>';
+    const progressRows=data.progress.length?data.progress.map(r=>`<tr><td>${htmlEsc(r.exercise)}</td><td>${r.sessions}</td><td>${r.sets}</td><td>${r.firstBest}</td><td>${r.lastBest}</td><td>${r.change>0?'+':''}${r.change}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Sin datos en este periodo.</td></tr>';
     const firstWeight=data.weights[0]?.kg;
-    if(data.weights.length)data.weights.forEach((w,i)=>out.push(row([w.date,w.kg,i===0?0:num(w.kg)-num(firstWeight)])));else out.push(row(['Sin datos','','']));
-    return '\ufeff'+out.join('\n');
+    const weightRows=data.weights.length?data.weights.map((w,i)=>`<tr><td>${htmlEsc(w.date)}</td><td>${w.kg}</td><td>${i===0?'0':`${num(w.kg)-num(firstWeight)>0?'+':''}${(num(w.kg)-num(firstWeight)).toFixed(1)}`}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">Sin datos en este periodo.</td></tr>';
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VitalPeak - Progreso</title><style>
+      *{box-sizing:border-box}body{margin:0;padding:24px;background:#f4f9f8;color:#173b43;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}main{max-width:1200px;margin:0 auto}.report-head{margin-bottom:28px;padding:22px 24px;border-radius:20px;background:linear-gradient(135deg,#0c2330,#0d4d54);color:#fff}.report-head h1{margin:0 0 6px;font-size:28px}.report-head p{margin:0;color:#d4e8e6}.section{margin:0 0 34px}.section h2{margin:0 0 12px;color:#123943;font-size:22px}.table-wrap{overflow:auto;border:1px solid #dceae7;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(18,57,67,.06)}table{width:100%;border-collapse:collapse;min-width:720px}th{padding:12px 14px;background:#e7f7f3;color:#143b44;text-align:left;font-size:13px;border-bottom:1px solid #cfe4df;white-space:nowrap}td{padding:11px 14px;border-bottom:1px solid #edf2f1;font-size:13px;vertical-align:top}tbody tr:last-child td{border-bottom:0}.empty{text-align:center;color:#7b8f94;padding:20px}@media(max-width:700px){body{padding:14px}.report-head{padding:18px}.report-head h1{font-size:24px}.section h2{font-size:19px}}
+    </style></head><body><main><header class="report-head"><h1>Informe de progreso VitalPeak</h1><p>Periodo: ${htmlEsc(from)} a ${htmlEsc(to)}</p></header>
+      <section class="section"><h2>Entrenamiento</h2><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Rutina</th><th>Ejercicio</th><th>Serie</th><th>Peso kg</th><th>Repeticiones</th><th>Notas</th></tr></thead><tbody>${trainingRows}</tbody></table></div></section>
+      <section class="section"><h2>Progreso por ejercicio</h2><div class="table-wrap"><table><thead><tr><th>Ejercicio</th><th>Sesiones</th><th>Series</th><th>Mejor inicial kg</th><th>Mejor final kg</th><th>Cambio kg</th></tr></thead><tbody>${progressRows}</tbody></table></div></section>
+      <section class="section"><h2>Peso corporal</h2><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Peso kg</th><th>Cambio desde inicio kg</th></tr></thead><tbody>${weightRows}</tbody></table></div></section>
+    </main></body></html>`;
   }
 
   async function shareCurrent(){
-    const modal=document.getElementById(MODAL_ID);if(!modal)return;const from=modal.querySelector('[name="from"]').value,to=modal.querySelector('[name="to"]').value,state=await readState(),data=buildData(state,from,to),csv=makeCsv(data),file=new File([csv],`vitalpeak-progreso-${from}-a-${to}.csv`,{type:'text/csv;charset=utf-8'}),text=`Mi progreso en VitalPeak del ${from} al ${to}: ${data.sessions.length} entrenamientos, ${data.setRows.length} series y ${data.progress.length} ejercicios.`;
+    const modal=document.getElementById(MODAL_ID);if(!modal)return;
+    const from=modal.querySelector('[name="from"]').value,to=modal.querySelector('[name="to"]').value;
+    const state=await readState(),data=buildData(state,from,to),html=makeHtmlReport(data,from,to);
+    const file=new File([html],`vitalpeak-progreso-${from}-a-${to}.html`,{type:'text/html;charset=utf-8'});
+    const text=`Mi progreso en VitalPeak del ${from} al ${to}: ${data.sessions.length} entrenamientos, ${data.setRows.length} series y ${data.progress.length} ejercicios.`;
     try{if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title:'Mi progreso VitalPeak',text,files:[file]});return}if(navigator.share){await navigator.share({title:'Mi progreso VitalPeak',text});return}}catch(err){if(err?.name==='AbortError')return}
     const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
