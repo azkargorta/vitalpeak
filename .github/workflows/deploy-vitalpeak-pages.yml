@@ -91,11 +91,12 @@ jobs:
           
           ;(async()=>{
             const scripts=[
+              "./routines-render-gate.js?v=1",
               "./routine-generator-ui.js?v=1",
               "./coach-anchor-fix.js?v=2",
-              "./routines-accordion.js?v=3",
-              "./routines-redesign.js?v=4",
-              "./personal-routines-actions.js?v=1"
+              "./routines-accordion.js?v=4",
+              "./routines-redesign.js?v=5",
+              "./personal-routines-actions.js?v=2"
             ];
             for(const src of scripts){
               await new Promise((resolve,reject)=>{
@@ -109,6 +110,7 @@ jobs:
             }
           })().catch(console.error);
           JS
+          grep -q 'routines-render-gate.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
