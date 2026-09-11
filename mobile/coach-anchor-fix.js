@@ -15,8 +15,24 @@
       #vp-smart-generator.vp-routines-coach .vp-smart-teaser .template-meta{color:#79f0dc!important}
       #vp-smart-generator.vp-routines-coach .vp-smart-teaser h2{color:#fff!important}
       #vp-smart-generator.vp-routines-coach .vp-smart-teaser p{color:#daf2ee!important;opacity:1!important}
-      #vp-smart-generator.vp-routines-coach .vp-smart-form-card,#vp-smart-generator.vp-routines-coach .vp-smart-form-card *{color:#163a43}
-      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .muted{color:#6b7d82!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card{background:#fff!important;color:#163a43!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card *{color:#163a43}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .template-meta{color:#16aa92!important;opacity:1!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card h2,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card h3,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card label,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card legend{color:#123843!important;opacity:1!important;text-shadow:none!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card p,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .muted,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card small{color:#627b81!important;opacity:1!important;text-shadow:none!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card input,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card select,
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card textarea{background:#fff!important;color:#123843!important;border-color:#c8dfda!important;opacity:1!important;-webkit-text-fill-color:#123843!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card option{color:#123843!important;background:#fff!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .vp-chips span{background:#fff!important;color:#31545b!important;border-color:#bcd9d3!important;opacity:1!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .vp-chips input:checked+span{background:#dff5ef!important;color:#0b6f5e!important;border-color:#16a98e!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-close{color:#0b454b!important;background:#54dfcf!important}
+      #vp-smart-generator.vp-routines-coach .vp-smart-form-card .primary{color:#0b3438!important;background:linear-gradient(90deg,#40dbc6,#67e7d7)!important}
       @media(max-width:620px){#vp-smart-generator.vp-routines-coach .vp-smart-teaser{padding:17px!important}}
     `;
     document.head.appendChild(style);
