@@ -4,7 +4,7 @@
   if (!window.__VITALPEAK_CARDIO_LOADER__) {
     window.__VITALPEAK_CARDIO_LOADER__ = true;
     const script = document.createElement('script');
-    script.src = './cardio-catalog.js?v=2';
+    script.src = './cardio-catalog.js?v=3';
     script.onload = () => {
       window.dispatchEvent(new Event('vitalpeak:catalog-updated'));
       const training = document.createElement('script');
