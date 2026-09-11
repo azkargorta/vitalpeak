@@ -102,7 +102,7 @@ jobs:
               "./progress-management.js?v=4",
               "./progress-weight-stable.js?v=1",
               "./account-progress-share-stable.js?v=2",
-              "./push-config.js?v=1",
+              "./push-config.js?v=2",
               "./training-notifications.js?v=4",
               "./training-notifications-fix.js?v=1"
             ];
