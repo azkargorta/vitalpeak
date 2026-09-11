@@ -65,6 +65,7 @@
       .vp-personal-routines-list{display:grid;gap:9px}
       .vp-personal-routine-card{width:100%;display:grid;text-align:left;gap:4px;padding:13px 14px;border:1px solid #d8e7e3;border-radius:13px;background:#fbfefd;color:#173b42}
       .vp-personal-routine-card b{font-size:14px}.vp-personal-routine-card span{font-size:11px;color:#687e84}.vp-personal-routine-card .template-meta{color:#168b78;font-weight:850}
+      .vp-routine-history{display:grid;gap:8px}.vp-history-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:5px 12px;text-align:left;padding:12px 13px;border:1px solid #d8e7e3;border-radius:13px;background:#fbfefd;color:#173b42}.vp-history-card b{font-size:14px}.vp-history-card span{font-size:11px;color:#687e84}.vp-history-card time{grid-row:1/3;grid-column:2;align-self:center;font-size:11px;font-weight:850;color:#168b78}.vp-history-card[disabled]{cursor:default;opacity:.72}
       @media(max-width:480px){
         .vp-routine-section>summary{min-height:56px;padding:14px;font-size:15px}
         .vp-routine-section-content{padding:12px}
@@ -211,6 +212,13 @@
     return makeDetails(`Rutinas personales${personal.length ? ` · ${personal.length}` : ''}`, [wrapper], 'personal-routines');
   }
 
+  function routineHistoryDetails(state) {
+    const routines=Array.isArray(state.routines)?state.routines:[],sessions=(Array.isArray(state.sessions)?state.sessions:[]).slice().reverse().slice(0,12);
+    const wrapper=document.createElement('div');wrapper.className='vp-routine-history';
+    wrapper.innerHTML=sessions.length?sessions.map(session=>{const routine=routines.find(r=>String(r.id)===String(session.routineId))||routines.find(r=>String(r.name)===String(session.routineName));const date=String(session.date||'');let label=date;try{label=new Intl.DateTimeFormat('es-ES',{day:'numeric',month:'short',year:'numeric'}).format(new Date(`${date}T12:00:00`))}catch{}const sets=Array.isArray(session.sets)?session.sets.length:0;return `<button type="button" class="vp-history-card" ${routine?`data-action="activate-routine" data-id="${esc(routine.id)}"`:'disabled'}><b>${esc(session.routineName||routine?.name||'Entrenamiento')}</b><span>${sets} serie${sets===1?'':'s'} registrada${sets===1?'':'s'}${routine?' · pulsa para ver la rutina':' · rutina ya no disponible'}</span><time datetime="${esc(date)}">${esc(label)}</time></button>`}).join(''):`<div class="vp-filter-empty">Cuando completes un entrenamiento aparecerá aquí la rutina utilizada y su fecha.</div>`;
+    return makeDetails(`Historial de rutinas${sessions.length?` · ${sessions.length}`:''}`,[wrapper],'routine-history');
+  }
+
   function tidyActiveRoutine(app, state) {
     const activeHead = sectionHead(app, 'Tu rutina activa');
     const activeBlock = activeHead?.nextElementSibling;
@@ -255,11 +263,13 @@
       accordion.className = 'vp-routines-accordion';
 
       const personal = personalDetails(state);
+      const history = routineHistoryDetails(state);
       const customDetails = makeDetails('Crea tu propia rutina', [customCard], 'custom');
       const predefinedDetails = makeDetails('Rutinas predefinidas', predefinedNodes, 'predefined-routines');
       const exerciseDetails = makeDetails('Ejercicios predefinidos', exerciseNodes, 'predefined-exercises');
       const addExerciseDetails = makeDetails('Añade tu ejercicio', [customExerciseBlock], 'add-exercise');
 
+      accordion.appendChild(history);
       accordion.appendChild(personal);
       accordion.appendChild(customDetails);
       accordion.appendChild(predefinedDetails);

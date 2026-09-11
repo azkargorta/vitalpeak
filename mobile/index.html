@@ -85,7 +85,7 @@
     </nav>
     <div id="toast" class="toast" role="status"></div>
     <script type="module">
-      const BUILD_VERSION = '68';
+      const BUILD_VERSION = '69';
       const catalogResponse = await fetch(`./catalog-data.js?v=${BUILD_VERSION}`, {cache: 'no-store'});
       if (!catalogResponse.ok) throw new Error('No se pudo cargar el catálogo de ejercicios');
       const catalogBlob = new Blob([await catalogResponse.text()], {type: 'text/javascript'});
