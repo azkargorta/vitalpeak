@@ -12,6 +12,31 @@
     return !!(btn?.classList.contains('active') || /Planes y ejercicios|RUTINAS/.test(app?.textContent || ''));
   }
 
+  function cleanDuplicates(app, accordion){
+    if(!accordion) return;
+
+    // Solo debe existir un acordeón canónico.
+    [...app.querySelectorAll('#vp-routines-accordion')].forEach(node=>{
+      if(node!==accordion) node.remove();
+    });
+
+    // Elimina secciones antiguas/sueltas que ya están representadas dentro
+    // del acordeón. No toca las secciones canónicas ni la tarjeta activa.
+    [...app.querySelectorAll('.vp-routine-section')].forEach(section=>{
+      if(!accordion.contains(section)) section.remove();
+    });
+
+    // Limpia restos del render base que pueden quedar debajo del rediseño.
+    [...app.querySelectorAll('.section-head')].forEach(head=>{
+      if(accordion.contains(head)) return;
+      const title=(head.querySelector('h2')?.textContent||head.textContent||'').trim();
+      if(!['Rutina personalizada','Planes preparados','Catálogo de ejercicios','Tu rutina activa'].includes(title)) return;
+      const next=head.nextElementSibling;
+      head.remove();
+      if(next && !accordion.contains(next) && !next.classList.contains('vp-routines-active') && !next.classList.contains('vp-routines-coach')) next.remove();
+    });
+  }
+
   function evaluate(){
     const app = APP();
     if(!app) return;
@@ -26,6 +51,8 @@
     }
 
     const accordion = app.querySelector('#vp-routines-accordion');
+    if(accordion) cleanDuplicates(app, accordion);
+
     const sections = accordion
       ? REQUIRED.map(key => accordion.querySelector(`.vp-routine-section[data-vp-section="${key}"]`))
       : [];
