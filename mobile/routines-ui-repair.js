@@ -2,7 +2,7 @@
   'use strict';
 
   let timer=null;
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
   const ADD_ICON='<svg viewBox="0 0 32 24" aria-hidden="true"><path d="M3 10v4m3-6v8m3-2h10m3-6v8m3-6v4"/><path d="M26 2.5v7m-3.5-3.5h7"/></svg>';
 
