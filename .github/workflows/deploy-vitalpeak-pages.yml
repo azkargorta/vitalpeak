@@ -91,6 +91,7 @@ jobs:
           
           ;(async()=>{
             const scripts=[
+              "./routines-transition-guard.js?v=1",
               "./routines-render-gate.js?v=4",
               "./routine-generator-ui.js?v=1",
               "./coach-anchor-fix.js?v=5",
@@ -134,6 +135,7 @@ jobs:
             }
           })().catch(console.error);
           JS
+          grep -q 'routines-transition-guard.js' mobile/catalog-data.js
           grep -q 'routines-render-gate.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
