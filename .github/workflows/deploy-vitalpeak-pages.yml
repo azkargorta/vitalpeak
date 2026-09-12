@@ -99,8 +99,10 @@ jobs:
               "./routines-redesign.js?v=5",
               "./routine-active-ux.js?v=1",
               "./personal-routines-actions.js?v=2",
+              "./progression-engine-v1.js?v=1",
               "./training-session-ui.js?v=1",
               "./training-entry-assist.js?v=1",
+              "./training-rir-progression.js?v=1",
               "./training-set-management.js?v=1",
               "./training-completion-history.js?v=1",
               "./calendar-experience.js?v=1",
@@ -138,8 +140,10 @@ jobs:
           grep -q 'routines-redesign.js' mobile/catalog-data.js
           grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
+          grep -q 'progression-engine-v1.js' mobile/catalog-data.js
           grep -q 'training-session-ui.js' mobile/catalog-data.js
           grep -q 'training-entry-assist.js' mobile/catalog-data.js
+          grep -q 'training-rir-progression.js' mobile/catalog-data.js
           grep -q 'training-set-management.js' mobile/catalog-data.js
           grep -q 'training-completion-history.js' mobile/catalog-data.js
           grep -q 'calendar-experience.js' mobile/catalog-data.js
