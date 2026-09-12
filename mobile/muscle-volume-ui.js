@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const DB_NAME='vitalpeak-mobile',STORE='state',STYLE_ID='vp-muscle-volume-styles';
-  let timer=null;
+  let timer=null,rendering=false;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=(v,d=1)=>Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
 
@@ -18,15 +18,22 @@
   }
   function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
   async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get('user');q.onsuccess=()=>resolve(q.result||{});q.onerror=()=>reject(q.error)})}
+  function stateKey(state){const sessions=state.sessions||[],last=sessions.at(-1),sets=last?.sets||[];return `${sessions.length}|${last?.date||''}|${sets.length}|${sets.at(-1)?.at||''}`}
   function rowHtml(x,max){const width=max?Math.min(100,Math.max(4,x.direct/max*100)):4;const change=x.changePct==null?'—':`${x.changePct>0?'+':''}${fmt(x.changePct,0)} %`;return `<article class="vp-muscle-row"><div class="vp-muscle-row-top"><div><h3>${esc(x.name)}</h3><p>${esc(x.reason)}</p></div><span class="vp-muscle-chip ${esc(x.status)}">${esc(x.label)}</span></div><div class="vp-muscle-metrics"><div class="vp-muscle-metric"><span>Series directas</span><b>${fmt(x.direct,0)}</b></div><div class="vp-muscle-metric"><span>Series implicadas</span><b>${fmt(x.involved,1)}</b></div><div class="vp-muscle-metric"><span>Vs. media</span><b>${esc(change)}</b></div></div><div class="vp-muscle-bar"><i style="width:${width}%"></i></div></article>`}
   async function enhance(){
+    if(rendering)return;
     injectStyles();const page=document.querySelector('.vp-progress-page');if(!page||!document.querySelector('.tabbar button[data-route="progress"].active'))return;
-    page.querySelector('.vp-muscle-card')?.remove();const engine=window.VitalPeakMuscleVolume;if(!engine)return;const state=await readState().catch(()=>null);if(!state)return;const a=engine.analyze(state,{weeks:6});
-    const current=a.currentWeek||{muscles:{}};const recentWeeks=a.weeks.slice(-4);const max=Math.max(1,...a.muscles.map(x=>x.direct));
-    const visible=a.muscles.filter(x=>x.direct>0||x.baseline>0).slice(0,10);
-    const card=document.createElement('section');card.className='vp-muscle-card';card.innerHTML=`<div class="vp-muscle-head"><div><h2>Volumen por grupo muscular</h2><p>Compara tus series semanales con tu propia media reciente.</p></div><div class="vp-muscle-note">Principal = 1 serie directa · secundario = 0,5 serie implicada. Es una estimación de carga de trabajo, no de recuperación.</div></div><div class="vp-muscle-week-grid">${recentWeeks.map(w=>`<div class="vp-muscle-week"><span>Semana ${esc(w.start.slice(5))}</span><b>${Object.values(w.muscles||{}).reduce((n,m)=>n+Number(m.direct||0),0)} series</b></div>`).join('')}</div>${visible.length?`<div class="vp-muscle-list">${visible.map(x=>rowHtml(x,max)).join('')}</div>`:`<div class="vp-empty-small">Aún no hay suficientes entrenamientos registrados para calcular volumen muscular.</div>`}`;
-    const intel=page.querySelector('.vp-intel-card');if(intel)intel.insertAdjacentElement('afterend',card);else{const summary=page.querySelector('.vp-progress-summary');if(summary)summary.insertAdjacentElement('beforebegin',card);else page.prepend(card)}
+    const engine=window.VitalPeakMuscleVolume;if(!engine)return;
+    rendering=true;
+    try{
+      const state=await readState().catch(()=>null);if(!state)return;
+      const key=stateKey(state),existing=page.querySelector('.vp-muscle-card');
+      if(existing?.dataset.vpStateKey===key)return;
+      const a=engine.analyze(state,{weeks:6});const recentWeeks=a.weeks.slice(-4);const max=Math.max(1,...a.muscles.map(x=>x.direct));const visible=a.muscles.filter(x=>x.direct>0||x.baseline>0).slice(0,10);
+      const card=existing||document.createElement('section');card.className='vp-muscle-card';card.dataset.vpStateKey=key;card.innerHTML=`<div class="vp-muscle-head"><div><h2>Volumen por grupo muscular</h2><p>Compara tus series semanales con tu propia media reciente.</p></div><div class="vp-muscle-note">Principal = 1 serie directa · secundario = 0,5 serie implicada. Es una estimación de carga de trabajo, no de recuperación.</div></div><div class="vp-muscle-week-grid">${recentWeeks.map(w=>`<div class="vp-muscle-week"><span>Semana ${esc(w.start.slice(5))}</span><b>${Object.values(w.muscles||{}).reduce((n,m)=>n+Number(m.direct||0),0)} series</b></div>`).join('')}</div>${visible.length?`<div class="vp-muscle-list">${visible.map(x=>rowHtml(x,max)).join('')}</div>`:`<div class="vp-empty-small">Aún no hay suficientes entrenamientos registrados para calcular volumen muscular.</div>`}`;
+      if(!existing){const intel=page.querySelector('.vp-intel-card');if(intel)intel.insertAdjacentElement('afterend',card);else{const summary=page.querySelector('.vp-progress-summary');if(summary)summary.insertAdjacentElement('beforebegin',card);else page.prepend(card)}}
+    } finally {rendering=false}
   }
-  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,120)}
+  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,140)}
   const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:true});const tabs=document.querySelector('.tabbar');if(tabs)new MutationObserver(schedule).observe(tabs,{attributes:true,subtree:true,attributeFilter:['class']});schedule();
 })();
