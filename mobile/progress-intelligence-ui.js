@@ -2,8 +2,8 @@
   'use strict';
 
   const DB_NAME='vitalpeak-mobile', STORE='state', STYLE_ID='vp-progress-intelligence-styles';
-  let timer=null;
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let timer=null, rendering=false;
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const fmt=(v,d=1)=>Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
 
   function injectStyles(){
@@ -21,6 +21,7 @@
 
   function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
   async function readState(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get('user');q.onsuccess=()=>resolve(q.result||{});q.onerror=()=>reject(q.error)})}
+  function stateKey(state){const sessions=state.sessions||[],last=sessions.at(-1),sets=last?.sets||[];return `${sessions.length}|${last?.date||''}|${sets.length}|${sets.at(-1)?.at||''}|${Object.keys(state.plan||{}).length}`}
 
   function insightHtml(x){
     const delta=x.deltaPct==null?'Sin comparativa':`${x.deltaPct>0?'+':''}${fmt(x.deltaPct,1)} %`;
@@ -29,23 +30,27 @@
   }
 
   async function enhance(){
+    if(rendering)return;
     injectStyles();
     const page=document.querySelector('.vp-progress-page');
     if(!page||!document.querySelector('.tabbar button[data-route="progress"].active'))return;
-    page.querySelector('.vp-intel-card')?.remove();
     const engine=window.VITALPEAK_PROGRESS_ENGINE;if(!engine)return;
-    const state=await readState().catch(()=>null);if(!state)return;
-    const a=engine.analyze(state);
-    const card=document.createElement('section');card.className='vp-intel-card';
-    const adherence=a.adherence.pct==null?'—':`${a.adherence.pct} %`;
-    const progressCount=a.exercises.filter(x=>x.status==='progressing').length;
-    const plateauCount=a.exercises.filter(x=>x.status==='plateau').length;
-    card.innerHTML=`<div class="vp-intel-head"><div><h2>Estado de progreso</h2><p>${esc(a.summary)}</p></div><span class="vp-intel-status ${esc(a.status)}">${esc(a.label)}</span></div><div class="vp-intel-metrics"><div class="vp-intel-metric"><span>Ejercicios mejorando</span><b>${progressCount}</b></div><div class="vp-intel-metric"><span>Posibles estancamientos</span><b>${plateauCount}</b></div><div class="vp-intel-metric"><span>Adherencia 28 días</span><b>${esc(adherence)}</b></div></div>${a.insights.length?`<div class="vp-intel-insights">${a.insights.map(insightHtml).join('')}</div>`:`<div class="vp-intel-insight"><h3>Aún estamos aprendiendo de tus entrenamientos</h3><p>Necesitamos al menos 4 sesiones por ejercicio para detectar tendencias y 6 para señalar un posible estancamiento con prudencia.</p></div>`}`;
-    const summary=page.querySelector('.vp-progress-summary');
-    if(summary)summary.insertAdjacentElement('beforebegin',card);else page.prepend(card);
+    rendering=true;
+    try{
+      const state=await readState().catch(()=>null);if(!state)return;
+      const key=stateKey(state),existing=page.querySelector('.vp-intel-card');
+      if(existing?.dataset.vpStateKey===key)return;
+      const a=engine.analyze(state);
+      const card=existing||document.createElement('section');card.className='vp-intel-card';card.dataset.vpStateKey=key;
+      const adherence=a.adherence.pct==null?'—':`${a.adherence.pct} %`;
+      const progressCount=a.exercises.filter(x=>x.status==='progressing').length;
+      const plateauCount=a.exercises.filter(x=>x.status==='plateau').length;
+      card.innerHTML=`<div class="vp-intel-head"><div><h2>Estado de progreso</h2><p>${esc(a.summary)}</p></div><span class="vp-intel-status ${esc(a.status)}">${esc(a.label)}</span></div><div class="vp-intel-metrics"><div class="vp-intel-metric"><span>Ejercicios mejorando</span><b>${progressCount}</b></div><div class="vp-intel-metric"><span>Posibles estancamientos</span><b>${plateauCount}</b></div><div class="vp-intel-metric"><span>Adherencia 28 días</span><b>${esc(adherence)}</b></div></div>${a.insights.length?`<div class="vp-intel-insights">${a.insights.map(insightHtml).join('')}</div>`:`<div class="vp-intel-insight"><h3>Aún estamos aprendiendo de tus entrenamientos</h3><p>Necesitamos al menos 4 sesiones por ejercicio para detectar tendencias y 6 para señalar un posible estancamiento con prudencia.</p></div>`}`;
+      if(!existing){const summary=page.querySelector('.vp-progress-summary');if(summary)summary.insertAdjacentElement('beforebegin',card);else page.prepend(card)}
+    } finally {rendering=false}
   }
 
-  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,100)}
+  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,120)}
   const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:true});
   const tabs=document.querySelector('.tabbar');if(tabs)new MutationObserver(schedule).observe(tabs,{attributes:true,subtree:true,attributeFilter:['class']});
   schedule();
