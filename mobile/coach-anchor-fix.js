@@ -77,15 +77,13 @@
     return true;
   }
 
-  function schedule(){
-    clearTimeout(timer);
-    timer=setTimeout(fix,25);
-  }
+  function schedule(){clearTimeout(timer);timer=setTimeout(fix,25)}
 
   const start=()=>{
     const app=document.querySelector('#app');
     if(!app) return setTimeout(start,30);
-    new MutationObserver(schedule).observe(app,{childList:true,subtree:true});
+    new MutationObserver(schedule).observe(app,{childList:true,subtree:false});
+    document.addEventListener('click',e=>{if(e.target.closest('[data-route="routines"]'))schedule()},true);
     fix();
   };
   start();
