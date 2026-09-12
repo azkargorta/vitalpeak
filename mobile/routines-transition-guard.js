@@ -3,9 +3,9 @@
 
   const STYLE_ID='vp-routines-transition-guard-style';
   const LOADER_ID='vp-routines-loading';
-  const RECOVERY_KEY='vitalpeak:routines-clean-recovery';
-  const APP=()=>document.getElementById('app');
-  let retryTimer=null, rafId=null, recoveryTimer=null, token=0;
+  const CLEAN_ENTRY_KEY='vitalpeak:routines-clean-entry';
+  const RETURN_KEY='vitalpeak:return-to-routines';
+  let loading=false, rafId=null, slowTimer=null;
 
   function styles(){
     if(document.getElementById(STYLE_ID)) return;
@@ -19,7 +19,6 @@
       #${LOADER_ID} b{font-size:17px;color:#153f49;letter-spacing:-.02em}
       #${LOADER_ID} span{font-size:12px;line-height:1.45;color:#73878c}
       @keyframes vp-routines-spin{to{transform:rotate(360deg)}}
-      @media(prefers-reduced-motion:reduce){#${LOADER_ID} .vp-routines-spinner{animation-duration:1.4s}}
     `;
     document.head.appendChild(s);
   }
@@ -43,18 +42,12 @@
     if(text) text.textContent='Preparando tu rutina activa y tus planes.';
     el.classList.add('show');
   }
-  function hideLoader(){ document.getElementById(LOADER_ID)?.classList.remove('show'); }
 
-  function stopWatch(){
-    if(rafId){cancelAnimationFrame(rafId);rafId=null;}
-    if(retryTimer){clearInterval(retryTimer);retryTimer=null;}
-    if(recoveryTimer){clearTimeout(recoveryTimer);recoveryTimer=null;}
-  }
-
-  function release(){
-    stopWatch();
-    hideLoader();
-    try{sessionStorage.removeItem(RECOVERY_KEY)}catch{}
+  function hideLoader(){
+    document.getElementById(LOADER_ID)?.classList.remove('show');
+    if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+    if(slowTimer){ clearTimeout(slowTimer); slowTimer=null; }
+    loading=false;
   }
 
   function isActive(){
@@ -62,7 +55,7 @@
   }
 
   function ready(){
-    const app=APP();
+    const app=document.getElementById('app');
     if(!app || !isActive()) return false;
     const accordion=app.querySelector('#vp-routines-accordion');
     const activeCard=app.querySelector('.vp-routines-active');
@@ -72,80 +65,79 @@
     return !!(redesigned && activeCard && accordion && polished);
   }
 
-  function wakeRoutinesEnhancers(){
-    const app=APP();
-    if(!app || !isActive() || ready()) return;
-    if(!app.querySelector('#vp-routines-accordion') && /Planes preparados|Catálogo de ejercicios|Planes y ejercicios/.test(app.textContent||'')){
-      const marker=document.createElement('i');
-      marker.hidden=true;
-      marker.dataset.vpRoutinesWake='1';
-      app.appendChild(marker);
-      marker.remove();
-    }
-  }
-
-  function recoverCleanly(myToken){
-    if(myToken!==token || !isActive() || ready()) return;
-    let recovered=false;
-    try{recovered=sessionStorage.getItem(RECOVERY_KEY)==='1'}catch{}
-    if(!recovered){
-      try{
-        sessionStorage.setItem(RECOVERY_KEY,'1');
-        sessionStorage.setItem('vitalpeak:return-to-routines','1');
-      }catch{}
-      location.reload();
-      return;
-    }
-    const text=document.querySelector(`#${LOADER_ID} [data-vp-routines-loading-text]`);
-    if(text) text.textContent='Terminando de preparar tus rutinas…';
-  }
-
-  function begin(){
-    token+=1;
-    const myToken=token;
-    stopWatch();
+  function watchUntilReady(){
+    if(loading) return;
+    loading=true;
     showLoader();
 
-    wakeRoutinesEnhancers();
-    retryTimer=setInterval(()=>{
-      if(myToken!==token || !isActive()){release();return;}
-      if(ready()){release();return;}
-      wakeRoutinesEnhancers();
-    },80);
-
     const check=()=>{
-      if(myToken!==token) return;
-      if(!isActive()){release();return;}
-      if(ready()){release();return;}
+      if(!isActive()) { hideLoader(); return; }
+      if(ready()) {
+        try{sessionStorage.removeItem(CLEAN_ENTRY_KEY)}catch{}
+        hideLoader();
+        return;
+      }
       rafId=requestAnimationFrame(check);
     };
     rafId=requestAnimationFrame(check);
 
-    // La primera carga limpia funciona de forma fiable. Si una reentrada queda en un
-    // DOM parcialmente transformado, hacemos una única recuperación limpia y volvemos
-    // directamente a Rutinas. RECOVERY_KEY impide cualquier bucle de recargas.
-    recoveryTimer=setTimeout(()=>recoverCleanly(myToken),1800);
+    slowTimer=setTimeout(()=>{
+      if(!loading || ready()) return;
+      const text=document.querySelector(`#${LOADER_ID} [data-vp-routines-loading-text]`);
+      if(text) text.textContent='Terminando de preparar tus rutinas…';
+    },2200);
   }
 
+  function requestCleanEntry(event){
+    if(isActive()) return false;
+    let clean=false;
+    try{ clean=sessionStorage.getItem(CLEAN_ENTRY_KEY)==='1'; }catch{}
+
+    // Tras la recarga limpia, routine-navigation-fix hace un click programático en
+    // Rutinas. Ese click debe continuar al router, no provocar otra recarga.
+    if(clean){
+      watchUntilReady();
+      return false;
+    }
+
+    event?.preventDefault?.();
+    event?.stopImmediatePropagation?.();
+    showLoader();
+    try{
+      sessionStorage.setItem(CLEAN_ENTRY_KEY,'1');
+      sessionStorage.setItem(RETURN_KEY,'1');
+    }catch{}
+    location.reload();
+    return true;
+  }
+
+  // El pointerdown se ejecuta antes que el router y evita que llegue a pintarse la
+  // vista antigua durante la navegación.
   document.addEventListener('pointerdown',e=>{
-    const tab=e.target.closest?.('.tabbar [data-route]');
+    const tab=e.target.closest?.('.tabbar [data-route="routines"]');
     if(!tab) return;
-    if(tab.dataset.route==='routines') begin();
-    else { token+=1; release(); }
+    requestCleanEntry(e);
   },true);
 
   document.addEventListener('click',e=>{
     const tab=e.target.closest?.('.tabbar [data-route]');
     if(!tab) return;
-    if(tab.dataset.route==='routines' && !ready()) begin();
-    else if(tab.dataset.route!=='routines'){ token+=1; release(); }
+    if(tab.dataset.route==='routines') requestCleanEntry(e);
+    else if(loading) hideLoader();
   },true);
 
+  // Si llegamos de una recarga limpia y el router activa Rutinas, esperamos hasta
+  // que la interfaz nueva esté completa antes de retirar el cargador.
   const tabs=document.querySelector('.tabbar');
   if(tabs){
     new MutationObserver(()=>{
-      if(isActive() && !ready()) begin();
-      else if(!isActive()) release();
+      if(isActive()){
+        let clean=false;
+        try{clean=sessionStorage.getItem(CLEAN_ENTRY_KEY)==='1'}catch{}
+        if(clean) watchUntilReady();
+      }else if(loading){
+        hideLoader();
+      }
     }).observe(tabs,{subtree:true,attributes:true,attributeFilter:['class']});
   }
 })();
