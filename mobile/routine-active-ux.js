@@ -50,8 +50,8 @@
     requestAnimationFrame(()=>{queued=false;enhanceActiveCard();enhanceSavedRoutineModal();});
   }
   injectStyles();
-  const app=document.getElementById('app');if(app)new MutationObserver(refresh).observe(app,{childList:true,subtree:true});
-  new MutationObserver(refresh).observe(document.body,{childList:true,subtree:true});
-  document.addEventListener('click',()=>setTimeout(refresh,40),true);
-  setTimeout(refresh,250);
+  const app=document.getElementById('app');if(app)new MutationObserver(refresh).observe(app,{childList:true,subtree:false});
+  new MutationObserver(refresh).observe(document.body,{childList:true,subtree:false});
+  document.addEventListener('click',e=>{if(e.target.closest('[data-route], [data-action="activate-routine"], [data-action="view-template"]'))setTimeout(refresh,30)},true);
+  setTimeout(refresh,120);
 })();
