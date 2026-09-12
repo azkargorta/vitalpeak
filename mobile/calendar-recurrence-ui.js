@@ -2,7 +2,7 @@
   'use strict';
 
   const DB_NAME='vitalpeak-mobile', STORE='state', STYLE_ID='vp-calendar-recurrence-styles';
-  let timer=null;
+  let timer=null, rendering=false;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const today=()=>new Date().toISOString().slice(0,10);
   const monthKey=()=>document.querySelector('[data-plan-add-date]')?.dataset.planAddDate?.slice(0,7)||today().slice(0,7);
@@ -82,7 +82,15 @@
     document.querySelector('.vp-plan-legend')?.remove();if(seen.size<2)return;const legend=document.createElement('div');legend.className='vp-plan-legend';legend.innerHTML=[...seen].map(([id,name])=>`<span style="--vp-plan-hue:${hue(id)}"><i></i>${esc(name)}</span>`).join('');cal.insertAdjacentElement('beforebegin',legend);
   }
 
-  async function enhance(){styles();const cal=document.querySelector('.month-calendar');if(!cal)return;const state=await readState().catch(()=>null);if(!state)return;paintPlans(state,cal);addPanel(state,cal);const msg=sessionStorage.getItem('vitalpeak:calendar-toast');if(msg){sessionStorage.removeItem('vitalpeak:calendar-toast');const toast=document.querySelector('#toast');if(toast){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2600)}}}
-  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,100)}
-  const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:true});document.addEventListener('change',e=>{if(e.target?.id==='planner-program')setTimeout(schedule,80)},true);schedule();
+  async function enhance(){
+    if(rendering)return;
+    const cal=document.querySelector('.month-calendar');if(!cal)return;
+    rendering=true;
+    try{styles();const state=await readState().catch(()=>null);if(!state||!document.contains(cal)||!document.querySelector('.month-calendar'))return;paintPlans(state,cal);addPanel(state,cal);const msg=sessionStorage.getItem('vitalpeak:calendar-toast');if(msg){sessionStorage.removeItem('vitalpeak:calendar-toast');const toast=document.querySelector('#toast');if(toast){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2600)}}}finally{rendering=false}
+  }
+  function schedule(){clearTimeout(timer);if(!document.querySelector('.month-calendar'))return;timer=setTimeout(enhance,50)}
+  const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:false});
+  const tabs=document.querySelector('.tabbar');if(tabs)new MutationObserver(schedule).observe(tabs,{attributes:true,subtree:true,attributeFilter:['class']});
+  document.addEventListener('change',e=>{if(e.target?.id==='planner-program')setTimeout(schedule,30)},true);
+  schedule();
 })();
