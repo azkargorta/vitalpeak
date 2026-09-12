@@ -106,8 +106,10 @@ jobs:
               "./calendar-experience.js?v=1",
               "./calendar-recurrence-ui.js?v=1",
               "./progress-engine-v1.js?v=1",
+              "./muscle-volume-engine-v1.js?v=1",
               "./progress-redesign.js?v=3",
               "./progress-intelligence-ui.js?v=1",
+              "./muscle-volume-ui.js?v=1",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=4",
               "./progress-weight-stable.js?v=1",
@@ -143,8 +145,10 @@ jobs:
           grep -q 'calendar-experience.js' mobile/catalog-data.js
           grep -q 'calendar-recurrence-ui.js' mobile/catalog-data.js
           grep -q 'progress-engine-v1.js' mobile/catalog-data.js
+          grep -q 'muscle-volume-engine-v1.js' mobile/catalog-data.js
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-intelligence-ui.js' mobile/catalog-data.js
+          grep -q 'muscle-volume-ui.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
           grep -q 'progress-management.js' mobile/catalog-data.js
           grep -q 'progress-weight-stable.js' mobile/catalog-data.js
