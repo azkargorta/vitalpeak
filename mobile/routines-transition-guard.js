@@ -3,8 +3,9 @@
 
   const STYLE_ID='vp-routines-transition-guard-style';
   const LOADER_ID='vp-routines-loading';
+  const RECOVERY_KEY='vitalpeak:routines-clean-recovery';
   const APP=()=>document.getElementById('app');
-  let retryTimer=null, rafId=null, slowTimer=null, token=0;
+  let retryTimer=null, rafId=null, recoveryTimer=null, token=0;
 
   function styles(){
     if(document.getElementById(STYLE_ID)) return;
@@ -47,12 +48,13 @@
   function stopWatch(){
     if(rafId){cancelAnimationFrame(rafId);rafId=null;}
     if(retryTimer){clearInterval(retryTimer);retryTimer=null;}
-    if(slowTimer){clearTimeout(slowTimer);slowTimer=null;}
+    if(recoveryTimer){clearTimeout(recoveryTimer);recoveryTimer=null;}
   }
 
   function release(){
     stopWatch();
     hideLoader();
+    try{sessionStorage.removeItem(RECOVERY_KEY)}catch{}
   }
 
   function isActive(){
@@ -82,6 +84,22 @@
     }
   }
 
+  function recoverCleanly(myToken){
+    if(myToken!==token || !isActive() || ready()) return;
+    let recovered=false;
+    try{recovered=sessionStorage.getItem(RECOVERY_KEY)==='1'}catch{}
+    if(!recovered){
+      try{
+        sessionStorage.setItem(RECOVERY_KEY,'1');
+        sessionStorage.setItem('vitalpeak:return-to-routines','1');
+      }catch{}
+      location.reload();
+      return;
+    }
+    const text=document.querySelector(`#${LOADER_ID} [data-vp-routines-loading-text]`);
+    if(text) text.textContent='Terminando de preparar tus rutinas…';
+  }
+
   function begin(){
     token+=1;
     const myToken=token;
@@ -103,17 +121,12 @@
     };
     rafId=requestAnimationFrame(check);
 
-    // Nunca mostramos la vista antigua como fallback. Si tarda, mantenemos la carga
-    // hasta que la interfaz nueva esté realmente lista. La barra inferior queda libre
-    // para que el usuario pueda salir de Rutinas en cualquier momento.
-    slowTimer=setTimeout(()=>{
-      if(myToken!==token || !isActive() || ready()) return;
-      const text=document.querySelector(`#${LOADER_ID} [data-vp-routines-loading-text]`);
-      if(text) text.textContent='Está tardando un poco más. Terminando de preparar tus rutinas…';
-    },3000);
+    // La primera carga limpia funciona de forma fiable. Si una reentrada queda en un
+    // DOM parcialmente transformado, hacemos una única recuperación limpia y volvemos
+    // directamente a Rutinas. RECOVERY_KEY impide cualquier bucle de recargas.
+    recoveryTimer=setTimeout(()=>recoverCleanly(myToken),1800);
   }
 
-  // pointerdown ocurre antes que el click del router: cubrimos la vista antigua antes de que se pinte.
   document.addEventListener('pointerdown',e=>{
     const tab=e.target.closest?.('.tabbar [data-route]');
     if(!tab) return;
