@@ -91,7 +91,7 @@ jobs:
           
           ;(async()=>{
             const scripts=[
-              "./routines-transition-guard.js?v=1",
+              "./routines-transition-guard.js?v=2",
               "./routines-render-gate.js?v=4",
               "./routine-generator-ui.js?v=1",
               "./coach-anchor-fix.js?v=5",
