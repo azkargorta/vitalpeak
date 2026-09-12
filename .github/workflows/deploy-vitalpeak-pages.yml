@@ -97,6 +97,7 @@ jobs:
               "./routine-navigation-fix.js?v=1",
               "./routines-accordion.js?v=4",
               "./routines-redesign.js?v=5",
+              "./routines-ui-repair.js?v=1",
               "./routine-active-ux.js?v=1",
               "./personal-routines-actions.js?v=2",
               "./progression-engine-v1.js?v=1",
@@ -109,11 +110,11 @@ jobs:
               "./calendar-recurrence-ui.js?v=1",
               "./progress-engine-v1.js?v=1",
               "./muscle-volume-engine-v1.js?v=1",
-              "./coach-intelligence.js?v=1",
+              "./coach-intelligence.js?v=2",
               "./coach-routine-adaptation.js?v=1",
               "./progress-redesign.js?v=3",
-              "./progress-intelligence-ui.js?v=1",
-              "./muscle-volume-ui.js?v=1",
+              "./progress-intelligence-ui.js?v=2",
+              "./muscle-volume-ui.js?v=2",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=4",
               "./progress-weight-stable.js?v=1",
@@ -140,6 +141,7 @@ jobs:
           grep -q 'routine-navigation-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
+          grep -q 'routines-ui-repair.js' mobile/catalog-data.js
           grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
           grep -q 'progression-engine-v1.js' mobile/catalog-data.js
