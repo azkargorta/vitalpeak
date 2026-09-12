@@ -112,6 +112,7 @@ jobs:
               "./routine-active-ux.js?v=3",
               "./personal-routines-actions.js?v=3",
               "./routines-accordion-fallback.js?v=1",
+              "./routines-predefined-day-filter.js?v=1",
               "./calendar-mobile.js?v=37",
               "./calendar-recurrence-ui.js?v=4",
               "./training-intelligence.js?v=37",
@@ -156,6 +157,7 @@ jobs:
           test "$(grep -o 'routine-navigation-fix.js' mobile/catalog-data.js | wc -l)" -eq 1
           test "$(grep -o 'routines-accordion.js' mobile/catalog-data.js | wc -l)" -eq 1
           test "$(grep -o 'routines-accordion-fallback.js' mobile/catalog-data.js | wc -l)" -eq 1
+          test "$(grep -o 'routines-predefined-day-filter.js' mobile/catalog-data.js | wc -l)" -eq 1
 
           grep -q 'routine-enhancements.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
@@ -169,6 +171,7 @@ jobs:
           grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
           grep -q 'routines-accordion-fallback.js?v=1' mobile/catalog-data.js
+          grep -q 'routines-predefined-day-filter.js?v=1' mobile/catalog-data.js
           grep -q 'calendar-mobile.js' mobile/catalog-data.js
           grep -q 'calendar-recurrence-ui.js' mobile/catalog-data.js
           grep -q 'training-intelligence.js' mobile/catalog-data.js
