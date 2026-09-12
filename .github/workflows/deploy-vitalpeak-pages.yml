@@ -105,7 +105,7 @@ jobs:
               "./routine-muscle-filter.js?v=37",
               "./routine-navigation-fix.js?v=37",
               "./routines-accordion.js?v=37",
-              "./routines-render-gate.js?v=6",
+              "./routines-render-gate.js?v=7",
               "./coach-anchor-fix.js?v=6",
               "./routines-redesign.js?v=6",
               "./routines-ui-repair.js?v=4",
@@ -160,7 +160,7 @@ jobs:
           grep -q 'routine-muscle-filter.js' mobile/catalog-data.js
           grep -q 'routine-navigation-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
-          grep -q 'routines-render-gate.js?v=6' mobile/catalog-data.js
+          grep -q 'routines-render-gate.js?v=7' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
           grep -q 'routines-ui-repair.js' mobile/catalog-data.js
