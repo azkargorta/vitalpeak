@@ -4,6 +4,7 @@
   const APP = () => document.querySelector('#app');
   const ROUTINES_BUTTON = () => document.querySelector('.tabbar button[data-route="routines"]');
   const REQUIRED = ['personal-routines','routine-history','custom','add-exercise','predefined-routines','predefined-exercises'];
+  const OPEN_STATE_KEY='vitalpeak:routines-open-sections';
   let timer = null;
   let cachedView = null;
   let cachedScrollY = 0;
@@ -24,6 +25,13 @@
     const accordion = app.querySelector('#vp-routines-accordion');
     if(!accordion) return false;
     return REQUIRED.every(key => accordion.querySelector(`.vp-routine-section[data-vp-section="${key}"]`));
+  }
+
+  function resetOpenSections(app=APP()){
+    try { sessionStorage.removeItem(OPEN_STATE_KEY); } catch {}
+    app?.querySelectorAll('#vp-routines-accordion .vp-routine-section[open]').forEach(section=>{
+      section.open=false;
+    });
   }
 
   function cleanDuplicates(app, accordion){
@@ -69,10 +77,11 @@
     cachedView = null;
     restoring = false;
 
+    resetOpenSections(app);
     const accordion = app.querySelector('#vp-routines-accordion');
     if(accordion) cleanDuplicates(app, accordion);
     app.classList.add('vp-routines-ready');
-    requestAnimationFrame(()=>window.scrollTo({top:cachedScrollY,left:0,behavior:'auto'}));
+    requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
     return true;
   }
 
@@ -139,8 +148,10 @@
         return;
       }
 
-      if(!isRoutinesActive() && nextRoute==='routines' && cachedView) {
-        restorePending=true;
+      if(!isRoutinesActive() && nextRoute==='routines') {
+        // Cada entrada a Rutinas empieza con todas las secciones plegadas.
+        resetOpenSections();
+        if(cachedView) restorePending=true;
       }
     },true);
 
