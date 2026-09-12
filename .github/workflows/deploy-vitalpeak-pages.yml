@@ -105,12 +105,13 @@ jobs:
               "./routine-muscle-filter.js?v=37",
               "./routine-navigation-fix.js?v=37",
               "./routines-accordion.js?v=37",
-              "./routines-render-gate.js?v=7",
+              "./routines-render-gate.js?v=8",
               "./coach-anchor-fix.js?v=6",
               "./routines-redesign.js?v=6",
               "./routines-ui-repair.js?v=4",
               "./routine-active-ux.js?v=3",
               "./personal-routines-actions.js?v=3",
+              "./routines-accordion-fallback.js?v=1",
               "./calendar-mobile.js?v=37",
               "./calendar-recurrence-ui.js?v=4",
               "./training-intelligence.js?v=37",
@@ -154,18 +155,20 @@ jobs:
           test "$(grep -o 'routine-generator-ui.js' mobile/catalog-data.js | wc -l)" -eq 1
           test "$(grep -o 'routine-navigation-fix.js' mobile/catalog-data.js | wc -l)" -eq 1
           test "$(grep -o 'routines-accordion.js' mobile/catalog-data.js | wc -l)" -eq 1
+          test "$(grep -o 'routines-accordion-fallback.js' mobile/catalog-data.js | wc -l)" -eq 1
 
           grep -q 'routine-enhancements.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'routine-muscle-filter.js' mobile/catalog-data.js
           grep -q 'routine-navigation-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
-          grep -q 'routines-render-gate.js?v=7' mobile/catalog-data.js
+          grep -q 'routines-render-gate.js?v=8' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
           grep -q 'routines-ui-repair.js' mobile/catalog-data.js
           grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
+          grep -q 'routines-accordion-fallback.js?v=1' mobile/catalog-data.js
           grep -q 'calendar-mobile.js' mobile/catalog-data.js
           grep -q 'calendar-recurrence-ui.js' mobile/catalog-data.js
           grep -q 'training-intelligence.js' mobile/catalog-data.js
