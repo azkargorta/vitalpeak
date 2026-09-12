@@ -5,88 +5,35 @@
   const ROUTINES_BUTTON = () => document.querySelector('.tabbar button[data-route="routines"]');
   const REQUIRED = ['personal-routines','routine-history','custom','add-exercise','predefined-routines','predefined-exercises'];
   const OPEN_STATE_KEY='vitalpeak:routines-open-sections';
-  let timer = null;
-  let cachedView = null;
-  let cachedScrollY = 0;
-  let restorePending = false;
-  let restoring = false;
+  let timer=null;
 
   function isRoutinesActive(){
     return !!ROUTINES_BUTTON()?.classList.contains('active');
   }
 
-  function isRoutinesRoute(){
-    const app = APP();
-    return !!(isRoutinesActive() || /Planes y ejercicios|RUTINAS/.test(app?.textContent || ''));
-  }
-
   function hasModernView(app=APP()){
     if(!app) return false;
-    const accordion = app.querySelector('#vp-routines-accordion');
-    if(!accordion) return false;
-    return REQUIRED.every(key => accordion.querySelector(`.vp-routine-section[data-vp-section="${key}"]`));
+    const accordion=app.querySelector('#vp-routines-accordion');
+    return !!accordion && REQUIRED.every(key=>accordion.querySelector(`.vp-routine-section[data-vp-section="${key}"]`));
   }
 
-  function resetOpenSections(app=APP()){
+  function closeAll(app=APP()){
     try { sessionStorage.removeItem(OPEN_STATE_KEY); } catch {}
-    app?.querySelectorAll('#vp-routines-accordion .vp-routine-section[open]').forEach(section=>{
-      section.open=false;
-    });
+    app?.querySelectorAll('#vp-routines-accordion .vp-routine-section[open]').forEach(section=>{ section.open=false; });
   }
 
-  function cleanDuplicates(app, accordion){
-    if(!accordion) return;
-
-    [...app.querySelectorAll('#vp-routines-accordion')].forEach(node=>{
-      if(node!==accordion) node.remove();
-    });
-
+  function cleanDuplicates(app){
+    const accordions=[...app.querySelectorAll('#vp-routines-accordion')];
+    const canonical=accordions[0];
+    accordions.slice(1).forEach(node=>node.remove());
+    if(!canonical) return;
     [...app.querySelectorAll('.vp-routine-section')].forEach(section=>{
-      if(!accordion.contains(section)) section.remove();
-    });
-
-    [...app.querySelectorAll('.section-head')].forEach(head=>{
-      if(accordion.contains(head)) return;
-      const title=(head.querySelector('h2')?.textContent||head.textContent||'').trim();
-      if(!['Rutina personalizada','Planes preparados','Catálogo de ejercicios','Tu rutina activa'].includes(title)) return;
-      const next=head.nextElementSibling;
-      head.remove();
-      if(next && !accordion.contains(next) && !next.classList.contains('vp-routines-active') && !next.classList.contains('vp-routines-coach')) next.remove();
+      if(!canonical.contains(section)) section.remove();
     });
   }
 
-  function captureModernView(){
-    const app = APP();
-    if(!app || !isRoutinesActive() || !hasModernView(app)) return false;
-
-    const fragment = document.createDocumentFragment();
-    while(app.firstChild) fragment.appendChild(app.firstChild);
-    cachedView = fragment;
-    cachedScrollY = window.scrollY;
-    app.classList.remove('vp-routines-ready');
-    return true;
-  }
-
-  function restoreModernView(){
-    const app = APP();
-    if(!app || !restorePending || !cachedView || !isRoutinesActive()) return false;
-
-    restoring = true;
-    restorePending = false;
-    app.replaceChildren(cachedView);
-    cachedView = null;
-    restoring = false;
-
-    resetOpenSections(app);
-    const accordion = app.querySelector('#vp-routines-accordion');
-    if(accordion) cleanDuplicates(app, accordion);
-    app.classList.add('vp-routines-ready');
-    requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
-    return true;
-  }
-
-  function wakeMountObservers(){
-    const app = APP();
+  function wakeMount(){
+    const app=APP();
     if(!app || !isRoutinesActive() || hasModernView(app)) return;
     const marker=document.createElement('span');
     marker.hidden=true;
@@ -96,62 +43,45 @@
   }
 
   function evaluate(){
-    const app = APP();
+    const app=APP();
     if(!app) return;
-
     app.classList.remove('vp-routines-preparing');
 
-    if(!isRoutinesRoute()){
+    if(!isRoutinesActive()){
       app.classList.remove('vp-routines-ready');
       return;
     }
 
-    if(restoreModernView()) return;
+    cleanDuplicates(app);
+    const ready=hasModernView(app);
+    app.classList.toggle('vp-routines-ready',ready);
+    if(ready) return;
 
-    const accordion = app.querySelector('#vp-routines-accordion');
-    if(accordion) cleanDuplicates(app, accordion);
-
-    const complete = hasModernView(app);
-    app.classList.toggle('vp-routines-ready', complete);
-
-    if(!complete && isRoutinesActive()) wakeMountObservers();
+    wakeMount();
+    document.dispatchEvent(new CustomEvent('vitalpeak:routines-needs-mount'));
   }
 
   function schedule(delay=20){
     clearTimeout(timer);
-    timer = setTimeout(evaluate, delay);
+    timer=setTimeout(evaluate,delay);
   }
 
-  const start = () => {
-    const app = APP();
-    if(!app) return setTimeout(start, 30);
+  const start=()=>{
+    const app=APP();
+    if(!app) return setTimeout(start,30);
 
-    new MutationObserver(() => {
-      if(restoring) return;
-      if(restorePending && cachedView && isRoutinesActive()) {
-        restoreModernView();
-        return;
-      }
-      schedule();
-    }).observe(app,{childList:true,subtree:false});
-
+    new MutationObserver(()=>schedule()).observe(app,{childList:true,subtree:false});
     const tabbar=document.querySelector('.tabbar');
-    if(tabbar) new MutationObserver(() => schedule(0)).observe(tabbar,{subtree:true,attributes:true,attributeFilter:['class']});
+    if(tabbar) new MutationObserver(()=>schedule(0)).observe(tabbar,{subtree:true,attributes:true,attributeFilter:['class']});
 
     document.addEventListener('click',e=>{
       const target=e.target.closest('.tabbar [data-route]');
       if(!target) return;
-      const nextRoute=target.dataset.route;
-
-      if(isRoutinesActive() && nextRoute!=='routines') {
-        captureModernView();
-        return;
-      }
-
-      if(!isRoutinesActive() && nextRoute==='routines') {
-        // Cada entrada a Rutinas empieza con todas las secciones plegadas.
-        resetOpenSections();
-        if(cachedView) restorePending=true;
+      if(target.dataset.route==='routines'){
+        closeAll();
+        setTimeout(()=>schedule(0),0);
+        setTimeout(()=>schedule(0),80);
+        setTimeout(()=>schedule(0),220);
       }
     },true);
 
