@@ -2,7 +2,7 @@
   'use strict';
 
   const DB='vitalpeak-mobile', STORE='state', STYLE='vp-coach-intelligence-style';
-  let timer=null;
+  let timer=null,rendering=false;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 
@@ -20,6 +20,7 @@
 
   function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
   async function readState(){const db=await openDb();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get('user');q.onsuccess=()=>res(q.result||{});q.onerror=()=>rej(q.error)})}
+  function stateKey(state){const sessions=state.sessions||[],last=sessions.at(-1),sets=last?.sets||[],routines=state.routines||[];return `${sessions.length}|${last?.date||''}|${sets.length}|${sets.at(-1)?.at||''}|${state.activeRoutineId||''}|${routines.length}`}
 
   function activeRoutine(state){return (state.routines||[]).find(r=>String(r.id)===String(state.activeRoutineId))||(state.routines||[])[0]||null}
   function routineItems(r){if(!r)return[];const days=Array.isArray(r.days)?r.days:[];return days.flatMap(d=>d.items||[]).length?days.flatMap(d=>d.items||[]):(r.exercises||[])}
@@ -27,18 +28,7 @@
 
   function priorityAlias(muscle){
     const n=norm(muscle);
-    if(/pectoral|pecho/.test(n))return 'Pecho';
-    if(/dorsal|espalda|trapecio/.test(n))return 'Espalda';
-    if(/cuadriceps/.test(n))return 'Cuádriceps';
-    if(/isquio|femoral/.test(n))return 'Isquios';
-    if(/glute/.test(n))return 'Glúteos';
-    if(/deltoide lateral/.test(n))return 'Deltoide lateral';
-    if(/deltoide posterior/.test(n))return 'Deltoide posterior';
-    if(/biceps/.test(n))return 'Bíceps';
-    if(/triceps/.test(n))return 'Tríceps';
-    if(/gemelo|pantorrilla|soleo/.test(n))return 'Gemelos';
-    if(/core|abdom|oblicuo/.test(n))return 'Core';
-    return null;
+    if(/pectoral|pecho/.test(n))return 'Pecho';if(/dorsal|espalda|trapecio/.test(n))return 'Espalda';if(/cuadriceps/.test(n))return 'Cuádriceps';if(/isquio|femoral/.test(n))return 'Isquios';if(/glute/.test(n))return 'Glúteos';if(/deltoide lateral/.test(n))return 'Deltoide lateral';if(/deltoide posterior/.test(n))return 'Deltoide posterior';if(/biceps/.test(n))return 'Bíceps';if(/triceps/.test(n))return 'Tríceps';if(/gemelo|pantorrilla|soleo/.test(n))return 'Gemelos';if(/core|abdom|oblicuo/.test(n))return 'Core';return null;
   }
 
   function buildModel(state){
@@ -47,13 +37,7 @@
     const progression=window.VITALPEAK_PROGRESSION_ENGINE;
     const routine=activeRoutine(state), items=uniqueItems(routineItems(routine));
     const loadRecs=[];
-    if(progression){
-      for(const item of items){
-        const name=item.exercise||item.name;if(!name)continue;
-        const rec=progression.recommendation(state,name,{sets:item.sets,reps:item.reps});
-        if(rec.status!=='insufficient')loadRecs.push({name,...rec});
-      }
-    }
+    if(progression){for(const item of items){const name=item.exercise||item.name;if(!name)continue;const rec=progression.recommendation(state,name,{sets:item.sets,reps:item.reps});if(rec.status!=='insufficient')loadRecs.push({name,...rec})}}
     loadRecs.sort((a,b)=>({increase:0,review:1,hold:2}[a.status]??9)-({increase:0,review:1,hold:2}[b.status]??9));
     const muscleAlerts=(volume?.alerts||[]).filter(x=>['low','falling'].includes(x.status));
     const priorities=[...new Set(muscleAlerts.map(x=>priorityAlias(x.name)).filter(Boolean))].slice(0,3);
@@ -66,22 +50,25 @@
   }
 
   function cardHtml(model){
-    const p=model.progress;
-    const enough=(p?.usableCount||0)>0 || model.loadRecs.length || model.priorities.length;
+    const p=model.progress;const enough=(p?.usableCount||0)>0||model.loadRecs.length||model.priorities.length;
     if(!enough)return `<div class="vp-coach-empty">Todavía necesito más entrenamientos registrados para personalizar el Coach. Sigue guardando series y sesiones; cuando haya suficiente historial aparecerán aquí recomendaciones basadas en tus propios datos.</div>`;
-    const status=p?.label||'Analizando';
-    const summary=p?.summary||'He analizado tu historial reciente para personalizar las recomendaciones.';
+    const status=p?.label||'Analizando',summary=p?.summary||'He analizado tu historial reciente para personalizar las recomendaciones.';
     const rows=model.insights.map(x=>`<article class="vp-coach-rec ${x.type}"><div class="vp-coach-rec-top"><b>${esc(x.title)}</b><span>${esc(x.tag)}</span></div><p>${esc(x.text)}</p></article>`).join('');
     const priorityNote=model.priorities.length?`<div class="vp-coach-priority-note">Prioridades sugeridas para un nuevo plan: ${model.priorities.map(esc).join(' · ')}</div>`:'';
     return `<div class="vp-coach-intel-head"><div><h3>Coach basado en tus datos</h3><p>${esc(summary)}</p></div><span class="vp-coach-intel-badge">${esc(status)}</span></div>${rows?`<div class="vp-coach-intel-grid">${rows}</div>`:''}${priorityNote}<div class="vp-coach-intel-actions">${model.priorities.length?'<button type="button" class="vp-coach-apply" data-vp-coach-apply>Aplicar prioridades al plan</button>':''}<button type="button" class="vp-coach-open-progress" data-vp-coach-progress>Ver análisis completo</button></div>`;
   }
 
   async function enhance(){
-    styles();const root=document.querySelector('#vp-smart-generator');if(!root)return;
-    let card=root.querySelector('.vp-coach-intel');if(!card){card=document.createElement('section');card.className='vp-coach-intel';const teaser=root.querySelector('.vp-smart-teaser');teaser?.insertAdjacentElement('afterend',card)}
-    const state=await readState().catch(()=>null);if(!state)return;const model=buildModel(state);card.__vpModel=model;card.innerHTML=cardHtml(model);
+    if(rendering)return;styles();const root=document.querySelector('#vp-smart-generator');if(!root)return;rendering=true;
+    try{
+      const state=await readState().catch(()=>null);if(!state)return;const key=stateKey(state);
+      let card=root.querySelector('.vp-coach-intel');
+      if(card?.dataset.vpStateKey===key)return;
+      if(!card){card=document.createElement('section');card.className='vp-coach-intel';const teaser=root.querySelector('.vp-smart-teaser');teaser?.insertAdjacentElement('afterend',card)}
+      const model=buildModel(state);card.__vpModel=model;card.dataset.vpStateKey=key;card.innerHTML=cardHtml(model);
+    } finally {rendering=false}
   }
-  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,100)}
+  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,140)}
 
   document.addEventListener('click',e=>{
     const apply=e.target.closest('[data-vp-coach-apply]');if(apply){e.preventDefault();const card=apply.closest('.vp-coach-intel'),model=card?.__vpModel;if(!model)return;document.querySelector('[data-vp-smart-open]')?.click();setTimeout(()=>{const form=document.querySelector('#vp-smart-form');if(!form)return;form.querySelectorAll('input[name="priority"]').forEach(i=>{i.checked=model.priorities.includes(i.value)});let note=form.querySelector('.vp-coach-applied-note');if(!note){note=document.createElement('div');note.className='vp-coach-priority-note vp-coach-applied-note';form.querySelector('.vp-priority')?.insertAdjacentElement('afterend',note)}if(note)note.textContent=`VitalPeak ha marcado como prioridad: ${model.priorities.join(', ')}. Puedes cambiarlo antes de generar el plan.`;form.scrollIntoView({behavior:'smooth',block:'start'})},120);return}
