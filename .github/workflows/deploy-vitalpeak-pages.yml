@@ -87,27 +87,42 @@ jobs:
           grep -q '"volumeEngine"' mobile/catalog-data.js
           grep -q '"exerciseSelector"' mobile/catalog-data.js
           grep -q '"routineEngine"' mobile/catalog-data.js
+
+          # El exportador antiguo añadía aquí una segunda carga asíncrona de varios
+          # módulos de Rutinas. Se elimina del artefacto y todos los módulos se cargan
+          # una única vez, de forma secuencial, en el bloque de abajo.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/catalog-data.js')
+          lines = p.read_text(encoding='utf-8').splitlines()
+          legacy = "for (const src of ['./routine-enhancements.js?v=36'"
+          lines = [line for line in lines if legacy not in line]
+          p.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
           cat >> mobile/catalog-data.js <<'JS'
-          
           ;(async()=>{
             const scripts=[
-              "./routines-transition-guard.js?v=6",
-              "./routines-render-gate.js?v=4",
-              "./routine-generator-ui.js?v=1",
-              "./coach-anchor-fix.js?v=5",
-              "./routine-navigation-fix.js?v=1",
-              "./routines-accordion.js?v=4",
-              "./routines-redesign.js?v=5",
-              "./routines-ui-repair.js?v=3",
-              "./routine-active-ux.js?v=2",
-              "./personal-routines-actions.js?v=2",
+              "./routine-enhancements.js?v=37",
+              "./routine-generator-ui.js?v=5",
+              "./routine-muscle-filter.js?v=37",
+              "./routine-navigation-fix.js?v=37",
+              "./routines-accordion.js?v=37",
+              "./routines-render-gate.js?v=5",
+              "./coach-anchor-fix.js?v=6",
+              "./routines-redesign.js?v=6",
+              "./routines-ui-repair.js?v=4",
+              "./routine-active-ux.js?v=3",
+              "./personal-routines-actions.js?v=3",
+              "./calendar-mobile.js?v=37",
+              "./calendar-recurrence-ui.js?v=4",
+              "./training-intelligence.js?v=37",
               "./progression-engine-v1.js?v=1",
               "./training-session-ui.js?v=1",
               "./training-entry-assist.js?v=1",
               "./training-rir-progression.js?v=1",
               "./training-set-management.js?v=1",
               "./training-completion-history.js?v=2",
-              "./calendar-recurrence-ui.js?v=3",
               "./progress-engine-v1.js?v=1",
               "./muscle-volume-engine-v1.js?v=1",
               "./coach-intelligence.js?v=2",
@@ -135,23 +150,34 @@ jobs:
             }
           })().catch(console.error);
           JS
-          grep -q 'routines-transition-guard.js' mobile/catalog-data.js
-          grep -q 'routines-render-gate.js' mobile/catalog-data.js
+
+          # No debe quedar el cargador antiguo ni scripts duplicados del exportador.
+          ! grep -q "routine-enhancements.js?v=36" mobile/catalog-data.js
+          ! grep -q "routines-transition-guard.js" mobile/catalog-data.js
+          test "$(grep -o 'routine-generator-ui.js' mobile/catalog-data.js | wc -l)" -eq 1
+          test "$(grep -o 'routine-navigation-fix.js' mobile/catalog-data.js | wc -l)" -eq 1
+          test "$(grep -o 'routines-accordion.js' mobile/catalog-data.js | wc -l)" -eq 1
+
+          grep -q 'routine-enhancements.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
-          grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
+          grep -q 'routine-muscle-filter.js' mobile/catalog-data.js
           grep -q 'routine-navigation-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
+          grep -q 'routines-render-gate.js' mobile/catalog-data.js
+          grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
           grep -q 'routines-ui-repair.js' mobile/catalog-data.js
           grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
+          grep -q 'calendar-mobile.js' mobile/catalog-data.js
+          grep -q 'calendar-recurrence-ui.js' mobile/catalog-data.js
+          grep -q 'training-intelligence.js' mobile/catalog-data.js
           grep -q 'progression-engine-v1.js' mobile/catalog-data.js
           grep -q 'training-session-ui.js' mobile/catalog-data.js
           grep -q 'training-entry-assist.js' mobile/catalog-data.js
           grep -q 'training-rir-progression.js' mobile/catalog-data.js
           grep -q 'training-set-management.js' mobile/catalog-data.js
           grep -q 'training-completion-history.js' mobile/catalog-data.js
-          grep -q 'calendar-recurrence-ui.js' mobile/catalog-data.js
           grep -q 'progress-engine-v1.js' mobile/catalog-data.js
           grep -q 'muscle-volume-engine-v1.js' mobile/catalog-data.js
           grep -q 'coach-intelligence.js' mobile/catalog-data.js
