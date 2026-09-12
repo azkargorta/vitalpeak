@@ -101,6 +101,7 @@ jobs:
               "./personal-routines-actions.js?v=2",
               "./training-session-ui.js?v=1",
               "./training-entry-assist.js?v=1",
+              "./training-set-management.js?v=1",
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
               "./progress-management.js?v=4",
@@ -132,6 +133,7 @@ jobs:
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
           grep -q 'training-session-ui.js' mobile/catalog-data.js
           grep -q 'training-entry-assist.js' mobile/catalog-data.js
+          grep -q 'training-set-management.js' mobile/catalog-data.js
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
           grep -q 'progress-management.js' mobile/catalog-data.js
