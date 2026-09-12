@@ -2,6 +2,7 @@
   'use strict';
 
   const STYLE_ID='vp-routines-transition-guard-style';
+  const LOADER_ID='vp-routines-loading';
   const APP=()=>document.getElementById('app');
   let releaseTimer=null, retryTimer=null, rafId=null, token=0;
 
@@ -10,10 +11,32 @@
     const s=document.createElement('style');
     s.id=STYLE_ID;
     s.textContent=`
-      #app.vp-routines-transition{visibility:hidden!important;pointer-events:none!important}
+      #${LOADER_ID}{position:fixed;inset:0 0 calc(78px + env(safe-area-inset-bottom)) 0;z-index:640;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#f5fbf9 0%,#edf6f3 100%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,visibility .12s ease}
+      #${LOADER_ID}.show{opacity:1;visibility:visible}
+      #${LOADER_ID} .vp-routines-loading-card{display:grid;justify-items:center;gap:12px;width:min(310px,86vw);padding:28px 22px;border:1px solid rgba(22,169,142,.14);border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 14px 38px rgba(16,46,56,.08);text-align:center}
+      #${LOADER_ID} .vp-routines-spinner{width:34px;height:34px;border:3px solid #d9ebe6;border-top-color:#16a98e;border-radius:50%;animation:vp-routines-spin .72s linear infinite}
+      #${LOADER_ID} b{font-size:17px;color:#153f49;letter-spacing:-.02em}
+      #${LOADER_ID} span{font-size:12px;line-height:1.45;color:#73878c}
+      @keyframes vp-routines-spin{to{transform:rotate(360deg)}}
+      @media(prefers-reduced-motion:reduce){#${LOADER_ID} .vp-routines-spinner{animation-duration:1.4s}}
     `;
     document.head.appendChild(s);
   }
+
+  function loader(){
+    let el=document.getElementById(LOADER_ID);
+    if(el) return el;
+    el=document.createElement('div');
+    el.id=LOADER_ID;
+    el.setAttribute('role','status');
+    el.setAttribute('aria-live','polite');
+    el.innerHTML='<div class="vp-routines-loading-card"><i class="vp-routines-spinner" aria-hidden="true"></i><b>Cargando rutinas…</b><span>Preparando tu rutina activa y tus planes.</span></div>';
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showLoader(){ styles(); loader().classList.add('show'); }
+  function hideLoader(){ document.getElementById(LOADER_ID)?.classList.remove('show'); }
 
   function stopWatch(){
     if(rafId){cancelAnimationFrame(rafId);rafId=null;}
@@ -23,7 +46,7 @@
 
   function release(){
     stopWatch();
-    APP()?.classList.remove('vp-routines-transition');
+    hideLoader();
   }
 
   function isActive(){
@@ -34,19 +57,17 @@
     const app=APP();
     if(!app || !isActive()) return false;
     const accordion=app.querySelector('#vp-routines-accordion');
+    const activeCard=app.querySelector('.vp-routines-active');
     const redesigned=app.classList.contains('vp-routines-page');
     const summaries=accordion?[...accordion.querySelectorAll('.vp-routine-section > summary')]:[];
-    const polished=summaries.length>=4 && summaries.every(x=>x.dataset.vpPolished==='1' || x.querySelector('.vp-section-title'));
-    return !!(redesigned && accordion && polished);
+    const polished=summaries.length>=6 && summaries.every(x=>x.dataset.vpPolished==='1' || x.querySelector('.vp-section-title'));
+    return !!(redesigned && activeCard && accordion && polished);
   }
 
   function wakeRoutinesEnhancers(){
     const app=APP();
     if(!app || !isActive() || ready()) return;
-
-    // Si seguimos viendo el render base antiguo, provocamos un único cambio de hijo
-    // para despertar los observers de accordion/redesign sin tocar el contenido real.
-    if(!app.querySelector('#vp-routines-accordion') && /Planes preparados|Catálogo de ejercicios/.test(app.textContent||'')){
+    if(!app.querySelector('#vp-routines-accordion') && /Planes preparados|Catálogo de ejercicios|Planes y ejercicios/.test(app.textContent||'')){
       const marker=document.createElement('i');
       marker.hidden=true;
       marker.dataset.vpRoutinesWake='1';
@@ -56,20 +77,17 @@
   }
 
   function begin(){
-    styles();
     token+=1;
     const myToken=token;
     stopWatch();
-    const app=APP();
-    if(!app) return;
-    app.classList.add('vp-routines-transition');
+    showLoader();
 
     wakeRoutinesEnhancers();
     retryTimer=setInterval(()=>{
       if(myToken!==token || !isActive()){release();return;}
       if(ready()){release();return;}
       wakeRoutinesEnhancers();
-    },90);
+    },80);
 
     const check=()=>{
       if(myToken!==token) return;
@@ -79,11 +97,11 @@
     };
     rafId=requestAnimationFrame(check);
 
-    // Tiempo suficiente para que carguen las capas auxiliares, pero nunca puede
-    // bloquear indefinidamente la pantalla si hay un fallo real.
-    releaseTimer=setTimeout(()=>{ if(myToken===token) release(); },2200);
+    // Fail-open: si una capa falla, nunca dejamos al usuario atrapado en "Cargando".
+    releaseTimer=setTimeout(()=>{ if(myToken===token) release(); },3000);
   }
 
+  // pointerdown ocurre antes que el click del router: cubrimos la vista antigua antes de que se pinte.
   document.addEventListener('pointerdown',e=>{
     const tab=e.target.closest?.('.tabbar [data-route]');
     if(!tab) return;
