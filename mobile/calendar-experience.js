@@ -2,7 +2,7 @@
   'use strict';
 
   const DB_NAME='vitalpeak-mobile', STORE='state', STYLE_ID='vp-calendar-experience-styles';
-  let timer=null;
+  let timer=null, rendering=false;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const today=()=>new Date().toISOString().slice(0,10);
 
@@ -78,8 +78,13 @@
     if(!to||to===from)return;state.plan=state.plan||{};const old=entries(state,from),key=old[index];if(!key)return;old.splice(index,1);if(old.length)state.plan[from]=old;else delete state.plan[from];const dest=entries(state,to);if(!dest.includes(key))dest.push(key);state.plan[to]=dest;await writeState(state);sessionStorage.setItem('vitalpeak:return-to-planner','1');location.reload();
   }
 
-  async function enhance(){injectStyles();const cal=document.querySelector('.month-calendar');if(!cal)return;const state=await readState().catch(()=>null);if(!state)return;addWeekStrip(state,cal);enhanceMonth(state,cal)}
-  function schedule(){clearTimeout(timer);timer=setTimeout(enhance,90)}
+  async function enhance(){
+    if(rendering)return;
+    const cal=document.querySelector('.month-calendar');if(!cal)return;
+    rendering=true;
+    try{injectStyles();const state=await readState().catch(()=>null);if(!state||!document.contains(cal)||!document.querySelector('.month-calendar'))return;addWeekStrip(state,cal);enhanceMonth(state,cal)}finally{rendering=false}
+  }
+  function schedule(){clearTimeout(timer);if(!document.querySelector('.month-calendar'))return;timer=setTimeout(enhance,45)}
 
   document.addEventListener('click',e=>{
     const open=e.target.closest('[data-vp-open-day]');if(open){e.preventDefault();readState().then(s=>openDay(s,open.dataset.vpOpenDay)).catch(()=>{});return}
@@ -89,5 +94,7 @@
   document.addEventListener('change',e=>{const input=e.target.closest('[data-vp-move-entry]');if(!input)return;readState().then(s=>moveEntry(s,input.dataset.fromDate,Number(input.dataset.vpMoveEntry),input.value)).catch(()=>{})},true);
 
   if(sessionStorage.getItem('vitalpeak:return-to-planner')==='1'){sessionStorage.removeItem('vitalpeak:return-to-planner');let n=0;const t=setInterval(()=>{const b=document.querySelector('[data-route="planner"]');if(b){clearInterval(t);b.click()}else if(++n>80)clearInterval(t)},50)}
-  const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:true});schedule();
+  const app=document.getElementById('app');if(app)new MutationObserver(schedule).observe(app,{childList:true,subtree:false});
+  const tabs=document.querySelector('.tabbar');if(tabs)new MutationObserver(schedule).observe(tabs,{attributes:true,subtree:true,attributeFilter:['class']});
+  schedule();
 })();
