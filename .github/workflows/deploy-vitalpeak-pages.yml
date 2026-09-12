@@ -110,6 +110,7 @@ jobs:
               "./progress-engine-v1.js?v=1",
               "./muscle-volume-engine-v1.js?v=1",
               "./coach-intelligence.js?v=1",
+              "./coach-routine-adaptation.js?v=1",
               "./progress-redesign.js?v=3",
               "./progress-intelligence-ui.js?v=1",
               "./muscle-volume-ui.js?v=1",
@@ -152,6 +153,7 @@ jobs:
           grep -q 'progress-engine-v1.js' mobile/catalog-data.js
           grep -q 'muscle-volume-engine-v1.js' mobile/catalog-data.js
           grep -q 'coach-intelligence.js' mobile/catalog-data.js
+          grep -q 'coach-routine-adaptation.js' mobile/catalog-data.js
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-intelligence-ui.js' mobile/catalog-data.js
           grep -q 'muscle-volume-ui.js' mobile/catalog-data.js
