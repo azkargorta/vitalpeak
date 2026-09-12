@@ -4,7 +4,7 @@
   const STYLE_ID='vp-routines-transition-guard-style';
   const LOADER_ID='vp-routines-loading';
   const APP=()=>document.getElementById('app');
-  let releaseTimer=null, retryTimer=null, rafId=null, token=0;
+  let retryTimer=null, rafId=null, slowTimer=null, token=0;
 
   function styles(){
     if(document.getElementById(STYLE_ID)) return;
@@ -12,7 +12,7 @@
     s.id=STYLE_ID;
     s.textContent=`
       #${LOADER_ID}{position:fixed;inset:0 0 calc(78px + env(safe-area-inset-bottom)) 0;z-index:640;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,#f5fbf9 0%,#edf6f3 100%);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,visibility .12s ease}
-      #${LOADER_ID}.show{opacity:1;visibility:visible}
+      #${LOADER_ID}.show{opacity:1;visibility:visible;pointer-events:auto}
       #${LOADER_ID} .vp-routines-loading-card{display:grid;justify-items:center;gap:12px;width:min(310px,86vw);padding:28px 22px;border:1px solid rgba(22,169,142,.14);border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 14px 38px rgba(16,46,56,.08);text-align:center}
       #${LOADER_ID} .vp-routines-spinner{width:34px;height:34px;border:3px solid #d9ebe6;border-top-color:#16a98e;border-radius:50%;animation:vp-routines-spin .72s linear infinite}
       #${LOADER_ID} b{font-size:17px;color:#153f49;letter-spacing:-.02em}
@@ -30,18 +30,24 @@
     el.id=LOADER_ID;
     el.setAttribute('role','status');
     el.setAttribute('aria-live','polite');
-    el.innerHTML='<div class="vp-routines-loading-card"><i class="vp-routines-spinner" aria-hidden="true"></i><b>Cargando rutinas…</b><span>Preparando tu rutina activa y tus planes.</span></div>';
+    el.innerHTML='<div class="vp-routines-loading-card"><i class="vp-routines-spinner" aria-hidden="true"></i><b>Cargando rutinas…</b><span data-vp-routines-loading-text>Preparando tu rutina activa y tus planes.</span></div>';
     document.body.appendChild(el);
     return el;
   }
 
-  function showLoader(){ styles(); loader().classList.add('show'); }
+  function showLoader(){
+    styles();
+    const el=loader();
+    const text=el.querySelector('[data-vp-routines-loading-text]');
+    if(text) text.textContent='Preparando tu rutina activa y tus planes.';
+    el.classList.add('show');
+  }
   function hideLoader(){ document.getElementById(LOADER_ID)?.classList.remove('show'); }
 
   function stopWatch(){
     if(rafId){cancelAnimationFrame(rafId);rafId=null;}
-    if(releaseTimer){clearTimeout(releaseTimer);releaseTimer=null;}
     if(retryTimer){clearInterval(retryTimer);retryTimer=null;}
+    if(slowTimer){clearTimeout(slowTimer);slowTimer=null;}
   }
 
   function release(){
@@ -97,8 +103,14 @@
     };
     rafId=requestAnimationFrame(check);
 
-    // Fail-open: si una capa falla, nunca dejamos al usuario atrapado en "Cargando".
-    releaseTimer=setTimeout(()=>{ if(myToken===token) release(); },3000);
+    // Nunca mostramos la vista antigua como fallback. Si tarda, mantenemos la carga
+    // hasta que la interfaz nueva esté realmente lista. La barra inferior queda libre
+    // para que el usuario pueda salir de Rutinas en cualquier momento.
+    slowTimer=setTimeout(()=>{
+      if(myToken!==token || !isActive() || ready()) return;
+      const text=document.querySelector(`#${LOADER_ID} [data-vp-routines-loading-text]`);
+      if(text) text.textContent='Está tardando un poco más. Terminando de preparar tus rutinas…';
+    },3000);
   }
 
   // pointerdown ocurre antes que el click del router: cubrimos la vista antigua antes de que se pinte.
