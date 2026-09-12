@@ -94,8 +94,10 @@ jobs:
               "./routines-render-gate.js?v=2",
               "./routine-generator-ui.js?v=1",
               "./coach-anchor-fix.js?v=4",
+              "./routine-navigation-fix.js?v=1",
               "./routines-accordion.js?v=4",
               "./routines-redesign.js?v=5",
+              "./routine-active-ux.js?v=1",
               "./personal-routines-actions.js?v=2",
               "./progress-redesign.js?v=3",
               "./progress-logo-fix.js?v=1",
@@ -121,8 +123,10 @@ jobs:
           grep -q 'routines-render-gate.js' mobile/catalog-data.js
           grep -q 'routine-generator-ui.js' mobile/catalog-data.js
           grep -q 'coach-anchor-fix.js' mobile/catalog-data.js
+          grep -q 'routine-navigation-fix.js' mobile/catalog-data.js
           grep -q 'routines-accordion.js' mobile/catalog-data.js
           grep -q 'routines-redesign.js' mobile/catalog-data.js
+          grep -q 'routine-active-ux.js' mobile/catalog-data.js
           grep -q 'personal-routines-actions.js' mobile/catalog-data.js
           grep -q 'progress-redesign.js' mobile/catalog-data.js
           grep -q 'progress-logo-fix.js' mobile/catalog-data.js
