@@ -97,7 +97,7 @@ jobs:
               "./routine-navigation-fix.js?v=1",
               "./routines-accordion.js?v=4",
               "./routines-redesign.js?v=5",
-              "./routines-ui-repair.js?v=1",
+              "./routines-ui-repair.js?v=2",
               "./routine-active-ux.js?v=1",
               "./personal-routines-actions.js?v=2",
               "./progression-engine-v1.js?v=1",
